@@ -21,14 +21,11 @@ jobs:
 
   steps:
   - checkout: self
-    submodules: false
 
   - task: AzureStaticWebApp@0
-    displayName: Build and Deploy Static Web App
     inputs:
       azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN_GRAY_ISLAND_0DE03D10F)
-
-      # ⬇️ KRITIČNE PUTANJE (tačne za tvoj repo)
       app_location: "frontend"
       api_location: ""
       output_location: "dist"
+
