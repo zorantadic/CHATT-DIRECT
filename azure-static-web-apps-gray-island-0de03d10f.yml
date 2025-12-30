@@ -1,4 +1,4 @@
-name: azure-static-web-apps-gray-island-0de03d10f
+name: Azure Static Web Apps CI/CD
 
 trigger:
   branches:
