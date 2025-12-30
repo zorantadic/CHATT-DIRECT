@@ -192,7 +192,7 @@ After finishing the text, stop speaking and wait silently.`
         <h2 style={{ margin: 0 }}>Manual Voice (TEXT → VOICE)</h2>
         <button
           onClick={() =>
-            window.open("http://localhost:3000/", "VoiceFrontend", "noopener,noreferrer")
+            window.open(import.meta.env.VITE_VOICECHAT_URL, "VoiceFrontend", "noopener,noreferrer")
           }
           style={{ marginLeft: 8 }}
         >
