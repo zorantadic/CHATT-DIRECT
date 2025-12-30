@@ -1,4 +1,4 @@
-name: azure-static-web-apps-gray-island-0de03d10f
+name: Azure Static Web Apps CI/CD
 
 trigger:
   branches:
@@ -16,15 +16,6 @@ jobs:
   pool:
     vmImage: ubuntu-latest
 
-  variables:
-    VITE_REALTIME_HTTP: https://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io
-    VITE_REALTIME_WS: wss://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io/voice/ws
-
-    VITE_ORCH_HTTP: https://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io
-    VITE_ORCH_CONTROL_WS: wss://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io/v1/control
-
-    VITE_STT_WS: wss://chatt-speech.yellowdesert-835dd921.eastus2.azurecontainerapps.io/stt/ws
-
   steps:
   - checkout: self
 
@@ -34,3 +25,11 @@ jobs:
       app_location: "frontend"
       api_location: ""
       output_location: "dist"
+    env:
+      VITE_REALTIME_HTTP: https://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io
+      VITE_REALTIME_WS: wss://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io/voice/ws
+
+      VITE_ORCH_HTTP: https://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io
+      VITE_ORCH_CONTROL_WS: wss://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io/v1/control
+
+      VITE_STT_WS: wss://chatt-speech.yellowdesert-835dd921.eastus2.azurecontainerapps.io/stt/ws
