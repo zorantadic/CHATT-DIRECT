@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const BACKEND_HTTP = "http://127.0.0.1:50505";
+const BACKEND_HTTP = import.meta.env.VITE_REALTIME_HTTP;
 
 type Props = {
   onBack: () => void;

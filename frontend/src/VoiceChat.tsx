@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import InstructionsPage from "./InstructionsPage";
 
-const REALTIME_HTTP = "http://127.0.0.1:50505";
-const REALTIME_WS = "ws://127.0.0.1:50505/voice/ws";
+const REALTIME_HTTP = import.meta.env.VITE_REALTIME_HTTP;
+const REALTIME_WS = import.meta.env.VITE_REALTIME_WS;
 
-const ORCH_HTTP = "http://127.0.0.1:50506";
-const ORCH_CONTROL_WS = (sid: string) => `ws://127.0.0.1:50506/v1/control/${sid}`;
+const ORCH_HTTP = import.meta.env.VITE_ORCH_HTTP;
+const ORCH_CONTROL_WS = (sid: string) =>
+  `${import.meta.env.VITE_ORCH_CONTROL_WS}/${sid}`;
 
-const STT_WS = (sid: string) => `ws://127.0.0.1:50507/stt/ws/${sid}`;
+const STT_WS = (sid: string) =>
+  `${import.meta.env.VITE_STT_WS}/${sid}`;
+
 
 type InstructionsResp = {
   current: string;
