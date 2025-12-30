@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-const MANUAL_WS = "ws://127.0.0.1:50605/manual/ws";
-const SAVE_URL = "http://127.0.0.1:50605/manual/answers";
-const LOAD_URL = "http://127.0.0.1:50605/manual/answers";
+const MANUAL_HTTP = import.meta.env.VITE_MANUAL_HTTP;
+const MANUAL_WS = MANUAL_HTTP.replace("https://", "wss://") + "/manual/ws";
+const SAVE_URL = MANUAL_HTTP + "/manual/answers";
+const LOAD_URL = MANUAL_HTTP + "/manual/answers";
+
 
 type ServerMsg =
   | { type: "audio"; data: string; sample_rate: number; channels: number }
