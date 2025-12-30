@@ -1,4 +1,4 @@
-name: Azure Static Web Apps CI/CD
+name: azure-static-web-apps-gray-island-0de03d10f
 
 trigger:
   branches:
@@ -17,20 +17,20 @@ jobs:
     vmImage: ubuntu-latest
 
   variables:
-  - group: Azure-Static-Web-Apps-gray-island-0de03d10f-variable-group
+    VITE_REALTIME_HTTP: https://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io
+    VITE_REALTIME_WS: wss://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io/voice/ws
+
+    VITE_ORCH_HTTP: https://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io
+    VITE_ORCH_CONTROL_WS: wss://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io/v1/control
+
+    VITE_STT_WS: wss://chatt-speech.yellowdesert-835dd921.eastus2.azurecontainerapps.io/stt/ws
 
   steps:
   - checkout: self
 
   - task: AzureStaticWebApp@0
-    displayName: Build and Deploy Static Web App
     inputs:
       azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN_GRAY_ISLAND_0DE03D10F)
       app_location: "frontend"
       api_location: ""
       output_location: "dist"
-    env:
-      VITE_SPEECH_BASE_URL: $(VITE_SPEECH_BASE_URL)
-      VITE_REALTIME_BASE_URL: $(VITE_REALTIME_BASE_URL)
-      VITE_ORCHESTRATOR_BASE_URL: $(VITE_ORCHESTRATOR_BASE_URL)
-      VITE_MANUAL_BASE_URL: $(VITE_MANUAL_BASE_URL)
