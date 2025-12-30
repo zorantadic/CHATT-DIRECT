@@ -1,36 +1,29 @@
 name: Azure Static Web Apps CI/CD
-
-trigger:
-  branches:
-    include:
-      - main
-
 pr:
   branches:
     include:
       - main
-
+trigger:
+  branches:
+    include:
+      - main
 jobs:
 - job: build_and_deploy_job
-  displayName: Build and Deploy Frontend (SWA)
+  displayName: Build and Deploy Job
+  condition: or(eq(variables['Build.Reason'], 'Manual'),or(eq(variables['Build.Reason'], 'PullRequest'),eq(variables['Build.Reason'], 'IndividualCI')))
   pool:
     vmImage: ubuntu-latest
-
   variables:
-    VITE_REALTIME_HTTP: https://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io
-    VITE_REALTIME_WS: wss://chatt-realtime.yellowdesert-835dd921.eastus2.azurecontainerapps.io/voice/ws
-
-    VITE_ORCH_HTTP: https://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io
-    VITE_ORCH_CONTROL_WS: wss://chatt-orchestrator.yellowdesert-835dd921.eastus2.azurecontainerapps.io/v1/control
-
-    VITE_STT_WS: wss://chatt-speech.yellowdesert-835dd921.eastus2.azurecontainerapps.io/stt/ws
-
+  - group: Azure-Static-Web-Apps-gray-island-0de03d10f-variable-group
   steps:
   - checkout: self
-
+    submodules: true
   - task: AzureStaticWebApp@0
     inputs:
       azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN_GRAY_ISLAND_0DE03D10F)
-      app_location: "frontend"
-      api_location: ""
-      output_location: "dist"
+###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
+# For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
+      app_location: "frontend" # App source code path
+      api_location: "" # Api source code path - optional
+      output_location: "dist" # Built app content directory - optional
+###### End of Repository/Build Configurations ######
