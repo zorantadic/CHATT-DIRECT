@@ -1,0 +1,87 @@
+# Ignore everything by default
+*
+
+# Allow core project files
+!.gitignore
+!README.md
+!CHATT_CANONICAL_PROJECT_STATE.md
+!SETUP.md
+!README_SETUP.txt
+!docker-compose.yml
+!start_all.ps1
+!stop_all.ps1
+!chatt.code-workspace
+
+# Allow backend and Desktop app
+!backend/
+!backend/**
+!Desktop/
+!Desktop/**
+
+# Keep already tracked web folders visible
+!frontend/
+!frontend/**
+!manual-frontend/
+!manual-frontend/**
+
+# Ignore secrets / environment files
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!backend/.env.example
+
+# Ignore Python runtime/cache
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+
+# Ignore Node/Electron generated folders
+**/node_modules/
+**/dist/
+**/build/
+**/.vite/
+**/.cache/
+
+# Ignore logs
+*.log
+logs/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# Ignore OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Ignore archives / exports
+*.zip
+*.7z
+*.rar
+*.tar
+*.gz
+
+# Ignore local runtime data
+.electron-userdata/
+Desktop/.electron-userdata/
+
+# Ignore out-of-scope project folders for now
+Manual-desktop/
+DesktopMic/
+manual-backend/
+deploy/
+.lh/
+
+# Ignore temporary/local test JSON files
+cm_test.json
+cost_foundry.json
+cv.json
+query.json
+Desktop/.electron-userdata/

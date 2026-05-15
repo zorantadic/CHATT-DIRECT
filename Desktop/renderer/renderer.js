@@ -1,0 +1,2494 @@
+/* global electronAPI */
+(function () {
+  const DEFAULTS = {
+    STT_WS_BASE: "wss://chatt-speech.ashyglacier-62457361.eastus2.azurecontainerapps.io/stt/ws",
+    ORCH_HTTP: "https://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io",
+    ORCH_CONTROL_WS_BASE: "wss://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io/v1/control",
+    REALTIME_HTTP: "https://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io",
+    REALTIME_WS: "wss://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io/voice/ws",
+  };
+  // Persisted settings
+  const LS_RT_DEVICE_ID = "chatt.rtOutputDeviceId";
+  const LS_RT_DEVICE_LABEL = "chatt.rtOutputDeviceLabel";
+  const LS_RT_DEVICE_PREFERRED_LABEL = "chatt.rtPreferredDeviceLabel";
+  // STT production settings
+  const LS_STT_ENABLED = "chatt.sttEnabled";
+  const LS_STT_LANGUAGE = "chatt.sttLanguage";
+  // Endpoints (settings page)
+  const LS_STT_BASE = "chatt.settings.sttBase";
+  const LS_ORCH_HTTP = "chatt.settings.orchHttp";
+  const LS_CONTROL_BASE = "chatt.settings.controlBase";
+  const LS_RT_HTTP = "chatt.settings.rtHttp";
+  const LS_RT_WS = "chatt.settings.rtWs";
+  // Auth (optional)
+  const LS_AUTH_TOKEN = "chatt.auth.bearerToken";
+  const SUPPORTED_LANGS = ["en-US", "sr-RS", "es-ES", "de-DE", "hr-HR"];
+  const DEFAULT_LANG = "en-US";
+// Voice output settings (Paket 1)
+const LS_VOICE_ENGINE = "chatt.voice.engine";       // "realtime" | "tts"
+const LS_REALTIME_RATE = "chatt.realtime.rate";     // "1" | "0.9" | "0.8"
+const LS_INSTR_TARGET = "chatt.instructions.target"; // "realtime" | "tts" | "stt" | "agent1"
+const ALLOWED_VOICE_ENGINES = ["realtime", "tts"];
+const DEFAULT_VOICE_ENGINE = "realtime";
+const ALLOWED_REALTIME_RATES = ["1", "0.9", "0.8"];
+const DEFAULT_REALTIME_RATE = "1";
+  // HARD REQUIREMENT: Realtime audio must go to headphones only.
+  const REALTIME_HEADPHONES_ONLY = true;
+  const FIXED_RULES =
+`RULES:
+Answer only the provided question.
+Do not ask questions.
+Do not introduce new topics.`;
+  const $ = (id) => document.getElementById(id);
+  // ------------------------------
+  // Logging
+  // ------------------------------
+  const logEl = $("log");
+  const logFilterEl = $("logFilter");
+  const logAutoscrollEl = $("logAutoscroll");
+  const btnLogCopy = $("btnLogCopy");
+  const btnLogClear = $("btnLogClear");
+  const btnLogDownload = $("btnLogDownload");
+  const logLines = [];
+  let logFilter = "";
+  let logAutoscroll = true;
+  function renderLog() {
+    if (!logEl) return;
+    const f = (logFilter || "").toLowerCase();
+    const visible = f ? logLines.filter((ln) => ln.toLowerCase().includes(f)) : logLines;
+    logEl.textContent = visible.join("\n") + (visible.length ? "\n" : "");
+    if (logAutoscroll) logEl.scrollTop = logEl.scrollHeight;
+  }
+  function push(m) {
+    const ts = new Date().toISOString();
+    const line = `${ts}  ${m}`;
+    logLines.push(line);
+    if (logLines.length > 5000) logLines.shift();
+    if (!logEl) return;
+    const f = (logFilter || "").toLowerCase();
+    if (!f) {
+      // Fast path: append
+      logEl.textContent += line + "\n";
+      if (logAutoscroll) logEl.scrollTop = logEl.scrollHeight;
+      return;
+    }
+    // Filtered view: re-render
+    renderLog();
+  }
+  function setPill(id, state, text) {
+    const el = $(id);
+    if (!el) return;
+    el.classList.remove("ok", "warn", "bad");
+    el.classList.add(state);
+    el.textContent = text;
+  }
+  // ------------------------------
+  // Navigation (Views)
+  // ------------------------------
+  const viewVoice = $("viewVoice");
+  const viewSettings = $("viewSettings");
+  const viewInstructions = $("viewInstructions");
+  const navVoice = $("navVoice");
+  const navSettings = $("navSettings");
+  const navInstructions = $("navInstructions");
+  // Voice view: instructions preview panel
+  const voiceInstrTextEl = $("voiceInstrText");
+  const voiceInstrUpdatedAtEl = $("voiceInstrUpdatedAt");
+  const btnVoiceCopyInstr = $("btnVoiceCopyInstr");
+  const btnVoiceOpenInstr = $("btnVoiceOpenInstr");
+  function setActiveNav(btn) {
+    for (const b of [navVoice, navSettings, navInstructions]) {
+      if (!b) continue;
+      b.classList.toggle("active", b === btn);
+    }
+  }
+  function setActiveView(name) {
+    if (viewVoice) viewVoice.classList.toggle("active", name === "voice");
+    if (viewSettings) viewSettings.classList.toggle("active", name === "settings");
+    if (viewInstructions) viewInstructions.classList.toggle("active", name === "instructions");
+    if (name === "voice") { setActiveNav(navVoice); updateVoiceInstructionsUI(); }
+    if (name === "settings") setActiveNav(navSettings);
+    if (name === "instructions") setActiveNav(navInstructions);
+    if (name === "instructions") {
+      // Lazy-load profiles + refresh instructions UI when user opens the page.
+      try { refreshInstructionsPage().catch(() => {}); } catch {}
+    }
+  }
+  if (navVoice) navVoice.addEventListener("click", () => setActiveView("voice"));
+  if (btnVoiceOpenInstr) btnVoiceOpenInstr.addEventListener("click", () => setActiveView("instructions"));
+  if (btnVoiceCopyInstr) btnVoiceCopyInstr.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(getEffectiveInstructionsForEngine().toString());
+      push("Instructions copied to clipboard");
+    } catch {
+      push("WARN: copy failed (clipboard permission)");
+    }
+  });
+  if (navSettings) navSettings.addEventListener("click", () => setActiveView("settings"));
+  if (navInstructions) navInstructions.addEventListener("click", () => setActiveView("instructions"));
+  // ------------------------------
+  // SessionId (mutable for Reset)
+  // ------------------------------
+  let sid =
+    (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : ("test-" + Math.random().toString(16).slice(2));
+  $("sid").textContent = sid;
+  // ------------------------------
+  // Settings helpers
+  // ------------------------------
+  function loadBoolLS(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      if (v === null || v === undefined) return fallback;
+      return v === "true";
+    } catch {
+      return fallback;
+    }
+  }
+  function saveBoolLS(key, val) {
+    try { localStorage.setItem(key, val ? "true" : "false"); } catch {}
+  }
+  function loadStrLS(key, fallback) {
+    try {
+      const v = (localStorage.getItem(key) || "").trim();
+      return v ? v : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  function saveStrLS(key, val) {
+    try {
+      if (val) localStorage.setItem(key, val);
+      else localStorage.removeItem(key);
+    } catch {}
+  }
+  function normalizeLang(lang) {
+    if (!lang) return DEFAULT_LANG;
+    if (SUPPORTED_LANGS.includes(lang)) return lang;
+    return DEFAULT_LANG;
+  }
+  function getAuthToken() {
+    try { return (localStorage.getItem(LS_AUTH_TOKEN) || "").trim(); } catch { return ""; }
+  }
+  function authHeaders(extra) {
+    const h = Object.assign({}, extra || {});
+    const token = getAuthToken();
+    if (token) h.Authorization = `Bearer ${token}`;
+    return h;
+  }
+  // ------------------------------
+  // DOM refs
+  // ------------------------------
+  const loopMonitor = $("loopMonitor");
+  const rtOutEl = $("rtOut");
+  const rtDeviceSel = $("rtDevice");
+  const sttEnabledEl = $("sttEnabled");
+  const sttLangEl = $("sttLang");
+  const voiceEngineEl = $("voiceEngine");
+  const voiceEngineVoiceEl = $("voiceEngineVoice");
+  const realtimeRateEl = $("realtimeRate");
+  const realtimeRateVoiceEl = $("realtimeRateVoice");
+  const btnResetSession = $("btnResetSession");
+  // Pause/Resume (Voice audio) UI refs (created dynamically)
+  let btnPauseAudio = null;
+  let pauseInfoEl = null;
+  // Settings page elements
+  const btnSaveSettings = $("btnSaveSettings");
+  const btnResetSettings = $("btnResetSettings");
+  const settingsSaved = $("settingsSaved");
+  const authTokenEl = $("authToken");
+  const btnSaveToken = $("btnSaveToken");
+  const btnClearToken = $("btnClearToken");
+  const authStatusEl = $("authStatus");
+  // Instructions page elements
+  const instrBackendEl = $("instrBackend");
+  const instrCurrentEl = $("instrCurrent");
+  const instrDefaultEl = $("instrDefault");
+  const instrUpdatedAtEl = $("instrUpdatedAt");
+  const instrStatusEl = $("instrStatus");
+  const btnInstrLoad = $("btnInstrLoad");
+  const btnInstrSave = $("btnInstrSave");
+  const btnInstrReset = $("btnInstrReset");
+  const instrTargetEl = $("instrTarget");
+  const profilesErrorEl = $("profilesError");
+  const profilesStylesEl = $("profilesStyles");
+  const profilesDomainsEl = $("profilesDomains");
+  let profilesCache = null; // {version, styles, domains} loaded (local first, backend fallback)
+
+  // ------------------------------
+  // Initialize settings into inputs
+  // ------------------------------
+  function loadEndpointSettingsIntoInputs() {
+    $("sttBase").value = loadStrLS(LS_STT_BASE, DEFAULTS.STT_WS_BASE);
+    $("orchHttp").value = loadStrLS(LS_ORCH_HTTP, DEFAULTS.ORCH_HTTP);
+    $("controlBase").value = loadStrLS(LS_CONTROL_BASE, DEFAULTS.ORCH_CONTROL_WS_BASE);
+    $("rtHttp").value = loadStrLS(LS_RT_HTTP, DEFAULTS.REALTIME_HTTP);
+    $("rtWs").value = loadStrLS(LS_RT_WS, DEFAULTS.REALTIME_WS);
+  }
+  function loadSttSettingsIntoInputs() {
+    const enabled = loadBoolLS(LS_STT_ENABLED, true);
+    const lang = normalizeLang(loadStrLS(LS_STT_LANGUAGE, DEFAULT_LANG));
+    if (sttEnabledEl) sttEnabledEl.checked = enabled;
+    if (sttLangEl) sttLangEl.value = lang;
+  }
+function loadVoiceSettingsIntoInputs() {
+  const engine = normalizeVoiceEngine(loadStrLS(LS_VOICE_ENGINE, DEFAULT_VOICE_ENGINE));
+  const rate = normalizeRealtimeRate(loadStrLS(LS_REALTIME_RATE, DEFAULT_REALTIME_RATE));
+  if (voiceEngineEl) voiceEngineEl.value = engine;
+  if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = engine;
+  if (realtimeRateEl) realtimeRateEl.value = rate;
+  if (realtimeRateVoiceEl) realtimeRateVoiceEl.value = rate;
+  applyVoiceEngineUiState(engine);
+}
+function loadInstructionsTargetIntoInputs() {
+  const t = (loadStrLS(LS_INSTR_TARGET, "realtime") || "realtime").toString().trim().toLowerCase();
+  const target = (["realtime", "tts", "stt", "agent1"].includes(t)) ? t : "realtime";
+  if (instrTargetEl) instrTargetEl.value = target;
+}
+
+  function initAuthUi() {
+    const token = getAuthToken();
+    if (authTokenEl) authTokenEl.value = token ? token : "";
+    if (authStatusEl) authStatusEl.textContent = token ? "Token set" : "No token";
+  }
+  loadEndpointSettingsIntoInputs();
+  loadSttSettingsIntoInputs();
+  initAuthUi();
+  loadVoiceSettingsIntoInputs();
+  loadInstructionsTargetIntoInputs();
+  // ------------------------------
+  // STT settings
+  // ------------------------------
+  function getSttEnabled() {
+    return !!sttEnabledEl?.checked;
+  }
+  function getSttLanguage() {
+    return normalizeLang(sttLangEl?.value || DEFAULT_LANG);
+  }
+  function buildSttWsUrl(base, sessionId, lang) {
+    const b = (base || "").replace(/\/+$/, "");
+    const l = encodeURIComponent(lang || DEFAULT_LANG);
+    // NOTE: server currently uses `language=`. We also include `lang` and `locale` for broader compatibility.
+    return `${b}/${sessionId}?language=${l}&lang=${l}&locale=${l}&mode=fixed`;
+  }
+
+// ------------------------------
+// Voice output settings (engine + rate)
+// ------------------------------
+function normalizeVoiceEngine(engine) {
+  const e = (engine || "").toString().trim().toLowerCase();
+  return ALLOWED_VOICE_ENGINES.includes(e) ? e : DEFAULT_VOICE_ENGINE;
+}
+function normalizeRealtimeRate(rate) {
+  const r = (rate || "").toString().trim();
+  return ALLOWED_REALTIME_RATES.includes(r) ? r : DEFAULT_REALTIME_RATE;
+}
+function getVoiceEngine() {
+  // Prefer Voice tab selector; fallback to Settings selector; then persisted; then default.
+  const uiVoice = (voiceEngineVoiceEl?.value || "").toString().trim();
+  const uiSettings = (voiceEngineEl?.value || "").toString().trim();
+  return normalizeVoiceEngine(uiVoice || uiSettings || loadStrLS(LS_VOICE_ENGINE, DEFAULT_VOICE_ENGINE));
+}
+function getRealtimeRate() {
+  const uiVoice = (realtimeRateVoiceEl?.value || "").toString().trim();
+  const uiSettings = (realtimeRateEl?.value || "").toString().trim();
+  return normalizeRealtimeRate(uiVoice || uiSettings || loadStrLS(LS_REALTIME_RATE, DEFAULT_REALTIME_RATE));
+}
+function applyVoiceEngineUiState(engine) {
+  const e = normalizeVoiceEngine(engine);
+  const enabled = e === "realtime";
+  if (realtimeRateEl) {
+    realtimeRateEl.disabled = !enabled;
+    realtimeRateEl.title = enabled ? "" : "Rate applies only when Voice Engine = realtime";
+  }
+  if (realtimeRateVoiceEl) {
+    realtimeRateVoiceEl.disabled = !enabled;
+    realtimeRateVoiceEl.title = enabled ? "" : "Rate applies only when Voice Engine = realtime";
+  }
+}
+function buildVoiceWsUrl(baseWsUrl, engine, rate) {
+  const base = (baseWsUrl || "").toString().trim().replace(/\/+$/, "");
+  const e = normalizeVoiceEngine(engine);
+  const r = normalizeRealtimeRate(rate);
+  try {
+    const u = new URL(base);
+    u.searchParams.set("engine", e);
+    if (e === "realtime") u.searchParams.set("rate", r);
+    else u.searchParams.delete("rate");
+    return u.toString();
+  } catch {
+    const sep = base.includes("?") ? "&" : "?";
+    let out = `${base}${sep}engine=${encodeURIComponent(e)}`;
+    if (e === "realtime") out += `&rate=${encodeURIComponent(r)}`;
+    return out;
+  }
+}
+
+  // ------------------------------
+  // Config builder (uses current sid)
+  // ------------------------------
+const cfg = () => {
+  const base = $("sttBase").value;
+  const lang = getSttLanguage();
+  const engine = getVoiceEngine();
+  const rate = getRealtimeRate();
+  const rtWsBase = $("rtWs").value.replace(/\/+$/, "");
+  return {
+    STT_WS: buildSttWsUrl(base, sid, lang),
+    ORCH_HTTP: $("orchHttp").value.replace(/\/+$/, ""),
+    ORCH_CONTROL_WS: `${$("controlBase").value.replace(/\/+$/, "")}/${sid}`,
+    REALTIME_HTTP: $("rtHttp").value.replace(/\/+$/, ""),
+    REALTIME_WS: rtWsBase,
+    VOICE_ENGINE: engine,
+    REALTIME_RATE: rate,
+    VOICE_WS: buildVoiceWsUrl(rtWsBase, engine, rate),
+  };
+};
+  // ------------------------------
+  // Desired connection state + reconnect (Control/Realtime)
+  // ------------------------------
+  let desiredConnected = false;
+  let controlWs = null;
+  let rtWs = null;
+  let controlReconnectAttempt = 0;
+  let rtReconnectAttempt = 0;
+  let controlReconnectTimer = null;
+  let rtReconnectTimer = null;
+  let rtReconnectSuppressOnce = false; // used for deliberate voice WS reconfigure
+  // Keepalive ping timers
+  let controlPingTimer = null;
+  let rtPingTimer = null;
+  function clearPingTimers() {
+    try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
+    try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
+    controlPingTimer = null;
+    rtPingTimer = null;
+  }
+  function startControlPing() {
+    try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
+    controlPingTimer = window.setInterval(() => {
+      if (controlWs && controlWs.readyState === WebSocket.OPEN) {
+        try { controlWs.send(JSON.stringify({ type: "ping" })); } catch {}
+      }
+    }, WS_PING_INTERVAL_MS);
+  }
+  function startRealtimePing() {
+    try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
+    rtPingTimer = window.setInterval(() => {
+      if (rtWs && rtWs.readyState === WebSocket.OPEN) {
+        try { rtWs.send(JSON.stringify({ type: "ping" })); } catch {}
+      }
+    }, WS_PING_INTERVAL_MS);
+  }
+  function clearReconnectTimers() {
+    try { if (controlReconnectTimer) window.clearTimeout(controlReconnectTimer); } catch {}
+    try { if (rtReconnectTimer) window.clearTimeout(rtReconnectTimer); } catch {}
+    controlReconnectTimer = null;
+    rtReconnectTimer = null;
+  }
+  const WS_PING_INTERVAL_MS = 30000; // 30s keepalive ping
+  const WS_MAX_BACKOFF_MS = 30000;   // strict max 30s
+  function backoffMs(attempt) {
+    const base = Math.min(WS_MAX_BACKOFF_MS, 1000 * Math.pow(2, Math.max(0, attempt)));
+    const jitter = Math.floor(Math.random() * 250);
+    return Math.min(WS_MAX_BACKOFF_MS, base + jitter);
+  }
+  function setControlStatus(state) {
+    if (state === "ON") setPill("controlStatus", "ok", "CONTROL: ON");
+    else if (state === "RECONNECTING") setPill("controlStatus", "warn", "CONTROL: RECONNECTING");
+    else setPill("controlStatus", "bad", "CONTROL: OFF");
+  }
+  function setRealtimeStatus(state) {
+    const label = (getVoiceEngine() === "tts") ? "TTS" : "REALTIME";
+    if (state === "ON") setPill("rtStatus", "ok", `${label}: ON`);
+    else if (state === "RECONNECTING") setPill("rtStatus", "warn", `${label}: RECONNECTING`);
+    else setPill("rtStatus", "bad", `${label}: OFF`);
+  }
+  function scheduleControlReconnect(reason) {
+    if (!desiredConnected) return;
+    if (controlReconnectTimer) return;
+    setControlStatus("RECONNECTING");
+    const delay = backoffMs(controlReconnectAttempt++);
+    push(`Control WS reconnect scheduled in ${delay}ms (${reason || "closed"})`);
+    controlReconnectTimer = window.setTimeout(() => {
+      controlReconnectTimer = null;
+      connectControl();
+    }, delay);
+  }
+  function scheduleRealtimeReconnect(reason) {
+    if (!desiredConnected) return;
+    if (rtReconnectTimer) return;
+    setRealtimeStatus("RECONNECTING");
+    const delay = backoffMs(rtReconnectAttempt++);
+    push(`Realtime WS reconnect scheduled in ${delay}ms (${reason || "closed"})`);
+    rtReconnectTimer = window.setTimeout(() => {
+      rtReconnectTimer = null;
+      connectRealtime().catch(() => {});
+    }, delay);
+  }
+// ------------------------------
+// Instructions (multi-target: realtime | tts | stt | agent1)
+// Local-first: Desktop (local JSON via Electron IPC) is the source of truth.
+// Backend is used only for one-time seeding (if local is empty) and best-effort sync.
+// IMPORTANT: Profiles apply to realtime target only.
+// ------------------------------
+const INSTR_TARGETS = ["realtime", "tts", "stt", "agent1"];
+
+function normalizeInstrTarget(t) {
+  const v = (t || "").toString().trim().toLowerCase();
+  return INSTR_TARGETS.includes(v) ? v : "realtime";
+}
+function getInstrTarget() {
+  const ui = (instrTargetEl?.value || "").toString().trim().toLowerCase();
+  return normalizeInstrTarget(ui || loadStrLS(LS_INSTR_TARGET, "realtime"));
+}
+function setInstrTarget(target) {
+  const t = normalizeInstrTarget(target);
+  if (instrTargetEl) instrTargetEl.value = t;
+  saveStrLS(LS_INSTR_TARGET, t);
+  return t;
+}
+function emptyInstrDoc() {
+  return { current: "", default: "", updatedAt: "", source: "empty" };
+}
+function normalizeStore(raw) {
+  // Accept legacy single-doc format and normalize into multi-target store.
+  if (!raw || typeof raw !== "object") {
+    return { realtime: emptyInstrDoc(), tts: emptyInstrDoc(), stt: emptyInstrDoc(), agent1: emptyInstrDoc() };
+  }
+  const hasTargets = INSTR_TARGETS.some((k) => Object.prototype.hasOwnProperty.call(raw, k));
+  if (hasTargets) {
+    const out = {};
+    for (const k of INSTR_TARGETS) {
+      const d = raw[k];
+      out[k] = {
+        current: (d?.current || "").toString(),
+        default: (d?.default || "").toString(),
+        updatedAt: (d?.updatedAt || "").toString(),
+        source: (d?.source || "local").toString(),
+      };
+    }
+    return out;
+  }
+  // Legacy: treat as realtime
+  return {
+    realtime: {
+      current: (raw.current || "").toString(),
+      default: (raw.default || "").toString(),
+      updatedAt: (raw.updatedAt || "").toString(),
+      source: (raw.source || "local").toString(),
+    },
+    tts: emptyInstrDoc(),
+    stt: emptyInstrDoc(),
+    agent1: emptyInstrDoc(),
+  };
+}
+
+let instructionStore = normalizeStore(null);
+
+function hasLocalInstructionStore() {
+  return !!(
+    window.electronAPI &&
+    typeof window.electronAPI.instructionsRead === "function" &&
+    typeof window.electronAPI.instructionsWrite === "function"
+  );
+}
+
+async function readLocalInstructionStore() {
+  if (!hasLocalInstructionStore()) return null;
+  try {
+    const d = await window.electronAPI.instructionsRead();
+    return normalizeStore(d);
+  } catch {
+    return null;
+  }
+}
+
+async function writeLocalInstructionStore(store) {
+  if (!hasLocalInstructionStore()) return false;
+  try {
+    const ok = await window.electronAPI.instructionsWrite(store);
+    return !!ok;
+  } catch {
+    return false;
+  }
+}
+
+function getBackendLabelForTarget(target) {
+  const t = normalizeInstrTarget(target);
+  const c = cfg();
+  if (t === "agent1") return c.ORCH_HTTP || "(orch not set)";
+  if (t === "stt") return "(local only)";
+  return c.REALTIME_HTTP || "(realtime not set)";
+}
+
+function setProfilesUiEnabled(enabled) {
+  if (profilesStylesEl) profilesStylesEl.style.display = enabled ? "" : "none";
+  if (profilesDomainsEl) profilesDomainsEl.style.display = enabled ? "" : "none";
+  if (profilesErrorEl) {
+    if (!enabled) profilesErrorEl.textContent = "";
+    profilesErrorEl.style.display = enabled ? "" : "none";
+  }
+}
+
+// Voice view: instructions preview panel uses CURRENT engine (realtime|tts)
+function getEffectiveInstructionsForEngine() {
+  const { VOICE_ENGINE } = cfg();
+  const t = (VOICE_ENGINE === "tts") ? "tts" : "realtime";
+  return (instructionStore?.[t]?.current || "").toString();
+}
+
+function updateVoiceInstructionsUI() {
+  if (!voiceInstrTextEl) return;
+  const eff = getEffectiveInstructionsForEngine().trim();
+  voiceInstrTextEl.textContent = eff ? eff : "(nije učitano)";
+  if (voiceInstrUpdatedAtEl) {
+    const { VOICE_ENGINE } = cfg();
+    const t = (VOICE_ENGINE === "tts") ? "tts" : "realtime";
+    const ua = (instructionStore?.[t]?.updatedAt || "").toString();
+    voiceInstrUpdatedAtEl.textContent = ua ? ua : "(nije učitano)";
+  }
+}
+
+function applyTargetDocToEditor(target, statusText, { silent } = {}) {
+  const t = normalizeInstrTarget(target);
+  const d = instructionStore?.[t] || emptyInstrDoc();
+
+
+// Ensure editor always shows canonical sections and never loses headers.
+// Normalize CURRENT/DEFAULT using DEFAULT as fallback (or existing CURRENT if available).
+const _fallback = (d.current || d.default || "").toString();
+const _normCurrent = normalizeInstructionText((d.current || "").toString(), _fallback);
+const _normDefault = normalizeInstructionText((d.default || "").toString(), (d.default || "").toString() || _fallback);
+
+// Keep in-memory store canonical so Voice tab preview and SEND_TEXT always use the same text.
+if (instructionStore && instructionStore[t]) {
+  instructionStore[t].current = _normCurrent;
+  instructionStore[t].default = _normDefault;
+}
+
+  if (instrCurrentEl) instrCurrentEl.value = (d.current || "").toString();
+  if (instrCurrentEl) instrCurrentEl.value = _normCurrent;
+  if (instrDefaultEl) instrDefaultEl.value = (d.default || "").toString();
+  if (instrDefaultEl) instrDefaultEl.value = _normDefault;
+  if (instrUpdatedAtEl) instrUpdatedAtEl.textContent = (d.updatedAt || "").toString();
+  if (instrBackendEl) instrBackendEl.textContent = getBackendLabelForTarget(t);
+  if (instrStatusEl && statusText) instrStatusEl.textContent = statusText;
+
+  // Profiles only for realtime
+  setProfilesUiEnabled(t === "realtime");
+
+  updateVoiceInstructionsUI();
+
+  if (!silent && d.updatedAt) push(`Instructions loaded (target=${t}) (${statusText || "ok"}) (${d.updatedAt})`);
+}
+
+async function fetchInstructionsFromBackend(target) {
+  const t = normalizeInstrTarget(target);
+  const c = cfg();
+
+  if (t === "realtime") {
+    const res = await fetch(`${c.REALTIME_HTTP}/v1/instructions`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return {
+      current: (data.current || "").toString(),
+      default: (data.default || "").toString(),
+      updatedAt: (data.updatedAt || "").toString(),
+      source: "backend",
+    };
+  }
+
+  // Future-proof: try target query param on realtime backend for tts
+  if (t === "tts") {
+    const res = await fetch(`${c.REALTIME_HTTP}/v1/instructions?target=tts`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return {
+      current: (data.current || "").toString(),
+      default: (data.default || "").toString(),
+      updatedAt: (data.updatedAt || "").toString(),
+      source: "backend",
+    };
+  }
+
+  // stt/agent1 are local-only for now
+  return null;
+}
+
+async function syncInstructionsToBackend(target, current, { silent } = {}) {
+  const t = normalizeInstrTarget(target);
+  const c = cfg();
+
+  // Agent1 instructions backend will be added later (orchestrator).
+  if (t === "agent1" || t === "stt") return { ok: true, status: 0, skipped: true };
+
+  const url =
+    (t === "tts")
+      ? `${c.REALTIME_HTTP}/v1/instructions?target=tts`
+      : `${c.REALTIME_HTTP}/v1/instructions`;
+
+  try {
+    const r = await fetch(url, {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ current: (current || "").toString() }),
+    });
+    if (!r.ok) {
+      if (!silent) push(`WARN: backend instructions sync failed (target=${t}) (HTTP ${r.status})`);
+      return { ok: false, status: r.status };
+    }
+    return { ok: true, status: r.status };
+  } catch {
+    if (!silent) push(`WARN: backend instructions sync failed (target=${t}) (network error)`);
+    return { ok: false, status: 0 };
+  }
+}
+
+async function loadInstructionStoreEffective({ silent } = {}) {
+  // 1) Prefer local store (source of truth).
+  const local = await readLocalInstructionStore();
+  if (local) {
+    instructionStore = local;
+    return instructionStore;
+  }
+
+  // 2) If local is missing/unavailable, seed realtime from backend once (best-effort).
+  try {
+    const backend = await fetchInstructionsFromBackend("realtime");
+    if (backend) {
+      instructionStore = normalizeStore({
+        realtime: {
+          current: backend.current,
+          default: backend.default,
+          updatedAt: backend.updatedAt || new Date().toISOString(),
+          source: "backend-seed",
+        },
+      });
+      // Persist locally if possible
+      if (hasLocalInstructionStore()) {
+        const ok = await writeLocalInstructionStore(instructionStore);
+        if (!ok && !silent) push("WARN: local instructions seed write failed");
+      }
+      return instructionStore;
+    }
+  } catch (e) {
+    if (!silent) push(`WARN: instructions seed fetch failed: ${e?.message || e}`);
+  }
+
+  instructionStore = normalizeStore(null);
+  return instructionStore;
+}
+
+async function loadInstructionsEffective({ silent } = {}) {
+  await loadInstructionStoreEffective({ silent });
+  const target = getInstrTarget();
+  applyTargetDocToEditor(target, "Loaded (local)", { silent });
+  return instructionStore;
+}
+
+// Explicit: load from backend (overwrites local for the target). Used only when user clicks "Load".
+async function loadInstructionsFromBackendExplicit({ silent } = {}) {
+  const target = getInstrTarget();
+
+  if (target === "stt" || target === "agent1") {
+    if (instrStatusEl) instrStatusEl.textContent = "Load skipped (local-only target for now)";
+    if (!silent) push(`Instructions Load skipped: target=${target} is local-only for now`);
+    return null;
+  }
+
+  try {
+    const backend = await fetchInstructionsFromBackend(target);
+    if (!backend) throw new Error("No backend data");
+    const payload = {
+      current: backend.current,
+      default: backend.default,
+      updatedAt: backend.updatedAt || new Date().toISOString(),
+      source: "backend-load",
+    };
+
+    instructionStore = instructionStore || normalizeStore(null);
+    instructionStore[target] = payload;
+
+    if (hasLocalInstructionStore()) {
+      const ok = await writeLocalInstructionStore(instructionStore);
+      if (!ok && !silent) push("WARN: local overwrite from backend failed");
+    }
+
+    applyTargetDocToEditor(target, "Loaded (backend)", { silent });
+    return payload;
+  } catch (e) {
+    if (!silent) push(`WARN: instructions fetch failed (target=${target}): ${e?.message || e}`);
+    if (instrStatusEl) instrStatusEl.textContent = "Load failed (check backend)";
+    return null;
+  }
+}
+
+async function saveInstructionsToBackend() {
+  const target = getInstrTarget();
+  const current = (instrCurrentEl?.value || "").toString();
+  const defaultText = (instrDefaultEl?.value || "").toString();
+  const updatedAt = new Date().toISOString();
+
+
+// Canonicalize before saving: keep sections, route plain paste into CONTENT, and preserve RULES.
+let currentToSave = current;
+let defaultToSave = defaultText;
+try {
+  const prev = (instructionStore?.[target]?.current || "").toString();
+  const fallback = prev || defaultText || current;
+  currentToSave = normalizeInstructionText(current, fallback);
+  defaultToSave = normalizeInstructionText(defaultText, defaultText || fallback);
+  // Reflect canonicalized text back into the editor immediately.
+  if (instrCurrentEl) instrCurrentEl.value = currentToSave;
+  if (instrDefaultEl) instrDefaultEl.value = defaultToSave;
+} catch {}
+
+  instructionStore = instructionStore || normalizeStore(null);
+  instructionStore[target] = {
+    current: currentToSave,
+    default: defaultToSave,
+    updatedAt,
+    source: "local-save",
+  };
+
+  // Desktop/local-first (source of truth)
+  if (hasLocalInstructionStore()) {
+    const ok = await writeLocalInstructionStore(instructionStore);
+    if (ok) {
+      applyTargetDocToEditor(target, "Saved (local)", { silent: true });
+      if (instrStatusEl) instrStatusEl.textContent = "Saved (local)";
+      push(`Instructions saved locally (target=${target})`);
+
+      // Best-effort backend sync only for realtime/tts (does NOT overwrite local)
+      const sync = await syncInstructionsToBackend(target, currentToSave, { silent: true });
+      if (instrStatusEl) {
+        instrStatusEl.textContent = sync.skipped
+          ? "Saved (local)"
+          : (sync.ok ? "Saved (local) + synced" : "Saved (local) (sync failed)");
+      }
+      if (!sync.ok && !sync.skipped) push("WARN: backend sync failed; local remains authoritative");
+      return;
+    }
+
+    if (instrStatusEl) instrStatusEl.textContent = "Local save failed; trying backend...";
+  }
+
+  // Backend fallback (non-Electron / local store unavailable) only for realtime/tts
+  if (target === "stt" || target === "agent1") {
+    if (instrStatusEl) instrStatusEl.textContent = "Save failed (local store unavailable for local-only target)";
+    return;
+  }
+
+  try {
+    const sync = await syncInstructionsToBackend(target, currentToSave, { silent: false });
+    if (instrStatusEl) instrStatusEl.textContent = sync.ok ? "Saved (backend)" : "Save failed";
+    await loadInstructionsFromBackendExplicit({ silent: true });
+  } catch {
+    if (instrStatusEl) instrStatusEl.textContent = "Save failed (network error)";
+  }
+}
+
+async function resetInstructionsToDefault() {
+  const target = getInstrTarget();
+  await loadInstructionStoreEffective({ silent: true });
+
+  const d = instructionStore?.[target] || emptyInstrDoc();
+  const updatedAt = new Date().toISOString();
+  const payload = {
+    current: (d.default || "").toString(),
+    default: (d.default || "").toString(),
+    updatedAt,
+    source: "local-reset",
+  };
+
+  instructionStore[target] = payload;
+
+  if (hasLocalInstructionStore()) {
+    const ok = await writeLocalInstructionStore(instructionStore);
+    if (!ok) {
+      if (instrStatusEl) instrStatusEl.textContent = "Reset failed (local write)";
+      push("WARN: local reset write failed");
+      return;
+    }
+
+    applyTargetDocToEditor(target, "Reset (local)", { silent: true });
+    if (instrStatusEl) instrStatusEl.textContent = "Reset (local)";
+    push(`Instructions reset to default (target=${target})`);
+
+    const sync = await syncInstructionsToBackend(target, payload.current, { silent: true });
+    if (instrStatusEl) {
+      instrStatusEl.textContent = sync.skipped
+        ? "Reset (local)"
+        : (sync.ok ? "Reset (local) + synced" : "Reset (local) (sync failed)");
+    }
+    if (!sync.ok && !sync.skipped) push("WARN: backend sync failed; local remains authoritative");
+    return;
+  }
+
+  // Browser fallback: for realtime, attempt backend reset endpoint (exists today).
+  if (target === "realtime") {
+    const c = cfg();
+    try {
+      const r = await fetch(`${c.REALTIME_HTTP}/v1/instructions/reset`, { method: "POST", headers: authHeaders() });
+      if (!r.ok) {
+        if (instrStatusEl) instrStatusEl.textContent = `Reset failed (HTTP ${r.status})`;
+        return;
+      }
+      if (instrStatusEl) instrStatusEl.textContent = "Reset done";
+      await loadInstructionsFromBackendExplicit({ silent: true });
+    } catch {
+      if (instrStatusEl) instrStatusEl.textContent = "Reset failed (network error)";
+    }
+    return;
+  }
+
+  if (instrStatusEl) instrStatusEl.textContent = "Reset failed (local store unavailable)";
+}
+
+async function refreshInstructionsPage() {
+  const target = getInstrTarget();
+  if (instrBackendEl) instrBackendEl.textContent = getBackendLabelForTarget(target);
+
+  await loadInstructionStoreEffective({ silent: true });
+  applyTargetDocToEditor(target, "Loaded (local)", { silent: true });
+
+  // Profiles: only for realtime
+  if (target === "realtime") {
+    if (!profilesLoadedOnce) await loadProfilesFromBackend();
+  } else {
+    setProfilesUiEnabled(false);
+  }
+}
+
+if (instrTargetEl) {
+  instrTargetEl.addEventListener("change", () => {
+    const t = setInstrTarget(instrTargetEl.value);
+    try { refreshInstructionsPage().catch(() => {}); } catch {}
+    updateVoiceInstructionsUI();
+    push(`Instructions target set to: ${t}`);
+  });
+}
+
+if (btnInstrLoad) btnInstrLoad.addEventListener("click", () => loadInstructionsFromBackendExplicit().catch(() => {}));
+if (btnInstrSave) btnInstrSave.addEventListener("click", () => saveInstructionsToBackend().catch(() => {}));
+if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructionsToDefault().catch(() => {}));
+
+  // ------------------------------
+  // Orchestrator REST
+  // ------------------------------
+  async function postTranscript(text) {
+    const { ORCH_HTTP } = cfg();
+    try {
+      const r = await fetch(`${ORCH_HTTP}/v1/sessions/${sid}/transcripts`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ transcript: text }),
+      });
+      push(`Orchestrator transcripts POST status=${r.status}`);
+    } catch (e) {
+      push(`ERROR: Orchestrator transcripts POST failed: ${e?.message || e}`);
+    }
+  }
+  async function postTurnDone(turnId) {
+    const { ORCH_HTTP } = cfg();
+    try {
+      const r = await fetch(`${ORCH_HTTP}/v1/sessions/${sid}/turns/${turnId}/done`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({}),
+      });
+      push(`turn_done POST status=${r.status} (turnId=${turnId})`);
+    } catch (e) {
+      push(`ERROR: Orchestrator turn_done POST failed: ${e?.message || e}`);
+    }
+  }
+  // ------------------------------
+  // Realtime output device selection (persisted) + Auto re-bind
+  // ------------------------------
+  async function enumerateAudioOutputs() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter((d) => d.kind === "audiooutput");
+    } catch (e) {
+      push(`WARN: enumerateDevices failed: ${e?.message || e}`);
+      return [];
+    }
+  }
+  function isHeadphonesLabel(label) {
+    return /headphone|headset|earbuds|earbud|buds/i.test(label || "");
+  }
+  function loadSavedRtDeviceId() {
+    try { return (localStorage.getItem(LS_RT_DEVICE_ID) || "").trim(); } catch { return ""; }
+  }
+  function loadPreferredRtLabel() {
+    try { return (localStorage.getItem(LS_RT_DEVICE_PREFERRED_LABEL) || "").trim(); } catch { return ""; }
+  }
+  function saveRtDeviceSelection(deviceId, label) {
+    try {
+      if (deviceId) localStorage.setItem(LS_RT_DEVICE_ID, deviceId);
+      else localStorage.removeItem(LS_RT_DEVICE_ID);
+      if (label) localStorage.setItem(LS_RT_DEVICE_LABEL, label);
+      else localStorage.removeItem(LS_RT_DEVICE_LABEL);
+      if (label) localStorage.setItem(LS_RT_DEVICE_PREFERRED_LABEL, label);
+    } catch {}
+  }
+  async function refreshOutputDevicesUI() {
+    const outputs = await enumerateAudioOutputs();
+    const current = (rtDeviceSel.value || "").trim();
+    const saved = loadSavedRtDeviceId();
+    rtDeviceSel.innerHTML = "";
+    const optAuto = document.createElement("option");
+    optAuto.value = "";
+    optAuto.textContent = "(auto)";
+    rtDeviceSel.appendChild(optAuto);
+    for (const d of outputs) {
+      const opt = document.createElement("option");
+      opt.value = d.deviceId;
+      opt.textContent = d.label ? d.label : `(audiooutput ${d.deviceId.slice(0, 8)}…)`;
+      rtDeviceSel.appendChild(opt);
+    }
+    if (current && outputs.some((o) => o.deviceId === current)) {
+      rtDeviceSel.value = current;
+    } else if (saved && outputs.some((o) => o.deviceId === saved)) {
+      rtDeviceSel.value = saved;
+    } else {
+      rtDeviceSel.value = "";
+    }
+    push(`Audio outputs detected: ${outputs.length}`);
+  }
+  // Tracks last applied sink so we can "hold" it if headphones disappear.
+  let lastAppliedSinkId = "";
+  function getOutputLabelById(outputs, deviceId) {
+    const d = outputs.find((x) => x.deviceId === deviceId);
+    return d?.label || "";
+  }
+  async function findDeviceIdByExactLabel(outputs, preferredLabel) {
+    if (!preferredLabel) return "";
+    const hit = outputs.find((d) => (d.label || "").trim() === preferredLabel.trim());
+    return hit ? hit.deviceId : "";
+  }
+  async function pickBestHeadphones(outputs) {
+    // Prefer anything that looks like headphones/headset; no fallback to speakers.
+    const hp = outputs.find((d) => isHeadphonesLabel(d.label));
+    return hp ? hp.deviceId : "";
+  }
+  async function applyRealtimeSink() {
+    if (typeof rtOutEl.setSinkId !== "function") {
+      push("WARN: rtOut.setSinkId is NOT supported in this Electron build. Realtime will use Windows default output.");
+      return;
+    }
+    const outputs = await enumerateAudioOutputs();
+    // Candidate sources
+    const dropdownId = (rtDeviceSel.value || "").trim();
+    const savedId = loadSavedRtDeviceId();
+    const preferredLabel = loadPreferredRtLabel();
+    let candidateId = "";
+    // 1) Explicit dropdown choice (but enforce headphones-only)
+    if (dropdownId) {
+      const lbl = getOutputLabelById(outputs, dropdownId);
+      if (!REALTIME_HEADPHONES_ONLY || isHeadphonesLabel(lbl)) {
+        candidateId = dropdownId;
+      } else {
+        push(`Realtime sink policy: headphones-only. Ignoring non-headphones selection: ${lbl || dropdownId}`);
+        candidateId = "";
+      }
+    }
+    // 2) Saved deviceId (only if it still exists and is headphones)
+    if (!candidateId && savedId && outputs.some((o) => o.deviceId === savedId)) {
+      const lbl = getOutputLabelById(outputs, savedId);
+      if (!REALTIME_HEADPHONES_ONLY || isHeadphonesLabel(lbl)) {
+        candidateId = savedId;
+      } else {
+        push(`Realtime sink policy: saved device is not headphones now (${lbl}). Will NOT switch to speakers.`);
+      }
+    }
+    // 3) Preferred label match (useful after unplug/replug -> new deviceId)
+    if (!candidateId && preferredLabel) {
+      const byLabel = await findDeviceIdByExactLabel(outputs, preferredLabel);
+      if (byLabel) candidateId = byLabel;
+    }
+    // 4) Heuristic: any headphones/headset
+    if (!candidateId) {
+      candidateId = await pickBestHeadphones(outputs);
+    }
+    // If still none: do NOT switch to speakers. Hold current sink.
+    if (!candidateId) {
+      if (REALTIME_HEADPHONES_ONLY) {
+        push("Realtime sink: no headphones device available right now. Holding previous sink (no fallback to speakers).");
+        return;
+      }
+      push("WARN: No suitable output device found. Realtime will stay on current sink.");
+      return;
+    }
+    // If candidate is unchanged, skip
+    if (candidateId === lastAppliedSinkId) return;
+    try {
+      await rtOutEl.setSinkId(candidateId);
+      // Update UI selection if possible
+      if (candidateId && outputs.some((o) => o.deviceId === candidateId)) {
+        rtDeviceSel.value = candidateId;
+      }
+      const label = getOutputLabelById(outputs, candidateId) || candidateId;
+      saveRtDeviceSelection(candidateId, label);
+      lastAppliedSinkId = candidateId;
+      push(`Realtime output sink set to: ${label}`);
+    } catch (e) {
+      const msg = e?.message || e;
+      push(`ERROR: setSinkId failed: ${msg}`);
+    }
+  }
+  // Auto re-bind on device changes (debounced)
+  let deviceChangeTimer = null;
+  function onDeviceChange() {
+    if (deviceChangeTimer) window.clearTimeout(deviceChangeTimer);
+    deviceChangeTimer = window.setTimeout(async () => {
+      deviceChangeTimer = null;
+      push("Device change detected (audio outputs may have changed). Re-applying Realtime sink...");
+      try {
+        await refreshOutputDevicesUI();
+        await applyRealtimeSink();
+      } catch (e) {
+        push(`WARN: device re-bind failed: ${e?.message || e}`);
+      }
+    }, 600);
+  }
+  // ------------------------------
+  // Playback pipeline (Realtime) routed to rtOutEl via MediaStreamDestination
+  // ------------------------------
+  let playbackCtx = null;
+  let playhead = 0;
+  let playbackDest = null;
+
+  // Realtime audio diagnostics (throttled logging)
+  // Goal: detect any sample_rate / channels drift or duration mismatch without flooding the log.
+  const rtAudioDiag = {
+    chunkCount: 0,
+    lastLogMs: 0,
+    lastSr: null,
+    lastCh: null,
+  };
+
+  // ------------------------------
+  // Pause/Resume + bounded buffer (120s) for Voice audio
+  // - While paused: buffer decoded PCM bytes (bounded ring buffer).
+  // - On resume: flush buffered audio into the existing playback pipeline.
+  // ------------------------------
+  const BUFFER_SECONDS = 120;
+  let isAudioPaused = false;
+  const audioQueue = []; // Array<{ bytes: Uint8Array, sampleRate: number, channels: number }>
+  let bufferedBytes = 0;
+  let lastFormat = null; // { sampleRate, channels }
+  function bytesPerSecond(sampleRate, channels) {
+    return sampleRate * channels * 2; // PCM16 => 2 bytes/sample
+  }
+  function updatePauseUi() {
+    if (btnPauseAudio) {
+      btnPauseAudio.textContent = isAudioPaused ? "Resume audio" : "Pause audio";
+    }
+    if (pauseInfoEl) {
+      pauseInfoEl.textContent = isAudioPaused
+        ? `Paused (buffered ~${(getBufferedSeconds()).toFixed(1)}s)`
+        : "";
+    }
+  }
+  function getBufferedSeconds() {
+    if (!lastFormat) return 0;
+    const bps = bytesPerSecond(lastFormat.sampleRate, lastFormat.channels);
+    return bps > 0 ? (bufferedBytes / bps) : 0;
+  }
+  function clearBufferedAudio() {
+    audioQueue.length = 0;
+    bufferedBytes = 0;
+    lastFormat = null;
+    updatePauseUi();
+  }
+  function enqueueAudio(chunk) {
+    audioQueue.push(chunk);
+    bufferedBytes += chunk.bytes.byteLength;
+    lastFormat = { sampleRate: chunk.sampleRate, channels: chunk.channels };
+    const maxBytes = BUFFER_SECONDS * bytesPerSecond(chunk.sampleRate, chunk.channels);
+    while (bufferedBytes > maxBytes && audioQueue.length > 0) {
+      const dropped = audioQueue.shift();
+      if (dropped) bufferedBytes -= dropped.bytes.byteLength;
+    }
+    updatePauseUi();
+  }
+  function playPcm16Bytes(bytes, sampleRate, channels) {
+    // Ensure aligned to Int16; ignore odd trailing byte if present.
+    const pcm16 = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
+    playPcm16(pcm16, sampleRate, channels);
+  }
+  function flushBufferedAudio() {
+    if (!audioQueue.length) return;
+    const queued = audioQueue.splice(0, audioQueue.length);
+    bufferedBytes = 0;
+    lastFormat = null;
+    updatePauseUi();
+    for (const chunk of queued) {
+      playPcm16Bytes(chunk.bytes, chunk.sampleRate, chunk.channels);
+    }
+  }
+  async function setAudioPaused(paused) {
+    const next = !!paused;
+    if (next === isAudioPaused) return;
+    isAudioPaused = next;
+    updatePauseUi();
+    try {
+      // Suspending the playback context pauses already-scheduled audio cleanly.
+      if (playbackCtx) {
+        if (isAudioPaused && playbackCtx.state === "running") await playbackCtx.suspend();
+        if (!isAudioPaused && playbackCtx.state === "suspended") await playbackCtx.resume();
+      }
+    } catch {}
+    if (!isAudioPaused) {
+      // Resume: continue from 'now' and flush buffered chunks.
+      try {
+        if (playbackCtx && playhead < playbackCtx.currentTime) playhead = playbackCtx.currentTime;
+      } catch {}
+      flushBufferedAudio();
+    }
+    push(isAudioPaused ? "Audio paused (incoming audio will be buffered)" : "Audio resumed");
+  }
+
+  function logRealtimeAudioChunk(pcmByteLength, sampleRate, channels) {
+    const sr = Number(sampleRate || 24000);
+    const ch = Math.max(1, Number(channels || 1));
+    rtAudioDiag.chunkCount += 1;
+
+    const nowMs = Date.now();
+    const expectedSec = pcmByteLength / (2 * ch * sr); // 2 bytes per int16 sample
+    const ctxRate = playbackCtx ? playbackCtx.sampleRate : null;
+
+    // Log at most once per second, plus whenever sr/ch changes.
+    const shouldLog =
+      sr !== rtAudioDiag.lastSr ||
+      ch !== rtAudioDiag.lastCh ||
+      (nowMs - rtAudioDiag.lastLogMs) >= 1000;
+
+    if (shouldLog) {
+      rtAudioDiag.lastLogMs = nowMs;
+      rtAudioDiag.lastSr = sr;
+      rtAudioDiag.lastCh = ch;
+      push(`RT_AUDIO: chunks=${rtAudioDiag.chunkCount} bytes=${pcmByteLength} sr=${sr} ch=${ch} expectedSec=${expectedSec.toFixed(3)} playbackCtxRate=${ctxRate}`);
+    }
+
+    // Always highlight unexpected metadata.
+    if (sr !== 24000 || ch !== 1) {
+      push(`WARN: RT_AUDIO metadata unexpected: sr=${sr} ch=${ch} (expected sr=24000 ch=1)`);
+    }
+  }
+
+  async function ensurePlayback() {
+    if (!playbackCtx) {
+      playbackCtx = new AudioContext({ sampleRate: 24000 });
+      playbackDest = playbackCtx.createMediaStreamDestination();
+      rtOutEl.srcObject = playbackDest.stream;
+      try { await rtOutEl.play(); } catch {}
+      push(`Playback AudioContext sampleRate=${playbackCtx.sampleRate}`);
+      await applyRealtimeSink();
+    } else {
+      await applyRealtimeSink();
+    }
+  }
+  function playPcm16(pcm16, sampleRate, channels) {
+    if (!playbackCtx || !playbackDest) return;
+    const ctx = playbackCtx;
+    const ch = Math.max(1, channels || 1);
+    const frameCount = Math.floor(pcm16.length / ch);
+    if (frameCount <= 0) return;
+    const buffer = ctx.createBuffer(ch, frameCount, sampleRate);
+    // Sanity-check: computed duration should match frameCount/sampleRate expectations.
+    // If this spikes when the "voice changes", it's strong evidence of a sample-rate/channel mismatch.
+    const expectedSec = frameCount / sampleRate;
+    if (Math.abs(buffer.duration - expectedSec) > 0.02) {
+      push(`WARN: RT_AUDIO duration mismatch: bufferSec=${buffer.duration.toFixed(3)} expectedSec=${expectedSec.toFixed(3)} sr=${sampleRate} ch=${ch} frames=${frameCount}`);
+    }
+    for (let c = 0; c < ch; c++) {
+      const channelData = buffer.getChannelData(c);
+      let idx = c;
+      for (let i = 0; i < frameCount; i++, idx += ch) {
+        channelData[i] = pcm16[idx] / 32768;
+      }
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(playbackDest);
+    const now = ctx.currentTime;
+    if (playhead < now) playhead = now;
+    src.start(playhead);
+    playhead += buffer.duration;
+  }
+  // ------------------------------
+  // Control WS
+  // ------------------------------
+  let activeTurnId = null;
+  function connectControl() {
+    if (controlWs && (controlWs.readyState === WebSocket.OPEN || controlWs.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    const { ORCH_CONTROL_WS } = cfg();
+    controlWs = new WebSocket(ORCH_CONTROL_WS);
+    setControlStatus("RECONNECTING");
+    controlWs.onopen = () => {
+      setControlStatus("ON");
+      push(`Control WS connected (sessionId=${sid})`);
+      startControlPing();
+      controlReconnectAttempt = 0;
+      if (controlReconnectTimer) {
+        try { window.clearTimeout(controlReconnectTimer); } catch {}
+        controlReconnectTimer = null;
+      }
+      refreshButtons();
+    };
+    controlWs.onclose = (evt) => {
+      const code = evt?.code;
+      const reason = evt?.reason;
+      const clean = evt?.wasClean;
+      push(`Control WS closed (code=${code}, clean=${clean}, reason=${reason || ""})`);
+      try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
+      controlPingTimer = null;
+      controlWs = null;
+      refreshButtons();
+      if (desiredConnected) scheduleControlReconnect("closed");
+      else setControlStatus("OFF");
+    };
+    controlWs.onerror = () => {
+      push("Control WS error");
+    };
+    controlWs.onmessage = (e) => {
+      if (typeof e.data !== "string") return;
+      let cmd;
+      try { cmd = JSON.parse(e.data); } catch { return; }
+      if (cmd.command === "SEND_TO_REALTIME") {
+        const { turnId, text } = cmd.payload || {};
+        if (!turnId || !text) return;
+        push(`COMMAND SEND_TO_REALTIME (turnId=${turnId})`);
+        activeTurnId = turnId;
+        const effInstr = getEffectiveInstructionsForEngine().toString();
+const cleanText = (text ?? "").toString();
+
+if (rtWs && rtWs.readyState === WebSocket.OPEN) {
+  rtWs.send(JSON.stringify({
+    type: "SEND_TEXT",
+    text: cleanText,
+    instructions: effInstr
+  }));
+} else {
+  push("ERROR: Realtime WS not open; cannot SEND_TEXT");
+}
+
+      }
+    };
+  }
+  // ------------------------------
+  // Realtime WS
+  // ------------------------------
+  async function connectRealtime() {
+    if (rtWs && (rtWs.readyState === WebSocket.OPEN || rtWs.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    const { VOICE_WS, VOICE_ENGINE, REALTIME_RATE } = cfg();
+    await ensurePlayback();
+    rtWs = new WebSocket(VOICE_WS);
+    setRealtimeStatus("RECONNECTING");
+    rtWs.onopen = () => {
+      setRealtimeStatus("ON");
+      push(`Voice WS connected (engine=${VOICE_ENGINE}${VOICE_ENGINE === "realtime" ? " rate=" + REALTIME_RATE : ""})`);
+      startRealtimePing();
+      rtReconnectAttempt = 0;
+      if (rtReconnectTimer) {
+        try { window.clearTimeout(rtReconnectTimer); } catch {}
+        rtReconnectTimer = null;
+      }
+      refreshButtons();
+    };
+    rtWs.onclose = (evt) => {
+      const code = evt?.code;
+      const reason = evt?.reason;
+      const clean = evt?.wasClean;
+      push(`Realtime WS closed (code=${code}, clean=${clean}, reason=${reason || ""})`);
+      try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
+      rtPingTimer = null;
+      rtWs = null;
+      refreshButtons();
+      if (rtReconnectSuppressOnce) {
+        rtReconnectSuppressOnce = false;
+        setRealtimeStatus("OFF");
+        return;
+      }
+      if (desiredConnected) scheduleRealtimeReconnect("closed");
+      else setRealtimeStatus("OFF");
+    };
+    rtWs.onerror = () => {
+      push("Realtime WS error");
+    };
+    rtWs.onmessage = async (e) => {
+      if (typeof e.data !== "string") return;
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      if (msg.type === "audio") {
+        const pcmBytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
+        if (isAudioPaused) {
+          // While paused, buffer decoded PCM bytes (bounded ring buffer).
+          enqueueAudio({ bytes: pcmBytes, sampleRate: msg.sample_rate || 24000, channels: msg.channels || 1 });
+          return;
+        }
+        // Diagnostics: log expected duration and metadata (throttled).
+        logRealtimeAudioChunk(pcmBytes.byteLength, msg.sample_rate || 24000, msg.channels || 1);
+        const pcm16 = new Int16Array(
+          pcmBytes.buffer,
+          pcmBytes.byteOffset,
+          Math.floor(pcmBytes.byteLength / 2)
+        );
+        playPcm16(pcm16, msg.sample_rate || 24000, msg.channels || 1);
+        return;
+      }
+      if (msg.type === "agent_done") {
+        if (!activeTurnId) {
+          push("agent_done received but no activeTurnId");
+          return;
+        }
+        const turnId = activeTurnId;
+        activeTurnId = null;
+        push(`agent_done (turnId=${turnId})`);
+        await postTurnDone(turnId);
+      }
+    };
+  }
+  // ------------------------------
+  // STT (loopback)
+  // ------------------------------
+  let sttWs = null;
+  let sttCtx = null;
+  let sttStream = null;
+  let analyser = null;
+  let analyserTimer = null;
+  let sttPending = [];
+  let sttBuffer = [];
+  let flushTimer = null;
+  const FLUSH_MS = 1200;
+  function clearFlushTimer() {
+    if (flushTimer) {
+      window.clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+  }
+  function stopAnalyser() {
+    if (analyserTimer) {
+      window.clearInterval(analyserTimer);
+      analyserTimer = null;
+    }
+    analyser = null;
+  }
+  function startAnalyser() {
+    if (!analyser || !sttCtx) return;
+    const buf = new Float32Array(analyser.fftSize);
+    if (analyserTimer) window.clearInterval(analyserTimer);
+    analyserTimer = window.setInterval(() => {
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+      push(`AUDIO_LEVEL_RMS: ${rms.toFixed(5)}`);
+    }, 1500);
+  }
+  async function flushSttBuffer() {
+    if (!sttBuffer.length) return;
+    const full = sttBuffer.join(" ").trim();
+    sttBuffer = [];
+    if (!full) return;
+    push(`STT_BUFFER_FLUSH: ${full}`);
+    await postTranscript(full);
+  }
+  async function getLoopbackStream() {
+    await window.electronAPI.enableLoopbackAudio();
+    try {
+      const media = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+      try {
+        media.getVideoTracks().forEach((t) => t.stop());
+        media.getVideoTracks().forEach((t) => media.removeTrack(t));
+      } catch {}
+      return media;
+    } finally {
+      try { await window.electronAPI.disableLoopbackAudio(); } catch {}
+    }
+  }
+  async function startStt() {
+    if (!getSttEnabled()) {
+      push("STT is disabled (STT Enabled is OFF).");
+      return;
+    }
+    const { STT_WS } = cfg();
+    sttBuffer = [];
+    clearFlushTimer();
+    sttPending = [];
+    sttStream = await getLoopbackStream();
+    const audioTracks = sttStream.getAudioTracks();
+    push(`Loopback audio tracks: ${audioTracks.length}`);
+    audioTracks.forEach((t, i) =>
+      push(`  [${i}] label="${t.label}" enabled=${t.enabled} muted=${t.muted} readyState=${t.readyState}`)
+    );
+    loopMonitor.srcObject = sttStream;
+    try { await loopMonitor.play(); } catch {}
+    sttCtx = new AudioContext();
+    push(`AudioContext sampleRate=${sttCtx.sampleRate}`);
+    const src = sttCtx.createMediaStreamSource(sttStream);
+    analyser = sttCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    src.connect(analyser);
+    startAnalyser();
+    const workletUrl = new URL("stt-worklet-processor.js", window.location.href).toString();
+    await sttCtx.audioWorklet.addModule(workletUrl);
+    const node = new AudioWorkletNode(sttCtx, "stt-pcm16-16k");
+    src.connect(node);
+    node.port.onmessage = (e) => {
+      const buf = e.data;
+      if (!sttWs) return;
+      if (sttWs.readyState === WebSocket.OPEN) {
+        sttWs.send(buf);
+      } else if (sttWs.readyState === WebSocket.CONNECTING) {
+        sttPending.push(buf);
+        if (sttPending.length > 80) sttPending.shift();
+      }
+    };
+    push(`Connecting STT WS: ${STT_WS}`);
+    sttWs = new WebSocket(STT_WS);
+    sttWs.binaryType = "arraybuffer";
+    refreshButtons();
+    sttWs.onopen = () => {
+      push("STT WS connected");
+      for (const buf of sttPending) {
+        try { sttWs.send(buf); } catch {}
+      }
+      sttPending = [];
+      refreshButtons();
+    };
+    sttWs.onclose = (evt) => {
+      const code = evt?.code;
+      const reason = evt?.reason;
+      const clean = evt?.wasClean;
+      push(`STT WS closed (code=${code}, clean=${clean}, reason=${reason || ""})`);
+      sttWs = null;
+      setPill("sttStatus", "bad", "STT: OFF");
+      refreshButtons();
+    };
+    sttWs.onerror = () => push("STT WS error");
+    sttWs.onmessage = (evt) => {
+      if (typeof evt.data !== "string") return;
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch { return; }
+      if (msg.type === "STT_FINAL") {
+        const chunk = (msg.transcript || "").trim();
+        if (!chunk) return;
+        push(`STT_FINAL: ${chunk}`);
+        sttBuffer.push(chunk);
+        const endsSentence = /[?.!]\s*$/.test(chunk);
+        clearFlushTimer();
+        const timeout = endsSentence ? 450 : FLUSH_MS;
+        flushTimer = window.setTimeout(() => {
+          flushSttBuffer().catch(() => {});
+          flushTimer = null;
+        }, timeout);
+      } else if (msg.type === "STT_ERROR") {
+        push(`STT_ERROR: ${msg.error || "unknown"}`);
+      } else if (msg.type === "STT_MODE") {
+        // Normalize server mode line for quick diagnostics (matches your log pattern).
+        const requested = (getSttLanguage() || "").toString();
+        const serverLang = (msg.language || msg.lang || msg.locale || "").toString();
+        const supported = Array.isArray(msg.supported) ? msg.supported.join(",") : (msg.supported || "");
+        push(`STT_MODE: mode=${msg.mode} requested=${requested} server=${serverLang || requested} supported=${supported}`);
+      } else {
+        push(`STT WS msg: ${JSON.stringify(msg)}`);
+      }
+    };
+    setPill("sttStatus", "ok", "STT: ON");
+    push(`STT streaming started (PCM16@16k mono). Language=${getSttLanguage()}`);
+    refreshButtons();
+  }
+  async function stopStt() {
+    clearFlushTimer();
+    try { await flushSttBuffer(); } catch {}
+    stopAnalyser();
+    try { sttWs?.close(1000, "stop"); } catch {}
+    sttWs = null;
+    try { sttStream?.getTracks().forEach((t) => t.stop()); } catch {}
+    sttStream = null;
+    try { loopMonitor.pause(); loopMonitor.srcObject = null; } catch {}
+    try { await sttCtx?.close(); } catch {}
+    sttCtx = null;
+    setPill("sttStatus", "bad", "STT: OFF");
+    push("STT stopped");
+    refreshButtons();
+  }
+  function refreshButtons() {
+    const controlOk = controlWs && controlWs.readyState === WebSocket.OPEN;
+    const rtOk = rtWs && rtWs.readyState === WebSocket.OPEN;
+    const sttOk = !!sttWs && sttWs.readyState !== WebSocket.CLOSED;
+    // Pause/Resume button is enabled only when Voice WS is open.
+    if (btnPauseAudio) {
+      btnPauseAudio.disabled = !rtOk;
+    }
+    const enabled = getSttEnabled();
+    $("btnStart").disabled = !(controlOk && rtOk) || sttOk || !enabled;
+    $("btnStop").disabled = !sttOk;
+  }
+  // ------------------------------
+  // Reset Session (Ready state; user clicks Connect)
+  // ------------------------------
+  async function resetSessionToReady() {
+    push("Reset session requested...");
+    desiredConnected = false;
+    clearReconnectTimers();
+    clearPingTimers();
+    try { await stopStt(); } catch {}
+    try { controlWs?.close(1000, "reset"); } catch {}
+    try { rtWs?.close(1000, "reset"); } catch {}
+    controlWs = null;
+    rtWs = null;
+    activeTurnId = null;
+    playhead = 0;
+    try { clearBufferedAudio(); } catch {}
+    controlReconnectAttempt = 0;
+    rtReconnectAttempt = 0;
+    sid =
+      (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : ("test-" + Math.random().toString(16).slice(2));
+    $("sid").textContent = sid;
+    setPill("sttStatus", "bad", "STT: OFF");
+    setControlStatus("OFF");
+    setRealtimeStatus("OFF");
+    refreshButtons();
+    push(`Session reset complete. New sessionId=${sid}. Ready (click Connect).`);
+  }
+  // ------------------------------
+  // Instructions Page (editor + profiles)
+  // ------------------------------
+  let profilesLoadedOnce = false;
+  function extractDomainBlock(text) {
+    const parts = (text || "").split("\n---\n");
+    const domainCandidate = parts.find((b, idx) => idx === 2 && b.startsWith("CONTENT INSTRUCTIONS:"));
+    return domainCandidate ?? null;
+  }
+  function extractRulesBlock(text) {
+    const parts = (text || "").split("\n---\n");
+    const rules = parts.find((b) => b.startsWith("RULES:"));
+    return rules ?? FIXED_RULES;
+  }
+
+  // ------------------------------
+  // Canonical instruction sections (ROLE / SPEECH / CONTENT / FORMAT / RULES)
+  // Goal: sections are never lost; plain-text paste is routed into CONTENT.
+  // Backward compatible with legacy (SPEECH BEHAVIOR / CONTENT INSTRUCTIONS) format.
+  // ------------------------------
+  function _stripHeader(block, header) {
+    const t = (block || "").toString().replace(/\r/g, "");
+    const h = header.endsWith(":") ? header : (header + ":");
+    if (t.startsWith(h)) return t.slice(h.length).replace(/^\n/, "");
+    return t;
+  }
+
+  function _hasAnyHeader(text) {
+    const t = (text || "").toString();
+    return /(^|\n)(ROLE:|SPEECH:|CONTENT:|FORMAT:|RULES:|SPEECH BEHAVIOR:|CONTENT INSTRUCTIONS:)\s*/.test(t);
+  }
+
+  function parseInstructionSectionsAny(text) {
+    const t = (text || "").toString().replace(/\r/g, "");
+    const parts = t.split("\n---\n").map((p) => p.trimEnd());
+
+    let role = "";
+    let speech = "";
+    let content = "";
+    let format = "";
+    let rules = "";
+
+    // Canonical blocks first
+    for (const b of parts) {
+      if (!b) continue;
+      if (b.startsWith("ROLE:")) role = _stripHeader(b, "ROLE:");
+      else if (b.startsWith("SPEECH:")) speech = _stripHeader(b, "SPEECH:");
+      else if (b.startsWith("CONTENT:")) content = _stripHeader(b, "CONTENT:");
+      else if (b.startsWith("FORMAT:")) format = _stripHeader(b, "FORMAT:");
+      else if (b.startsWith("RULES:")) rules = _stripHeader(b, "RULES:");
+    }
+
+    // Legacy support: SPEECH BEHAVIOR + (CONTENT INSTRUCTIONS xN) + RULES
+    if (!role && !speech && !content && !format) {
+      let legacySpeech = "";
+      const legacyContents = [];
+      for (const b of parts) {
+        if (!b) continue;
+        if (b.startsWith("SPEECH BEHAVIOR:")) legacySpeech = _stripHeader(b, "SPEECH BEHAVIOR:");
+        else if (b.startsWith("CONTENT INSTRUCTIONS:")) legacyContents.push(_stripHeader(b, "CONTENT INSTRUCTIONS:"));
+        else if (b.startsWith("RULES:")) rules = _stripHeader(b, "RULES:");
+      }
+
+      // Map legacy: speech -> SPEECH; first CONTENT INSTRUCTIONS -> FORMAT (style),
+      // second CONTENT INSTRUCTIONS -> CONTENT (domain). If only one, map to CONTENT.
+      speech = legacySpeech;
+      if (legacyContents.length === 1) {
+        content = legacyContents[0];
+      } else if (legacyContents.length >= 2) {
+        format = legacyContents[0];
+        content = legacyContents[1];
+      }
+    }
+
+    // If still empty and text is plain, treat entire text as CONTENT.
+    if (!role && !speech && !content && !format && !rules && t.trim()) {
+      content = t.trim();
+    }
+
+    // Ensure rules fallback
+    if (!rules.trim()) {
+      rules = _stripHeader(FIXED_RULES, "RULES:");
+    }
+
+    return {
+      role: (role || "").toString().trimEnd(),
+      speech: (speech || "").toString().trimEnd(),
+      content: (content || "").toString().trimEnd(),
+      format: (format || "").toString().trimEnd(),
+      rules: (rules || "").toString().trimEnd(),
+    };
+  }
+
+  function composeInstructionCanonical(sections) {
+    const s = sections || {};
+    const role = (s.role || "").toString().trimEnd();
+    const speech = (s.speech || "").toString().trimEnd();
+    const content = (s.content || "").toString().trimEnd();
+    const format = (s.format || "").toString().trimEnd();
+    const rules = ((s.rules || "").toString().trimEnd()) || _stripHeader(FIXED_RULES, "RULES:");
+
+    // Always keep headers even if section is empty.
+    return (
+`ROLE:
+${role}
+---
+SPEECH:
+${speech}
+---
+CONTENT:
+${content}
+---
+FORMAT:
+${format}
+---
+RULES:
+${rules}`.trimEnd()
+    );
+  }
+
+  function normalizeInstructionText(raw, fallbackText) {
+    const rawText = (raw || "").toString().replace(/\r/g, "").trim();
+    const fbText = (fallbackText || "").toString().replace(/\r/g, "").trim();
+
+    const fb = parseInstructionSectionsAny(fbText);
+    if (!rawText) {
+      // If user cleared everything, keep fallback structure (do not wipe sections).
+      return composeInstructionCanonical(fb);
+    }
+
+    if (!_hasAnyHeader(rawText)) {
+      // Plain paste: route into CONTENT; keep other sections from fallback.
+      const next = { ...fb, content: rawText };
+      return composeInstructionCanonical(next);
+    }
+
+    // Header-based paste: parse and fill missing from fallback.
+    const cur = parseInstructionSectionsAny(rawText);
+    const next = {
+      role: cur.role.trim() ? cur.role : fb.role,
+      speech: cur.speech.trim() ? cur.speech : fb.speech,
+      content: cur.content.trim() ? cur.content : fb.content,
+      format: cur.format.trim() ? cur.format : fb.format,
+      rules: cur.rules.trim() ? cur.rules : fb.rules,
+    };
+    return composeInstructionCanonical(next);
+  }
+
+  function profileArr(p, key, legacyKey) {
+    const v = p?.[key];
+    if (Array.isArray(v)) return v;
+    const l = legacyKey ? p?.[legacyKey] : null;
+    if (Array.isArray(l)) return l;
+    return [];
+  }
+
+  function _toLines(blockText) {
+    const raw = (blockText || "").toString().replace(/\r/g, "");
+    const lines = raw ? raw.split("\n").map((s) => (s ?? "").toString().trimEnd()) : [];
+    // Drop leading/trailing empty lines, keep intentional blank lines inside.
+    while (lines.length && !lines[0].trim()) lines.shift();
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    return lines;
+  }
+
+  function _stripLegacyProfileKeys(p) {
+    if (!p || typeof p !== "object") return p;
+
+    // If a profile only has legacy keys, convert them into canonical arrays BEFORE removing them.
+    const hasCanonical =
+      Array.isArray(p.role) || Array.isArray(p.speech) || Array.isArray(p.content) || Array.isArray(p.format) || Array.isArray(p.rules);
+
+    if (!hasCanonical) {
+      if (!Array.isArray(p.speech) && Array.isArray(p.speechBehavior) && p.speechBehavior.length) {
+        p.speech = [...p.speechBehavior];
+      }
+      if (Array.isArray(p.contentInstructions) && p.contentInstructions.length) {
+        const joined = p.contentInstructions.join("\n");
+const sections = parseInstructionSectionsAny(joined);
+        // Best-effort mapping: prefer explicit sections if present; otherwise treat as CONTENT.
+        p.role = _toLines(sections.role);
+        p.speech = _toLines(sections.speech) || (Array.isArray(p.speech) ? p.speech : []);
+        p.content = _toLines(sections.content);
+        p.format = _toLines(sections.format);
+        p.rules = _toLines(sections.rules || _stripHeader(FIXED_RULES, "RULES:"));
+      }
+    }
+
+    // Remove legacy keys that cause the UI to render SPEECH BEHAVIOR / CONTENT INSTRUCTIONS blocks.
+    if ("speechBehavior" in p) delete p.speechBehavior;
+    if ("contentInstructions" in p) delete p.contentInstructions;
+    return p;
+  }
+
+
+  function _canonicalizeProfileFromText(p, textValue) {
+    const sections = parseInstructionSectionsAny(textValue || "");
+    p.role = _toLines(sections.role);
+    p.speech = _toLines(sections.speech);
+    p.content = _toLines(sections.content);
+    p.format = _toLines(sections.format);
+    p.rules = _toLines(sections.rules || _stripHeader(FIXED_RULES, "RULES:"));
+    _stripLegacyProfileKeys(p);
+    return p;
+  }
+
+  function _sanitizeProfilesCache(profiles) {
+    if (!profiles) return profiles;
+    const styles = Array.isArray(profiles.styles) ? profiles.styles : [];
+    const domains = Array.isArray(profiles.domains) ? profiles.domains : [];
+    for (const p of styles) _stripLegacyProfileKeys(p);
+    for (const p of domains) _stripLegacyProfileKeys(p);
+    return profiles;
+  }
+
+  function profileToCanonicalText(profile) {
+    const p = profile || {};
+    // Canonical storage only (ROLE/SPEECH/CONTENT/FORMAT/RULES). We intentionally ignore legacy
+    // keys (speechBehavior/contentInstructions) to prevent the UI from re-inserting them.
+    const role = profileArr(p, "role", null).join("\n").trim();
+    const speech = profileArr(p, "speech", null).join("\n").trim();
+    const content = profileArr(p, "content", null).join("\n").trim();
+    const format = profileArr(p, "format", null).join("\n").trim();
+    const rules = profileArr(p, "rules", null).join("\n").trim();
+
+    return composeInstructionCanonical({
+      role,
+      speech,
+      content,
+      format,
+      rules: rules || _stripHeader(FIXED_RULES, "RULES:")
+    });
+  }
+  function applyStyleProfile(profile) {
+    const current = (instrCurrentEl?.value || "").toString();
+
+// Canonical sections path (ROLE/SPEECH/CONTENT/FORMAT/RULES) + legacy-compatible profile fields.
+// If current text already has canonical headers OR profile uses canonical arrays, prefer canonical update.
+const profileHasCanonical = Array.isArray(profile?.role) || Array.isArray(profile?.speech) || Array.isArray(profile?.content) || Array.isArray(profile?.format) || Array.isArray(profile?.rules);
+const currentLooksCanonical = /(^|\n)(ROLE:|SPEECH:|CONTENT:|FORMAT:)\s*/.test(current);
+if (profileHasCanonical || currentLooksCanonical) {
+  const fb = parseInstructionSectionsAny(current);
+  const next = {
+    role: fb.role,
+    speech: (profileArr(profile, "speech", null).join("\n").trim()) || fb.speech,
+    content: fb.content,
+    format: (profileArr(profile, "format", null).join("\n").trim()) || fb.format,
+    rules: fb.rules,
+  };
+  const canonical = composeInstructionCanonical(next);
+  if (instrCurrentEl) instrCurrentEl.value = canonical;
+  if (instrStatusEl) instrStatusEl.textContent = "Applied (style → SPEECH/FORMAT)";
+  updateVoiceInstructionsUI();
+  return;
+}
+    const speech = (profile.speechBehavior ?? []).join("\n").trim();
+    const styleContent = (profile.contentInstructions ?? []).join("\n").trim();
+    const domainBlock = extractDomainBlock(current);
+    const rulesBlock = extractRulesBlock(current);
+    const next =
+`SPEECH BEHAVIOR:
+${speech}
+---
+CONTENT INSTRUCTIONS:
+${styleContent}${domainBlock ? "\n---\n" + domainBlock : ""}
+---
+${rulesBlock}`;
+    if (instrCurrentEl) instrCurrentEl.value = next;
+  }
+  function applyDomainProfile(profile) {
+    const current = (instrCurrentEl?.value || "").toString();
+
+// Canonical sections path (ROLE/SPEECH/CONTENT/FORMAT/RULES) + legacy-compatible profile fields.
+const profileHasCanonical = Array.isArray(profile?.role) || Array.isArray(profile?.speech) || Array.isArray(profile?.content) || Array.isArray(profile?.format) || Array.isArray(profile?.rules);
+const currentLooksCanonical = /(^|\n)(ROLE:|SPEECH:|CONTENT:|FORMAT:)\s*/.test(current);
+if (profileHasCanonical || currentLooksCanonical) {
+  const fb = parseInstructionSectionsAny(current);
+  const next = {
+    role: (profileArr(profile, "role", null).join("\n").trim()) || fb.role,
+    speech: fb.speech,
+    content: (profileArr(profile, "content", null).join("\n").trim()) || fb.content,
+    format: fb.format,
+    rules: (profileArr(profile, "rules", null).join("\n").trim()) || fb.rules,
+  };
+  const canonical = composeInstructionCanonical(next);
+  if (instrCurrentEl) instrCurrentEl.value = canonical;
+  if (instrStatusEl) instrStatusEl.textContent = "Applied (domain → ROLE/CONTENT)";
+  updateVoiceInstructionsUI();
+  return;
+}
+    const parts = current.split("\n---\n");
+    const rulesBlock = extractRulesBlock(current);
+    const speechBlock = parts.find((b) => b.startsWith("SPEECH BEHAVIOR:")) ?? "SPEECH BEHAVIOR:\n";
+    const styleBlock = parts.find((b, idx) => idx === 1 && b.startsWith("CONTENT INSTRUCTIONS:")) ?? "CONTENT INSTRUCTIONS:\n";
+    const domain =
+`CONTENT INSTRUCTIONS:
+${(profile.contentInstructions ?? []).join("\n").trim()}`;
+    const next =
+`${speechBlock}
+---
+${styleBlock}
+---
+${domain}
+---
+${rulesBlock}`;
+    if (instrCurrentEl) instrCurrentEl.value = next;
+  }
+  
+  // ------------------------------
+  // Local persistence for Instruction Profiles (Option B)
+  // Stored under: .electron-userdata/instruction_profiles.local.json
+  // ------------------------------
+  function formatStyleProfile(p) {
+    return `SPEECH BEHAVIOR:\n${(p.speechBehavior ?? []).join("\n")}\n\nCONTENT INSTRUCTIONS:\n${(p.contentInstructions ?? []).join("\n")}`.trim();
+  }
+  function formatDomainProfile(p) {
+    return `CONTENT INSTRUCTIONS:\n${(p.contentInstructions ?? []).join("\n")}`.trim();
+  }
+  function parseStyleProfileText(text) {
+    const t = (text || "").toString().replace(/\r/g, "");
+    const speechHdr = "SPEECH BEHAVIOR:";
+    const contentHdr = "CONTENT INSTRUCTIONS:";
+    const iSpeech = t.indexOf(speechHdr);
+    const iContent = t.indexOf(contentHdr);
+    let speechPart = "";
+    let contentPart = "";
+    if (iSpeech >= 0 && iContent > iSpeech) {
+      speechPart = t.slice(iSpeech + speechHdr.length, iContent).trim();
+      contentPart = t.slice(iContent + contentHdr.length).trim();
+    } else if (iContent >= 0) {
+      // No speech header; treat everything after CONTENT INSTRUCTIONS as content.
+      contentPart = t.slice(iContent + contentHdr.length).trim();
+    } else {
+      // No headers; treat whole text as content.
+      contentPart = t.trim();
+    }
+    const speechBehavior = speechPart ? speechPart.split("\n").map((s) => s.trimEnd()) : [];
+    const contentInstructions = contentPart ? contentPart.split("\n").map((s) => s.trimEnd()) : [];
+    // Drop leading/trailing empty lines but keep intentional blank lines inside.
+    while (speechBehavior.length && !speechBehavior[0].trim()) speechBehavior.shift();
+    while (speechBehavior.length && !speechBehavior[speechBehavior.length - 1].trim()) speechBehavior.pop();
+    while (contentInstructions.length && !contentInstructions[0].trim()) contentInstructions.shift();
+    while (contentInstructions.length && !contentInstructions[contentInstructions.length - 1].trim()) contentInstructions.pop();
+    return { speechBehavior, contentInstructions };
+  }
+  function parseDomainProfileText(text) {
+    const t = (text || "").toString().replace(/\r/g, "");
+    const hdr = "CONTENT INSTRUCTIONS:";
+    const i = t.indexOf(hdr);
+    const contentPart = (i >= 0 ? t.slice(i + hdr.length) : t).trim();
+    const contentInstructions = contentPart ? contentPart.split("\n").map((s) => s.trimEnd()) : [];
+    while (contentInstructions.length && !contentInstructions[0].trim()) contentInstructions.shift();
+    while (contentInstructions.length && !contentInstructions[contentInstructions.length - 1].trim()) contentInstructions.pop();
+    return { contentInstructions };
+  }
+  async function saveProfilesToLocal() {
+    if (!profilesCache) return false;
+    if (!window.electronAPI?.instructionProfilesWrite) return false;
+    const payload = {
+      version: profilesCache.version || 1,
+      updatedAt: new Date().toISOString(),
+      styles: Array.isArray(profilesCache.styles) ? profilesCache.styles : [],
+      domains: Array.isArray(profilesCache.domains) ? profilesCache.domains : [],
+    };
+
+    _sanitizeProfilesCache(payload);
+    try {
+      await window.electronAPI.instructionProfilesWrite(payload);
+      if (profilesErrorEl) profilesErrorEl.textContent = "";
+      push("Instruction profiles saved locally");
+      return true;
+    } catch (e) {
+      if (profilesErrorEl) profilesErrorEl.textContent = "Local save failed (instruction_profiles.local.json)";
+      push("WARN: instruction profiles local save failed");
+      return false;
+    }
+  }
+
+  function renderProfiles(profiles) {
+    if (!profilesStylesEl || !profilesDomainsEl) return;
+    profilesStylesEl.innerHTML = "";
+    profilesDomainsEl.innerHTML = "";
+    const styles = Array.isArray(profiles.styles) ? profiles.styles : [];
+    const domains = Array.isArray(profiles.domains) ? profiles.domains : [];
+    let styleSeq = 0;
+    let domainSeq = 0;
+    for (const p of styles) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const title = document.createElement("strong");
+      title.textContent = p.name || p.id || "Style";
+      // UI-only: simplify titles (avoid long profile names).
+      styleSeq += 1;
+      title.textContent = `Instruction ${styleSeq}`;
+      card.appendChild(title);
+      const desc = document.createElement("div");
+      desc.textContent = p.description || "";
+      card.appendChild(desc);
+      const ta = document.createElement("textarea");
+      ta.readOnly = false;
+      ta.rows = 8;
+      ta.value =
+`SPEECH BEHAVIOR:
+${(p.speechBehavior ?? []).join("\n")}
+CONTENT INSTRUCTIONS:
+${(p.contentInstructions ?? []).join("\n")}`;
+      // UI: show canonical sections (ROLE/SPEECH/CONTENT/FORMAT/RULES) instead of legacy headers.
+      ta.value = profileToCanonicalText(p);
+      // If profile uses canonical sections (role/speech/content/format/rules), show canonical text in the editor.
+      const _hasCanonicalProfile = Array.isArray(p?.role) || Array.isArray(p?.speech) || Array.isArray(p?.content) || Array.isArray(p?.format) || Array.isArray(p?.rules);
+      if (_hasCanonicalProfile) {
+        ta.value = profileToCanonicalText(p);
+      }
+      card.appendChild(ta);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Apply";
+      btn.addEventListener("click", () => {
+        applyStyleProfile(p);
+        // Apply should take effect immediately for the next turn.
+// Apply should take effect immediately for the next turn.
+instructionStore = instructionStore || normalizeStore(null);
+instructionStore.realtime = instructionStore.realtime || emptyInstrDoc();
+instructionStore.realtime.current = (instrCurrentEl?.value || "").toString();
+instructionStore.realtime.updatedAt = new Date().toISOString();
+instructionStore.realtime.source = "ui-apply";
+updateVoiceInstructionsUI();
+      });
+      card.appendChild(btn);
+
+      const btnSave = document.createElement("button");
+      btnSave.type = "button";
+      btnSave.textContent = "Save";
+      btnSave.disabled = true;
+      ta.addEventListener("input", () => { btnSave.disabled = false; });
+      btnSave.addEventListener("click", async () => {
+        // Save in canonical storage only. This prevents the editor from re-inserting
+        // legacy headers like "SPEECH BEHAVIOR:" / "CONTENT INSTRUCTIONS:".
+        _canonicalizeProfileFromText(p, ta.value);
+        ta.value = profileToCanonicalText(p);
+        profilesCache = profilesCache || profiles;
+        btnSave.disabled = true;
+        await saveProfilesToLocal();
+      });
+      card.appendChild(btnSave);
+
+      profilesStylesEl.appendChild(card);
+    }
+    for (const p of domains) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const title = document.createElement("strong");
+      title.textContent = p.name || p.id || "Domain";
+      // UI-only: simplify titles (avoid long profile names).
+      domainSeq += 1;
+      title.textContent = `Instruction ${domainSeq}`;
+      card.appendChild(title);
+      const desc = document.createElement("div");
+      desc.textContent = p.description || "";
+      card.appendChild(desc);
+      const ta = document.createElement("textarea");
+      ta.readOnly = false;
+      ta.rows = 8;
+      ta.value =
+`CONTENT INSTRUCTIONS:
+${(p.contentInstructions ?? []).join("\n")}`;
+      // UI: show canonical sections (ROLE/SPEECH/CONTENT/FORMAT/RULES) instead of legacy headers.
+      ta.value = profileToCanonicalText(p);
+      // If profile uses canonical sections (role/speech/content/format/rules), show canonical text in the editor.
+      const _hasCanonicalProfile = Array.isArray(p?.role) || Array.isArray(p?.speech) || Array.isArray(p?.content) || Array.isArray(p?.format) || Array.isArray(p?.rules);
+      if (_hasCanonicalProfile) {
+        ta.value = profileToCanonicalText(p);
+      }
+      card.appendChild(ta);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Apply";
+      btn.addEventListener("click", () => {
+        applyDomainProfile(p);
+// Apply should take effect immediately for the next turn.
+instructionStore = instructionStore || normalizeStore(null);
+instructionStore.realtime = instructionStore.realtime || emptyInstrDoc();
+instructionStore.realtime.current = (instrCurrentEl?.value || "").toString();
+instructionStore.realtime.updatedAt = new Date().toISOString();
+instructionStore.realtime.source = "ui-apply";
+updateVoiceInstructionsUI();
+      });
+      card.appendChild(btn);
+
+      const btnSave = document.createElement("button");
+      btnSave.type = "button";
+      btnSave.textContent = "Save";
+      btnSave.disabled = true;
+      ta.addEventListener("input", () => { btnSave.disabled = false; });
+      btnSave.addEventListener("click", async () => {
+        // Save in canonical storage only (ROLE/SPEECH/CONTENT/FORMAT/RULES).
+        _canonicalizeProfileFromText(p, ta.value);
+        ta.value = profileToCanonicalText(p);
+        profilesCache = profilesCache || profiles;
+        btnSave.disabled = true;
+        await saveProfilesToLocal();
+      });
+      card.appendChild(btnSave);
+
+      profilesDomainsEl.appendChild(card);
+    }
+  }
+    async function loadProfilesFromBackend() {
+    // 1) Local override (preferred)
+    if (window.electronAPI?.instructionProfilesRead) {
+      try {
+        const local = await window.electronAPI.instructionProfilesRead();
+        if (local && (Array.isArray(local.styles) || Array.isArray(local.domains))) {
+          _sanitizeProfilesCache(local);
+          profilesCache = local;
+          renderProfiles(local);
+          if (profilesErrorEl) profilesErrorEl.textContent = "";
+          push(`Instruction profiles loaded (local${local.updatedAt ? " " + local.updatedAt : ""})`);
+          return local;
+        }
+      } catch {}
+    }
+
+    // 2) Backend seed (fallback)
+    const { REALTIME_HTTP } = cfg();
+    try {
+      const r = await fetch(`${REALTIME_HTTP}/instruction_profiles.json?t=${Date.now()}`, { headers: authHeaders() });
+      if (!r.ok) {
+        if (profilesErrorEl) profilesErrorEl.textContent = `Profiles load failed (HTTP ${r.status}). Check backend serves /instruction_profiles.json`;
+        profilesCache = { version: 1, styles: [], domains: [] };
+        renderProfiles(profilesCache);
+        return profilesCache;
+      }
+      const data = await r.json();
+      _sanitizeProfilesCache(data);
+      profilesCache = data;
+      renderProfiles(data);
+      if (profilesErrorEl) profilesErrorEl.textContent = "";
+      push("Instruction profiles loaded (backend)");
+      // Seed local for offline use
+      try { await window.electronAPI?.instructionProfilesWrite?.(data); } catch {}
+      return data;
+    } catch (e) {
+      if (profilesErrorEl) profilesErrorEl.textContent = "Profiles load failed (network error)";
+      profilesCache = { version: 1, styles: [], domains: [] };
+      renderProfiles(profilesCache);
+      return profilesCache;
+    }
+  }
+
+  async function saveInstructionsToBackend_LEGACY() {
+    const current = (instrCurrentEl?.value || "").toString();
+    const defaultText = (instrDefaultEl?.value || "").toString();
+    const updatedAt = new Date().toISOString();
+
+    // Desktop/local-first (source of truth)
+    if (hasLocalInstructionStore()) {
+      const payload = { current, default: defaultToSave, updatedAt, source: "local-save" };
+      const ok = await writeLocalInstructions(payload);
+
+      if (ok) {
+        applyInstructionsToUi(payload, "Saved (local)", { silent: true });
+        if (instrStatusEl) instrStatusEl.textContent = "Saved (local)";
+        push("Instructions saved locally");
+
+        // Best-effort backend sync (does NOT overwrite local)
+        const sync = await syncInstructionsToBackend(current, { silent: true });
+        if (instrStatusEl) {
+          instrStatusEl.textContent = sync.ok ? "Saved (local) + synced" : "Saved (local) (sync failed)";
+        }
+        if (!sync.ok) push("WARN: backend sync failed; local remains authoritative");
+        return;
+      }
+
+      if (instrStatusEl) instrStatusEl.textContent = "Local save failed; trying backend...";
+    }
+
+    // Backend fallback (non-Electron / local store unavailable)
+    try {
+      const { REALTIME_HTTP } = cfg();
+      const r = await fetch(`${REALTIME_HTTP}/v1/instructions`, {
+        method: "PUT",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ current }),
+      });
+      if (!r.ok) {
+        if (instrStatusEl) instrStatusEl.textContent = `Save failed (HTTP ${r.status})`;
+        return;
+      }
+      if (instrStatusEl) instrStatusEl.textContent = "Saved (backend)";
+      await loadInstructionsFromBackendExplicit({ silent: true });
+    } catch {
+      if (instrStatusEl) instrStatusEl.textContent = "Save failed (network error)";
+    }
+  }
+
+  async function resetInstructionsToDefault_LEGACY() {
+    // Desktop/local-first: reset CURRENT to DEFAULT in local store; then best-effort sync to backend.
+    if (hasLocalInstructionStore()) {
+      const data = await loadInstructionsEffective({ silent: true });
+      if (!data) {
+        if (instrStatusEl) instrStatusEl.textContent = "Reset failed (no instructions loaded)";
+        return;
+      }
+      const updatedAt = new Date().toISOString();
+      const payload = {
+        current: (data.default || "").toString(),
+        default: (data.default || "").toString(),
+        updatedAt,
+        source: "local-reset",
+      };
+
+      const ok = await writeLocalInstructions(payload);
+      if (!ok) {
+        if (instrStatusEl) instrStatusEl.textContent = "Reset failed (local write)";
+        push("WARN: local reset write failed");
+        return;
+      }
+
+      applyInstructionsToUi(payload, "Reset (local)", { silent: true });
+      if (instrStatusEl) instrStatusEl.textContent = "Reset (local)";
+      push("Instructions reset to default (local)");
+
+      const sync = await syncInstructionsToBackend(payload.current, { silent: true });
+      if (instrStatusEl) {
+        instrStatusEl.textContent = sync.ok ? "Reset (local) + synced" : "Reset (local) (sync failed)";
+      }
+      if (!sync.ok) push("WARN: backend sync failed; local remains authoritative");
+      return;
+    }
+
+    // Browser fallback: use backend reset endpoint
+    const { REALTIME_HTTP } = cfg();
+    try {
+      const r = await fetch(`${REALTIME_HTTP}/v1/instructions/reset`, { method: "POST", headers: authHeaders() });
+      if (!r.ok) {
+        if (instrStatusEl) instrStatusEl.textContent = `Reset failed (HTTP ${r.status})`;
+        return;
+      }
+      if (instrStatusEl) instrStatusEl.textContent = "Reset done";
+      await loadInstructionsFromBackendExplicit({ silent: true });
+    } catch {
+      if (instrStatusEl) instrStatusEl.textContent = "Reset failed (network error)";
+    }
+  }
+
+  async function refreshInstructionsPage_LEGACY() {
+    const { REALTIME_HTTP } = cfg();
+    if (instrBackendEl) instrBackendEl.textContent = REALTIME_HTTP;
+    // Always refresh current instructions when page is opened
+    await loadInstructionsEffective({ silent: true });
+    if (!profilesLoadedOnce) await loadProfilesFromBackend();
+  }
+  if (btnInstrLoad) btnInstrLoad.addEventListener("click", () => loadInstructionsFromBackendExplicit().catch(() => {}));
+  if (btnInstrSave) btnInstrSave.addEventListener("click", () => saveInstructionsToBackend().catch(() => {}));
+  if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructionsToDefault().catch(() => {}));
+  // ------------------------------
+  // UI wiring (Settings page)
+  // ------------------------------
+  function markSettingsSaved(msg) {
+    if (!settingsSaved) return;
+    settingsSaved.textContent = msg || "Saved";
+    window.setTimeout(() => {
+      try { settingsSaved.textContent = ""; } catch {}
+    }, 1500);
+  }
+  function saveSettingsFromInputs() {
+    saveStrLS(LS_STT_BASE, $("sttBase").value.trim());
+    saveStrLS(LS_ORCH_HTTP, $("orchHttp").value.trim());
+    saveStrLS(LS_CONTROL_BASE, $("controlBase").value.trim());
+    saveStrLS(LS_RT_HTTP, $("rtHttp").value.trim());
+    saveStrLS(LS_RT_WS, $("rtWs").value.trim());
+saveStrLS(LS_VOICE_ENGINE, normalizeVoiceEngine((voiceEngineEl?.value || "").toString()));
+saveStrLS(LS_REALTIME_RATE, normalizeRealtimeRate((realtimeRateEl?.value || "").toString()));
+applyVoiceEngineUiState(getVoiceEngine());
+markSettingsSaved("Saved");
+  }
+  function resetSettingsToDefaults() {
+    saveStrLS(LS_STT_BASE, "");
+    saveStrLS(LS_ORCH_HTTP, "");
+    saveStrLS(LS_CONTROL_BASE, "");
+    saveStrLS(LS_RT_HTTP, "");
+    saveStrLS(LS_RT_WS, "");
+    saveStrLS(LS_VOICE_ENGINE, "");
+    saveStrLS(LS_REALTIME_RATE, "");
+    loadEndpointSettingsIntoInputs();
+    loadVoiceSettingsIntoInputs();
+    markSettingsSaved("Reset to defaults");
+  }
+  if (btnSaveSettings) btnSaveSettings.addEventListener("click", () => {
+    saveSettingsFromInputs();
+    // Keep Instructions page backend label consistent if user changed REALTIME_HTTP
+    try { refreshInstructionsPage().catch(() => {}); } catch {}
+  });
+  if (btnResetSettings) btnResetSettings.addEventListener("click", () => {
+    resetSettingsToDefaults();
+    try { refreshInstructionsPage().catch(() => {}); } catch {}
+  });
+  if (sttEnabledEl) {
+    sttEnabledEl.addEventListener("change", async () => {
+      const enabled = getSttEnabled();
+      saveBoolLS(LS_STT_ENABLED, enabled);
+      push(`STT Enabled set to: ${enabled ? "ON" : "OFF"}`);
+      if (!enabled && sttWs) {
+        await stopStt();
+      }
+      refreshButtons();
+    });
+  }
+  if (sttLangEl) {
+    sttLangEl.addEventListener("change", () => {
+      const lang = getSttLanguage();
+      saveStrLS(LS_STT_LANGUAGE, lang);
+      push(`STT language set to: ${lang} (will apply on next STT start)`);
+    });
+  }
+// Voice engine + rate (Paket 1)
+async function reconnectVoiceWs(reason) {
+  if (!desiredConnected) return;
+  try {
+    rtReconnectSuppressOnce = true;
+    try { rtWs?.close(1000, reason || "reconfigure"); } catch {}
+    rtWs = null;
+    // Connect immediately with the new config.
+    await connectRealtime();
+    refreshButtons();
+  } catch (e) {
+    push(`WARN: voice WS reconnect failed: ${e?.message || e}`);
+  }
+}
+
+if (voiceEngineEl) {
+  voiceEngineEl.addEventListener("change", async () => {
+    // Keep Voice tab selector in sync
+    try { if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = voiceEngineEl.value; } catch {}
+    const engine = getVoiceEngine();
+    saveStrLS(LS_VOICE_ENGINE, engine);
+    applyVoiceEngineUiState(engine);
+    push(`Voice Engine set to: ${engine}${engine === "realtime" ? " (rate applies)" : ""}`);
+    await reconnectVoiceWs("engine-change");
+    updateVoiceInstructionsUI();
+  });
+}
+if (voiceEngineVoiceEl) {
+  voiceEngineVoiceEl.addEventListener("change", async () => {
+    // Sync Settings selector
+    try { if (voiceEngineEl) voiceEngineEl.value = voiceEngineVoiceEl.value; } catch {}
+    const engine = getVoiceEngine();
+    saveStrLS(LS_VOICE_ENGINE, engine);
+    applyVoiceEngineUiState(engine);
+    push(`Voice Engine set to: ${engine}${engine === "realtime" ? " (rate applies)" : ""}`);
+    await reconnectVoiceWs("engine-change");
+    updateVoiceInstructionsUI();
+    // Update status label immediately (even if disconnected)
+    setRealtimeStatus(desiredConnected ? "RECONNECTING" : "OFF");
+  });
+}
+if (realtimeRateEl) {
+  realtimeRateEl.addEventListener("change", async () => {
+    // Keep Voice tab selector in sync
+    try { if (realtimeRateVoiceEl) realtimeRateVoiceEl.value = realtimeRateEl.value; } catch {}
+    const rate = getRealtimeRate();
+    saveStrLS(LS_REALTIME_RATE, rate);
+    push(`Realtime rate set to: ${rate} (will apply immediately if connected)`);
+    if (getVoiceEngine() === "realtime") await reconnectVoiceWs("rate-change");
+  });
+}
+if (realtimeRateVoiceEl) {
+  realtimeRateVoiceEl.addEventListener("change", async () => {
+    // Sync Settings selector
+    try { if (realtimeRateEl) realtimeRateEl.value = realtimeRateVoiceEl.value; } catch {}
+    const rate = getRealtimeRate();
+    saveStrLS(LS_REALTIME_RATE, rate);
+    push(`Realtime rate set to: ${rate} (will apply immediately if connected)`);
+    if (getVoiceEngine() === "realtime") await reconnectVoiceWs("rate-change");
+  });
+}
+
+  // Auth token UI
+  function setAuthStatus() {
+    if (!authStatusEl) return;
+    const token = getAuthToken();
+    authStatusEl.textContent = token ? "Token set" : "No token";
+  }
+  if (btnSaveToken) btnSaveToken.addEventListener("click", () => {
+    const token = (authTokenEl?.value || "").trim();
+    saveStrLS(LS_AUTH_TOKEN, token);
+    setAuthStatus();
+    push(token ? "Auth token saved (will be used for API calls)" : "Auth token cleared");
+  });
+  if (btnClearToken) btnClearToken.addEventListener("click", () => {
+    saveStrLS(LS_AUTH_TOKEN, "");
+    if (authTokenEl) authTokenEl.value = "";
+    setAuthStatus();
+    push("Auth token cleared");
+  });
+  // ------------------------------
+
+  // ------------------------------
+  // Pause button is injected into the existing Voice controls row (no HTML change).
+  // ------------------------------
+  function initPauseUi() {
+    try {
+      const btnConnectEl = $("btnConnect");
+      const btnStopEl = $("btnStop");
+      if (!btnConnectEl) return;
+      const host = btnConnectEl.parentElement;
+      if (!host) return;
+      // Create Pause/Resume button
+      btnPauseAudio = document.createElement("button");
+      btnPauseAudio.id = "btnPauseAudio";
+      btnPauseAudio.type = "button";
+      btnPauseAudio.textContent = "Pause audio";
+      btnPauseAudio.disabled = true;
+      btnPauseAudio.title = "Pause/resume Voice audio. While paused, audio is buffered (max 120s).";
+      btnPauseAudio.addEventListener("click", async () => {
+        await setAudioPaused(!isAudioPaused);
+        refreshButtons();
+      });
+      // Small status text (optional)
+      pauseInfoEl = document.createElement("span");
+      pauseInfoEl.id = "pauseInfo";
+      pauseInfoEl.className = "small";
+      pauseInfoEl.style.marginLeft = "8px";
+      pauseInfoEl.textContent = "";
+      // Insert after Stop STT if present; otherwise after Connect
+      if (btnStopEl && btnStopEl.parentElement === host) {
+        host.insertBefore(btnPauseAudio, btnStopEl.nextSibling);
+      } else {
+        host.appendChild(btnPauseAudio);
+      }
+      host.appendChild(pauseInfoEl);
+      updatePauseUi();
+    } catch {}
+  }
+
+  initPauseUi();
+  // UI wiring (Voice page)
+  // ------------------------------
+  $("btnRefreshDevices").addEventListener("click", async () => {
+    await refreshOutputDevicesUI();
+    await applyRealtimeSink();
+  });
+  rtDeviceSel.addEventListener("change", async () => {
+    const outputs = await enumerateAudioOutputs();
+    const deviceId = (rtDeviceSel.value || "").trim();
+    const label =
+      outputs.find((d) => d.deviceId === deviceId)?.label ||
+      rtDeviceSel.options[rtDeviceSel.selectedIndex]?.textContent ||
+      "";
+    if (REALTIME_HEADPHONES_ONLY && deviceId && !isHeadphonesLabel(label)) {
+      push(`Realtime sink policy: headphones-only. Cannot select: ${label || deviceId}`);
+      rtDeviceSel.value = "";
+    } else {
+      saveRtDeviceSelection(deviceId, label);
+    }
+    await applyRealtimeSink();
+  });
+  $("btnConnect").addEventListener("click", async () => {
+    desiredConnected = true;
+    clearReconnectTimers();
+    await refreshOutputDevicesUI();
+    connectControl();
+    await connectRealtime();
+    await loadInstructionsEffective();
+    refreshButtons();
+  });
+  $("btnReloadInstr").addEventListener("click", async () => {
+    await loadInstructionsEffective();
+  });
+  $("btnStart").addEventListener("click", async () => {
+    try {
+      await startStt();
+    } catch (e) {
+      push(`ERROR(STT start): ${e?.message || e}`);
+    }
+  });
+  $("btnStop").addEventListener("click", async () => {
+    await stopStt();
+  });
+  if (btnResetSession) {
+    btnResetSession.addEventListener("click", async () => {
+      try {
+        await resetSessionToReady();
+      } catch (e) {
+        push(`ERROR(reset session): ${e?.message || e}`);
+      }
+    });
+  }
+  if (navigator?.mediaDevices) {
+    try {
+      navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
+    } catch {
+      navigator.mediaDevices.ondevicechange = onDeviceChange;
+    }
+  }
+  window.addEventListener("beforeunload", () => {
+    desiredConnected = false;
+    clearReconnectTimers();
+    clearPingTimers();
+    try { controlWs?.close(1000, "reset"); } catch {}
+    try { rtWs?.close(1000, "reset"); } catch {}
+    try { sttWs?.close(1000, "stop"); } catch {}
+    controlWs = null;
+    rtWs = null;
+    sttWs = null;
+    try {
+      if (navigator?.mediaDevices) {
+        navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
+      }
+    } catch {}
+  });
+  // Initial UI state
+  setPill("sttStatus", "bad", "STT: OFF");
+  setControlStatus("OFF");
+  setRealtimeStatus("OFF");
+  (async () => {
+    try {
+      await refreshOutputDevicesUI();
+      await applyRealtimeSink();
+      await loadInstructionsEffective({ silent: true });
+    } catch {}
+    refreshButtons();
+  })();
+  push("Ready. Click: Connect Control + Realtime, then Start STT.");
+})();

@@ -1,0 +1,60 @@
+{
+  "name": "chatt-desktop",
+  "version": "0.1.5",
+  "private": true,
+  "description": "CHATT Desktop - Electron (static renderer)",
+  "author": "CHATT",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+
+    "build:ui": "npm --prefix ../frontend run build -- --base=./ --outDir ../desktop/renderer --emptyOutDir",
+
+    "build": "electron-builder --win",
+
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "electron-audio-loopback": "^1.0.6"
+  },
+  "devDependencies": {
+    "electron": "31.7.7",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.chatt.desktop",
+    "productName": "CHATT Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "renderer/**",
+      "assets/**"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "renderer/stt-worklet-processor.js"
+    ],
+    "icon": "assets/icon.ico",
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CHATT Desktop",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    }
+  }
+}
+

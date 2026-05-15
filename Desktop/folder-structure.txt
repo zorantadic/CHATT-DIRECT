@@ -1,0 +1,14 @@
+﻿Desktop
+.electron-userdata
+electron
+electron\main.cjs
+electron\preload.cjs
+folder-structure.txt
+ha.txt
+node_modules
+package.json
+package-lock.json
+renderer
+renderer\index.html
+renderer\renderer.js
+renderer\stt-worklet-processor.js
