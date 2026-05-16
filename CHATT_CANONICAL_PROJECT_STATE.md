@@ -2,508 +2,548 @@
 
 Last updated: 2026-05-15
 
-## 1. Purpose
-
-This file is the canonical working reference for the CHATT project refactoring and improvement work.
-
-Its purpose is to keep the project direction stable, avoid repeated re-analysis, and give Codex precise context before any inspect-only or coding task.
-
-This file must be updated whenever we make a confirmed architectural decision.
+This file is the canonical working state for the CHATT project.  
+Use it as the first reference before making architecture, configuration, Codex, backend, Desktop, or deployment changes.
 
 ---
 
-## 2. Project Scope
+## 1. Project Direction
 
-The project is a personal-use real voice chat system with:
+CHATT is a personal-use real voice chat project.
 
-- Desktop Electron Windows app
-- Shared Python backend services
-- STT (Speech-to-Text)
-- Orchestrator
-- Agent1 question extraction/formulation
-- Realtime voice answer engine
-- TTS (Text-to-Speech) answer engine
-- Controlled headphone-only audio playback
-
-Current focus:
+The current priority is:
 
 ```text
-Desktop Electron app + local backend services
+Windows Electron Desktop app first
+Shared backend local development second
+Web frontend later / secondary
+Docker and Azure Container Apps only after local validation
 ```
 
-Out of current scope:
+The immediate development target is the Windows Desktop/Electron application using the shared backend.
 
-```text
-web frontend
-manual-backend
-manual-frontend
-Manual-desktop
-DesktopMic
-deploy/cloud deployment
-Docker/Azure Container Apps deployment
-```
+The web frontend is not the current priority.
 
-Docker images and Azure Container Apps deployment will be handled only after the local Desktop + backend workflow is stable.
+Manual scenario exists but is out of scope for the current phase.
 
 ---
 
-## 3. Current Development Strategy
+## 2. Main Runtime Scenario
 
-Development must be local-first.
-
-Current target workflow:
+Canonical main flow:
 
 ```text
-Desktop Electron app
-→ local backend services
-→ Azure AI services
-```
-
-Local backend services:
-
-```text
-50505 → Realtime/TTS backend
-50506 → Orchestrator
-50507 → STT backend
-```
-
-Docker is not used during active development.
-
-After local validation:
-
-```text
-local stable version
-→ Docker images
-→ Azure Container Apps
-```
-
----
-
-## 4. Main Runtime Scenario
-
-The main scenario is:
-
-```text
-browser/web-session/system audio
-→ STT (Speech-to-Text)
+Browser/web-session/system audio
+→ STT
 → Orchestrator
-→ Agent1 model
+→ Agent1
 → Orchestrator
-→ Realtime voice model or TTS model
-→ headphones only
+→ Realtime voice model or TTS
+→ headphones/output device selected by the app
+```
+
+Important invariant:
+
+```text
+Microphone must never be routed to STT in the main scenario.
+```
+
+STT receives only captured session/system/browser audio.
+
+---
+
+## 3. Current Primary Client
+
+Primary client:
+
+```text
+C:\Projects\chatt\Desktop
+```
+
+Desktop package:
+
+```text
+C:\Projects\chatt\Desktop\package.json
+```
+
+Desktop start command:
+
+```powershell
+cd C:\Projects\chatt\Desktop
+npm start
+```
+
+This runs:
+
+```text
+electron .
+```
+
+---
+
+## 4. Active Backend Services
+
+The backend is currently a Python/FastAPI backend under:
+
+```text
+C:\Projects\chatt\backend
+```
+
+Active services:
+
+| Service | File | Port | Purpose |
+|---|---|---:|---|
+| Realtime/TTS backend | `backend/app_realtime.py` | 50505 | Voice answer via Realtime or TTS |
+| Orchestrator | `backend/orchestrator/server.py` | 50506 | Transcript intake, Agent1 call, turn control |
+| STT backend | `backend/speech_server.py` | 50507 | Speech-to-text WebSocket service |
+
+Current local run model is manual VS Code terminals.  
+No `ps1` startup scripts are part of the current active workflow.
+
+---
+
+## 5. Manual Local Backend Startup
+
+Each backend service is started from:
+
+```text
+C:\Projects\chatt\backend
+```
+
+Every terminal must activate the backend virtual environment first:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+### 5.1 Realtime/TTS
+
+```powershell
+python -m uvicorn app_realtime:app --host 127.0.0.1 --port 50505 --log-level info
+```
+
+Expected local URL:
+
+```text
+http://127.0.0.1:50505
+```
+
+### 5.2 Orchestrator
+
+```powershell
+python -m uvicorn orchestrator.server:app --host 127.0.0.1 --port 50506 --log-level info
+```
+
+Expected local URL:
+
+```text
+http://127.0.0.1:50506
+```
+
+### 5.3 STT
+
+```powershell
+python -m uvicorn speech_server:app --host 127.0.0.1 --port 50507 --log-level info
+```
+
+Expected local URL:
+
+```text
+http://127.0.0.1:50507
+```
+
+STT WebSocket path:
+
+```text
+ws://127.0.0.1:50507/stt/ws/{sessionId}
+```
+
+---
+
+## 6. Confirmed Local Backend Validation
+
+The following were confirmed working locally:
+
+```text
+50505 Realtime/TTS backend: OK
+50506 Orchestrator backend: OK
+50507 STT backend: OK
+Agent1 through local Orchestrator: OK
+Desktop full local pipeline: OK
+```
+
+### 6.1 Realtime/TTS Health Test
+
+Run from:
+
+```text
+C:\Projects\chatt
+```
+
+Command:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:50505/
+```
+
+Expected:
+
+```text
+status : ok
+ws     : ws://127.0.0.1:50505/voice/ws
+```
+
+### 6.2 Orchestrator Docs Test
+
+Run from:
+
+```text
+C:\Projects\chatt
+```
+
+Command:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:50506/docs -UseBasicParsing
+```
+
+Expected:
+
+```text
+StatusCode : 200
+```
+
+### 6.3 STT Docs Test
+
+Run from:
+
+```text
+C:\Projects\chatt
+```
+
+Command:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:50507/docs -UseBasicParsing
+```
+
+Expected:
+
+```text
+StatusCode : 200
+```
+
+### 6.4 Agent1 Local Test Through Orchestrator
+
+Run from:
+
+```text
+C:\Projects\chatt
+```
+
+Command:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:50506/v1/sessions/test-local-agent/transcripts" `
+  -ContentType "application/json" `
+  -Body '{"transcript":"Identify the business unit requiring immediate executive attention and generate an executive operational risk summary.","lang":"en-US"}'
+```
+
+Expected:
+
+```text
+status : ok
+```
+
+This confirms:
+
+```text
+local Orchestrator → Agent1 → OK
+```
+
+---
+
+## 7. Desktop Local Endpoint Settings
+
+To use the local backend from Desktop Settings, use:
+
+```text
+STT WS base
+ws://127.0.0.1:50507/stt/ws
+
+Orchestrator HTTP
+http://127.0.0.1:50506
+
+Control WS base
+ws://127.0.0.1:50506/v1/control
+
+Realtime HTTP
+http://127.0.0.1:50505
+
+Realtime WS
+ws://127.0.0.1:50505/voice/ws
+```
+
+Why `ws://` locally:
+
+```text
+Local uvicorn services are not running TLS.
+```
+
+Why deployed URLs use `wss://`:
+
+```text
+Azure Container Apps endpoints are HTTPS/TLS-backed.
+```
+
+---
+
+## 8. Previous Deployed Endpoint Values
+
+These were the previously used deployed Container Apps endpoint values:
+
+```text
+STT WS base
+wss://chatt-speech.ashyglacier-62457361.eastus2.azurecontainerapps.io/stt/ws
+
+Orchestrator HTTP
+https://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io
+
+Control WS base
+wss://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io/v1/control
+
+Realtime HTTP
+https://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io
+
+Realtime WS
+wss://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io/voice/ws
+```
+
+---
+
+## 9. Current Azure Resource Values for Local Backend
+
+The current working Azure values are represented in:
+
+```text
+C:\Projects\chatt\backend\.env
+C:\Projects\chatt\backend\orchestrator\.env
+```
+
+Do not commit real secrets.
+
+A non-secret template exists at:
+
+```text
+C:\Projects\chatt\backend\.env.example
+```
+
+### 9.1 Realtime Voice
+
+```env
+AZURE_OPENAI_ENDPOINT=https://agentfield.cognitiveservices.azure.com
+AZURE_OPENAI_MODEL=gpt-realtime-mini
+AZURE_OPENAI_API_VERSION=2025-05-01-preview
+```
+
+### 9.2 Agent1
+
+```env
+AGENT1_PROJECT_ENDPOINT=https://agentfield.services.ai.azure.com/api/projects/proj-default
+AGENT1_AGENT_ID=asst_sS6A4EFTSyKUSbKpRh8v5rXu
 ```
 
 Important:
 
-The Desktop app captures audio from the browser/web-session/system audio source.
-
-Microphone audio must never be routed to STT in the main scenario.
-
----
-
-## 5. Non-Negotiable Principles
-
-### 5.1 Microphone Safety
-
-In the main scenario:
-
 ```text
-microphone → STT
+The Orchestrator code reads AGENT1_PROJECT_ENDPOINT and AGENT1_AGENT_ID.
 ```
 
-is forbidden.
-
-STT must receive only captured browser/web-session/system audio.
-
-### 5.2 Headphones-Only Playback
-
-Voice model output must play only through the selected headphones/output device.
-
-Speakers must not be used as an automatic fallback.
-
-If a valid output device is not available or cannot be confirmed, playback should not start automatically.
-
-### 5.3 Auto Send Must Remain Fast
-
-Auto Send is the default low-latency mode.
-
-New controls must not slow down the default Auto Send path.
-
-### 5.4 Review Queue Is Optional
-
-Review Before Send and Pending Question Queue must be optional.
-
-They provide extra control but may add intentional user-controlled delay.
-
-### 5.5 No Unnecessary Enterprise Complexity
-
-This is a personal-use application.
-
-Avoid unnecessary enterprise formalities such as:
-
-- complex audit systems
-- multi-user role model
-- database persistence unless clearly needed
-- policy engine
-- cloud deployment automation during local development
-
----
-
-## 6. Confirmed Active Backend Services
-
-### 6.1 Realtime/TTS Backend
-
-Service:
+It does not read these legacy aliases directly:
 
 ```text
-backend/app_realtime.py
+AZURE_AI_PROJECT_ENDPOINT
+AGENT1_ID
 ```
 
-Port:
+### 9.3 TTS
 
-```text
-50505
-```
-
-Primary paths:
-
-```text
-GET /
-GET /v1/instructions
-PUT /v1/instructions
-POST /v1/instructions/reset
-GET /instruction_profiles.json
-WS  /voice/ws
-```
-
-Responsibilities:
-
-- Realtime voice bridge
-- TTS streaming bridge
-- instruction APIs
-- instruction profile file serving
-
-### 6.2 Orchestrator
-
-Service:
-
-```text
-backend/orchestrator/server.py
-```
-
-Port:
-
-```text
-50506
-```
-
-Primary paths:
-
-```text
-WS   /v1/control/{session_id}
-POST /v1/sessions/{session_id}/transcripts
-POST /v1/sessions/{session_id}/turns/{turn_id}/done
-```
-
-Responsibilities:
-
-- receives final STT transcript
-- calls Agent1
-- receives formulated question(s)
-- manages question queue and active turn
-- sends control command `SEND_TO_REALTIME`
-- receives `turn_done`
-
-### 6.3 STT Backend
-
-Service:
-
-```text
-backend/speech_server.py
-```
-
-Port:
-
-```text
-50507
-```
-
-Primary path:
-
-```text
-WS /stt/ws/{session_id}
-```
-
-Responsibilities:
-
-- receives PCM16 16 kHz mono audio stream
-- sends audio to Azure Speech SDK
-- handles STT partial/final recognition
-- uses STT context buffering
-- returns consolidated STT final transcript
-
----
-
-## 7. Current Desktop Runtime Flow
-
-Confirmed flow:
-
-```text
-Desktop app startup
-→ loopback/session audio capture
-→ AudioWorklet downsample to PCM16 16 kHz
-→ STT WS /stt/ws/{sessionId}
-→ Azure Speech SDK
-→ STT_FINAL
-→ Desktop POST transcript to Orchestrator
-→ Orchestrator calls Agent1
-→ Agent1 formulates question(s)
-→ Orchestrator queue + active_turn_id
-→ Control WS sends SEND_TO_REALTIME
-→ Desktop sends SEND_TEXT to /voice/ws?engine=realtime|tts
-→ Realtime/TTS backend produces audio
-→ Desktop playback queue
-→ selected headphones/output device
-→ agent_done
-→ Desktop POST turn_done
-→ Orchestrator dispatches next queued question
+```env
+AZURE_OPENAI_TTS_ENDPOINT=https://agentfield.cognitiveservices.azure.com
+AZURE_OPENAI_TTS_DEPLOYMENT=gpt-4o-mini-tts
+AZURE_OPENAI_TTS_API_VERSION=2025-03-01-preview
+AZURE_OPENAI_TTS_VOICE=alloy
+AZURE_OPENAI_TTS_RESPONSE_FORMAT=pcm
 ```
 
 ---
 
-## 8. Existing Desktop Capabilities
+## 10. Important `.env` Findings
 
-The Desktop app already has or partially has:
+### 10.1 Duplicate `.env` Files
 
-- loopback/session audio capture
-- STT enabled/language controls
-- STT WebSocket connection
-- Orchestrator Control WebSocket connection
-- `SEND_TO_REALTIME` handling
-- Realtime/TTS engine selection
-- Realtime speech rate selection: `1.0`, `0.9`, `0.8`
-- instruction prompt settings
-- instruction profile/preset files
-- selected output device logic
-- `setSinkId` output routing where supported
-- headphones-only behavior concept
-- audio queue/buffer
-- pause audio behavior
-- logs/status indicators
+There are at least two relevant env files:
+
+```text
+C:\Projects\chatt\backend\.env
+C:\Projects\chatt\backend\orchestrator\.env
+```
+
+The `backend\orchestrator\.env` can override or differ from `backend\.env`.
+
+During troubleshooting, the local Agent1 failure was caused by stale values in:
+
+```text
+C:\Projects\chatt\backend\orchestrator\.env
+```
+
+Old failing endpoint:
+
+```env
+AGENT1_PROJECT_ENDPOINT=https://zoranspeechf.services.ai.azure.com/api/projects/proj-zoranspeechF
+```
+
+That hostname did not resolve locally.
+
+Working Agent1 endpoint:
+
+```env
+AGENT1_PROJECT_ENDPOINT=https://agentfield.services.ai.azure.com/api/projects/proj-default
+```
+
+### 10.2 STT Inline Comment Issue
+
+This form is unsafe:
+
+```env
+SPEECH_REGION=eastus2   # npr: eastus, westeurope...
+```
+
+Use this instead:
+
+```env
+SPEECH_REGION=eastus2
+```
+
+The local STT issue was resolved after correcting local STT env values.
 
 ---
 
-## 9. Important Known Risks
+## 11. STT Configuration
 
-### 9.1 Output Device Risk
+Working STT configuration should match the deployed Container App values.
 
-If `setSinkId` is unsupported or no headphones device is found before playback, the audio element may remain on the platform default output device.
+Use:
 
-Required future fix:
+```env
+AZURE_SPEECH_REGION=eastus2
+SPEECH_REGION=eastus2
+SPEECH_LANG=en-US
+SPEECH_SAMPLE_RATE=16000
 
-```text
-if output device is not confirmed, do not start playback automatically
-```
-
-### 9.2 Desktop Defaults Point to Cloud
-
-Current Desktop default endpoint settings point to Azure Container Apps, not localhost.
-
-For local development, Desktop settings must be changed to:
-
-```text
-STT WS base:          ws://127.0.0.1:50507/stt/ws
-Orchestrator HTTP:    http://127.0.0.1:50506
-Control WS base:      ws://127.0.0.1:50506/v1/control
-Realtime HTTP:        http://127.0.0.1:50505
-Realtime WS:          ws://127.0.0.1:50505/voice/ws
-```
-
-Risk:
-
-`Reset settings to defaults` may return Desktop to cloud URLs.
-
-### 9.3 Backend Local Startup Is Not Clean Yet
-
-Existing `start_all.ps1` starts backend, web, and manual services.
-
-For Desktop-focused work, we need backend-only scripts:
-
-```text
-start_backend_local.ps1
-stop_backend_local.ps1
-```
-
-### 9.4 STT_RECO_MODE Risk
-
-`STT_RECO_MODE` may be read but not actually applied.
-
-This needs later verification before relying on it as a runtime control.
-
-### 9.5 Agent1 Import-Time Startup Risk
-
-Orchestrator may create Agent1 client at import/startup.
-
-If Agent1 environment variables are missing, service startup can fail.
-
-Preferred future improvement:
-
-```text
-service should start even if Agent1 is not ready;
-Agent1 errors should appear at runtime with clear status
-```
-
----
-
-## 10. Required Local Backend Environment Variables
-
-Minimum for local Desktop Realtime flow:
-
-```text
-AZURE_SPEECH_KEY
-AZURE_SPEECH_REGION
-AGENT1_PROJECT_ENDPOINT
-AGENT1_AGENT_ID
-AZURE_OPENAI_ENDPOINT
-AZURE_OPENAI_KEY
-```
-
-Required for TTS engine:
-
-```text
-AZURE_OPENAI_TTS_DEPLOYMENT
-```
-
-or:
-
-```text
-AZURE_OPENAI_TTS_DEPLOYMENT_NAME
-```
-
-Azure authentication:
-
-The Orchestrator uses `DefaultAzureCredential`, so local Azure login or another valid identity is required for Agent1 access.
-
----
-
-## 11. Optional/Tuning Environment Variables
-
-### 11.1 STT
-
-```text
-STT_DEFAULT_LANGUAGE=en-US
-STT_SEGMENTATION_STRATEGY=Semantic
+STT_SEGMENTATION_STRATEGY=Default
 STT_SEGMENTATION_SILENCE_TIMEOUT_MS=2000
 STT_END_SILENCE_TIMEOUT_MS=2500
 STT_INITIAL_SILENCE_TIMEOUT_MS=4000
 STT_SEGMENTATION_MAXIMUM_TIME_MS=45000
 STT_RECO_MODE=Conversation
 STT_STABLE_PARTIAL_THRESHOLD=3
-STT_CONTEXT_FLUSH_SILENCE_MS=<STT_END_SILENCE_TIMEOUT_MS>
+STT_CONTEXT_FLUSH_SILENCE_MS=2500
+STT_DEFAULT_LANGUAGE=en-US
 ```
 
-### 11.2 Realtime
+Known STT errors and meanings:
+
+### 11.1 Authentication Error 401
+
+Example:
 
 ```text
-DEBUG=False
-AZURE_OPENAI_MODEL=gpt-realtime-mini
-AZURE_OPENAI_API_VERSION=2025-05-01-preview
-AZURE_OPENAI_PROFILE=byom-azure-openai-realtime
-REALTIME_SAMPLE_RATE=24000
-AUDIO_CHANNELS=1
-PORT=50505
+WebSocket upgrade failed: Authentication error (401)
 ```
 
-### 11.3 TTS
+Meaning:
 
 ```text
-AZURE_OPENAI_TTS_ENDPOINT=<AZURE_OPENAI_ENDPOINT>
-AZURE_OPENAI_TTS_KEY=<AZURE_OPENAI_KEY>
-AZURE_OPENAI_TTS_API_VERSION=<AZURE_OPENAI_API_VERSION>
-AZURE_OPENAI_TTS_MODEL=gpt-4o-mini-tts-2025-12-15
-AZURE_OPENAI_TTS_VOICE=alloy
-AZURE_OPENAI_TTS_RESPONSE_FORMAT=pcm
-TTS_SAMPLE_RATE=24000
+Azure Speech key or region is wrong.
 ```
 
-### 11.4 Instructions/Profiles
+### 11.2 Could Not Validate Speech Context
+
+Example:
 
 ```text
-INSTRUCTIONS_PATH=instructions.json
-INSTRUCTION_PROFILES_PATH=instruction_profiles.json
-MANUAL_ANSWERS_PATH=manual_answers.json
-MAX_INSTRUCTIONS_LEN=8192
-MAX_MANUAL_ANSWERS=10
-MAX_MANUAL_ANSWER_LEN=4096
+Error code: 1007
+Could not validate speech context
+```
+
+Meaning:
+
+```text
+Azure Speech accepted the connection, but rejected the speech context/configuration.
+```
+
+Confirmed fix in this project:
+
+```text
+Align local STT env values with working Container App settings.
+Remove inline comments from runtime env values.
 ```
 
 ---
 
-## 12. Planned Improvements
+## 12. Answer Engines
 
-### 12.1 Backend Local Development Scripts
-
-Create:
+The project supports two answer engines:
 
 ```text
-start_backend_local.ps1
-stop_backend_local.ps1
+Realtime voice
+TTS
 ```
 
-Purpose:
+The Desktop UI already has engine selection.
 
-- start only backend services required by Desktop
-- stop only backend ports `50505`, `50506`, `50507`
-- avoid web/manual services
-- simplify daily development
-
-### 12.2 Voice Output Test
-
-Add Desktop button:
+The project also supports speech rate values such as:
 
 ```text
-Test Voice Output
+1.0
+0.9
+0.8
 ```
 
-Requirements:
+This should be preserved.
 
-- one-click test
-- use same playback path as Realtime/TTS output
-- validate selected headphones/output device
-- help verify volume
-- no backend change required initially
+---
 
-### 12.3 Headphones-Only Safety Guard
+## 13. Existing Desktop Capabilities
 
-Before playback:
-
-- confirm valid selected output device
-- confirm `setSinkId` success where supported
-- if headphones/output device is not confirmed, block playback
-- do not fallback automatically to speakers
-
-### 12.4 Stop Audio Now
-
-Add button:
+Known existing capabilities:
 
 ```text
-Stop Audio Now
+Realtime/TTS engine selection
+Speech rate selection
+STT enabled/language controls
+Instruction prompt settings
+Instruction profiles/presets
+Output device selection
+Headphones-only behavior
+Audio buffer/pause behavior
+Status/log indicators
+Control WebSocket handling
+SEND_TO_REALTIME handling
 ```
 
-Must immediately:
+The Desktop app is ahead of the web app and should be treated as the primary client.
 
-- stop local playback
-- clear playback queue
-- clear audio buffer
-- send backend cancel/stop if supported
+---
 
-Initial implementation may be Desktop-only.
+## 14. Planned Enhancements
 
-### 12.5 Stop Before Sending to Voice Model
+The following enhancements are planned but not implemented yet.
 
-Before Desktop sends `SEND_TEXT` to Realtime/TTS backend, user should be able to stop or prevent sending when Review mode is enabled.
-
-### 12.6 Auto Send vs Review Before Send
+### 14.1 Auto Send vs Review Before Send
 
 Two modes:
 
@@ -512,37 +552,66 @@ Auto Send
 Review Before Send
 ```
 
-Auto Send:
+Default:
 
 ```text
-STT → Agent1 → formulated question → voice model immediately
+Auto Send
 ```
 
-Review Before Send:
+Reason:
 
 ```text
-STT → Agent1 → formulated question → Pending Question Queue → user selects/sends
+Auto Send must remain the lowest-latency mode.
 ```
 
-Auto Send remains default.
+Review mode adds control and may add delay.
 
-Review Before Send is optional.
+### 14.2 Pending Question Queue
 
-### 12.7 Pending Question Queue
+Review Before Send mode should show formulated questions before sending them to the voice model.
 
-Review mode queue should support:
+Required actions:
 
-- show formulated questions
-- click/send selected question
-- edit question
-- delete question
-- clear queue
+```text
+Send selected question
+Edit question
+Delete question
+Clear queue
+```
 
-For personal use, `Hold` is optional and can be skipped initially.
+Hold may be skipped initially for personal-use simplicity.
 
-### 12.8 STT Presets
+### 14.3 Stop Audio Now
 
-Add simple Desktop STT modes:
+Must immediately:
+
+```text
+stop local playback
+clear local playback queue
+clear local audio buffer
+send backend cancel/stop if supported
+```
+
+This must not be just mute or pause.
+
+### 14.4 Stop Before Sending to Voice Model
+
+In Review Before Send mode, the question should wait before being sent to Realtime/TTS.
+
+### 14.5 Voice Output Test
+
+Add a one-click output test using the same playback path as Realtime/TTS output.
+
+Purpose:
+
+```text
+verify audio plays only to selected headphones/output device
+verify volume is acceptable
+```
+
+### 14.6 STT Presets
+
+Add UI presets:
 
 ```text
 Fast
@@ -551,14 +620,7 @@ Careful
 Custom
 ```
 
-Purpose:
-
-- Fast: lowest latency, higher risk of cutting off longer thought
-- Balanced: default compromise
-- Careful: waits longer for pauses and longer context
-- Custom: manual tuning
-
-Initial custom controls should be limited to:
+Custom should initially expose only the useful controls:
 
 ```text
 context flush silence
@@ -567,15 +629,11 @@ end silence
 maximum segment time
 ```
 
-### 12.9 Runtime STT Tuning
+Do not expose too many STT knobs at once.
 
-Eventually allow runtime control from Desktop UI for selected STT settings.
+### 14.7 Latency Panel
 
-Container/App/env variables remain defaults only.
-
-### 12.10 Latency Panel
-
-Add simple timing visibility:
+Measure and show:
 
 ```text
 STT latency
@@ -586,138 +644,120 @@ Playback latency
 Total turn latency
 ```
 
-This is for debugging and optimization, not enterprise telemetry.
+### 14.8 Instruction Prompt Workflow
 
-### 12.11 Improved Instruction Prompt Workflow
+Keep current prompt functionality but improve usability.
 
-Keep existing default prompt behavior.
+Preferred model:
 
-Add or improve:
+```text
+Default prompt
+Preset selector
+Short extra instruction
+Editable template
+Reset to default
+```
 
-- preset selector
-- editable template
-- short extra instruction/override
-- reset to default
-
-Default prompt must work immediately without user changes.
+Do not force writing a full new instruction prompt for every small change.
 
 ---
 
-## 13. Preferred Implementation Order
+## 15. Latency Rule
 
-### Phase 1: Local Backend Development
+All new features must follow this rule:
 
-- create `start_backend_local.ps1`
-- create `stop_backend_local.ps1`
-- optionally add `backend/.env.example`
-- optionally add `docs/backend-local-run.md`
+```text
+Do not slow down Auto Send mode.
+```
 
-### Phase 2: Audio Safety
+Design principle:
 
-- Voice Output Test
-- headphones-only guard
-- Stop Audio Now
-
-### Phase 3: Question Control
-
-- Auto Send vs Review Before Send
-- Pending Question Queue
-- send/edit/delete/clear
-
-### Phase 4: STT Control
-
-- STT preset modes
-- limited custom runtime STT settings
-
-### Phase 5: Prompt Workflow
-
-- default prompt
-- presets
-- short override
-- reset to default
-
-### Phase 6: Latency Panel
-
-- simple per-turn timing display
+```text
+Auto Send = fastest path
+Review Queue = optional control path
+```
 
 ---
 
-## 14. Codex Workflow Rules
+## 16. Work Process Rules
 
-Codex must receive small, precise tasks.
-
-Preferred process:
+For all future project work:
 
 ```text
-1. define one small task
-2. Codex inspects or edits
-3. immediately run git status --short
-4. inspect changed files
-5. inspect git diff --name-status
-6. inspect git diff --stat
-7. inspect full git diff
-8. test locally
-9. commit only if working
+Analyze first.
+Then plan.
+Then change code.
 ```
 
-If Codex creates untracked files, do not rely only on `git diff`.
+No skipping steps.
 
-Use one of:
+When giving tasks:
 
 ```text
-inspect file content directly
+maximum 1-2 tasks at a time
+always specify exact folder/path
+always specify exact command
 ```
 
-or:
+Before moving to the next step:
 
 ```text
-git add -N <file>
-git diff -- <file>
+the previous step must be completed or explicitly skipped by the user
 ```
 
-Do not commit until the app is tested.
+When modifying files:
+
+```text
+always provide the complete file content
+no partial file snippets unless explicitly approved
+if shortening is unavoidable, clearly state what was shortened
+```
+
+For Codex work:
+
+```text
+Codex must receive narrow scoped prompts
+Inspect-only when appropriate
+After Codex response, run git status --short
+If Codex creates untracked files, inspect those files before commit
+Do not commit until local test passes
+```
 
 ---
 
-## 15. Assistant Workflow Rules
+## 17. Git Notes
 
-The assistant must work step by step.
+Real `.env` files are not expected to be committed.
 
-Rules:
+Current committed env template:
 
-- do not skip steps
-- give no more than one or two tasks at a time
-- always ask whether the previous task is completed before giving the next task
-- before coding, explain what will change and why
-- when writing or modifying a file, return the complete file
-- if shortening is unavoidable, clearly state exactly what was shortened and why
-- keep responses short unless detailed analysis is requested
-- do not move to the next phase without user confirmation
+```text
+backend/.env.example
+```
+
+The working `.env` files may remain local-only:
+
+```text
+backend/.env
+backend/orchestrator/.env
+```
+
+Do not commit real keys or secrets.
 
 ---
 
-## 16. Current Next Step
+## 18. Current Known Good State
 
-The next planned step is Phase 1:
-
-```text
-create backend-only local start/stop scripts
-```
-
-But before implementation, confirm:
+As of this update, the known good local state is:
 
 ```text
-git status --short
+Backend services manually started from backend/.venv
+Realtime/TTS local service works
+Orchestrator local service works
+STT local service works
+Agent1 through local Orchestrator returns status ok
+Desktop can be configured to use local backend endpoints
+STT issue fixed by aligning env values and removing inline runtime comments
 ```
 
-from:
-
-```text
-C:\Projects\chatt
-```
-
-Expected result:
-
-```text
-no output
-```
+This is the baseline for the next implementation phase.
