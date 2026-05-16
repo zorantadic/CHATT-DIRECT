@@ -7,6 +7,13 @@
     REALTIME_HTTP: "https://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io",
     REALTIME_WS: "wss://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io/voice/ws",
   };
+  const LOCAL_BACKEND_PRESET = {
+    STT_WS_BASE: "ws://127.0.0.1:50507/stt/ws",
+    ORCH_HTTP: "http://127.0.0.1:50506",
+    ORCH_CONTROL_WS_BASE: "ws://127.0.0.1:50506/v1/control",
+    REALTIME_HTTP: "http://127.0.0.1:50505",
+    REALTIME_WS: "ws://127.0.0.1:50505/voice/ws",
+  };
   // Persisted settings
   const LS_RT_DEVICE_ID = "chatt.rtOutputDeviceId";
   const LS_RT_DEVICE_LABEL = "chatt.rtOutputDeviceLabel";
@@ -194,6 +201,7 @@ Do not introduce new topics.`;
   let btnPauseAudio = null;
   let pauseInfoEl = null;
   // Settings page elements
+  const btnUseLocalBackend = $("btnUseLocalBackend");
   const btnSaveSettings = $("btnSaveSettings");
   const btnResetSettings = $("btnResetSettings");
   const settingsSaved = $("settingsSaved");
@@ -2255,6 +2263,17 @@ markSettingsSaved("Saved");
     loadVoiceSettingsIntoInputs();
     markSettingsSaved("Reset to defaults");
   }
+  function applyLocalBackendPreset() {
+    $("sttBase").value = LOCAL_BACKEND_PRESET.STT_WS_BASE;
+    $("orchHttp").value = LOCAL_BACKEND_PRESET.ORCH_HTTP;
+    $("controlBase").value = LOCAL_BACKEND_PRESET.ORCH_CONTROL_WS_BASE;
+    $("rtHttp").value = LOCAL_BACKEND_PRESET.REALTIME_HTTP;
+    $("rtWs").value = LOCAL_BACKEND_PRESET.REALTIME_WS;
+    push("Local backend endpoint preset applied. Click Save settings.");
+  }
+  if (btnUseLocalBackend) btnUseLocalBackend.addEventListener("click", () => {
+    applyLocalBackendPreset();
+  });
   if (btnSaveSettings) btnSaveSettings.addEventListener("click", () => {
     saveSettingsFromInputs();
     // Keep Instructions page backend label consistent if user changed REALTIME_HTTP
