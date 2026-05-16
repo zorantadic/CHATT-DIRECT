@@ -2079,7 +2079,7 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     $("btnStart").disabled = directBusy || fullPipelineTestActive;
     $("btnStop").disabled = !(directBusy || sttOk);
     if (btnTestFullPipeline) {
-      btnTestFullPipeline.disabled = !(controlOk && rtOk) || sttOk || directBusy || fullPipelineTestActive;
+      btnTestFullPipeline.disabled = directBusy;
     }
   }
   // ------------------------------
@@ -2904,6 +2904,10 @@ if (realtimeRateEl) {
     try { if (realtimeRateVoiceEl) realtimeRateVoiceEl.value = realtimeRateEl.value; } catch {}
     const rate = getRealtimeRate();
     saveStrLS(LS_REALTIME_RATE, rate);
+    if (directRealtimeActive || directRealtimeStarting) {
+      push("Realtime rate change will apply after Direct Realtime restart.");
+      return;
+    }
     push(`Realtime rate set to: ${rate} (will apply immediately if connected)`);
     if (getVoiceEngine() === "realtime") await reconnectVoiceWs("rate-change");
   });
@@ -2914,6 +2918,10 @@ if (realtimeRateVoiceEl) {
     try { if (realtimeRateEl) realtimeRateEl.value = realtimeRateVoiceEl.value; } catch {}
     const rate = getRealtimeRate();
     saveStrLS(LS_REALTIME_RATE, rate);
+    if (directRealtimeActive || directRealtimeStarting) {
+      push("Realtime rate change will apply after Direct Realtime restart.");
+      return;
+    }
     push(`Realtime rate set to: ${rate} (will apply immediately if connected)`);
     if (getVoiceEngine() === "realtime") await reconnectVoiceWs("rate-change");
   });
@@ -3028,12 +3036,8 @@ if (realtimeRateVoiceEl) {
     }
   });
   if (btnTestFullPipeline) {
-    btnTestFullPipeline.addEventListener("click", async () => {
-      try {
-        await startFullPipelineTest();
-      } catch (e) {
-        failFullPipelineTest(e?.message || e);
-      }
+    btnTestFullPipeline.addEventListener("click", () => {
+      push("Test Direct Pipeline is not implemented yet.");
     });
   }
   if (btnResetSession) {

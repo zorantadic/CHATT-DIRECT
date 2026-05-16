@@ -15,7 +15,7 @@
              http://localhost:50505 http://localhost:50506 http://localhost:50507;"
 />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CHATT Desktop - Full Pipeline Test</title>
+    <title>CHATT Direct – Realtime Voice</title>
     <style>
       body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; }
       h2 { margin: 0 0 8px 0; }
@@ -72,7 +72,7 @@
 
 </head>
   <body>
-    <h2>CHATT Direct - Direct Realtime Voice</h2>
+    <h2>CHATT Direct – Realtime Voice</h2>
 
     <div class="nav">
       <button id="navVoice" type="button" class="active">Voice</button>
@@ -89,7 +89,7 @@
         <div class="row">
           <div><b>SessionId:</b> <span id="sid" class="mono"></span></div>
           <span id="sttStatus" class="pill bad">DIRECT: OFF</span>
-          <span id="controlStatus" class="pill bad">CONTROL: OFF</span>
+          <span id="controlStatus" class="pill bad hidden">CONTROL: OFF</span>
           <span id="rtStatus" class="pill bad">REALTIME: OFF</span>
         </div>
 
@@ -112,10 +112,10 @@
         </div>
 
         <div class="row">
-          <button id="btnConnect" type="button">Connect Realtime</button>
+          <button id="btnConnect" type="button" class="hidden">Connect Realtime</button>
           <button id="btnStart" type="button" disabled>Start Direct Realtime</button>
           <button id="btnStop" type="button" disabled>Stop Direct Realtime</button>
-          <button id="btnTestFullPipeline" type="button" disabled>Test Full Pipeline</button>
+          <button id="btnTestFullPipeline" type="button">Test Direct Pipeline</button>
           <button id="btnReloadInstr" type="button">Reload instructions</button>
           <button id="btnResetSession" type="button" title="Generate a new sessionId and reset local state (Ready state, no auto-connect).">
             Reset session
@@ -154,15 +154,15 @@
       <div class="box">
         <h3>Connection + Audio Settings</h3>
 
-        <div class="row">
+        <div class="row hidden">
           <label>STT WS base</label>
           <input id="sttBase" type="text" />
         </div>
-        <div class="row">
+        <div class="row hidden">
           <label>Orchestrator HTTP</label>
           <input id="orchHttp" type="text" />
         </div>
-        <div class="row">
+        <div class="row hidden">
           <label>Control WS base</label>
           <input id="controlBase" type="text" />
         </div>
@@ -173,7 +173,7 @@
         <div class="row">
           <label>Realtime WS</label>
           <input id="rtWs" type="text" />
-        <div class="row">
+        <div class="row hidden">
   <label>Voice Engine</label>
   <select id="voiceEngine">
     <option value="realtime">realtime</option>
@@ -199,7 +199,7 @@
           <button id="btnRefreshDevices" type="button">Refresh devices</button>
         </div>
 
-        <div class="row">
+        <div class="row hidden">
           <label>STT mode</label>
 
           <div class="check" title="When OFF, we keep Control/Realtime connected but we do not capture audio / send STT.">
@@ -245,8 +245,8 @@
         </div>
 
         <div class="row small">
-          Direct Realtime salje <b>PCM16 24k mono</b> loopback audio bytes na <code>/voice/ws</code>.
-          Azure Realtime VAD kontrolise turn detection i interruption.
+          Direct mode streams loopback/system audio as <b>PCM16 24k mono</b> to <code>/voice/ws</code>.
+          Microphone is not used. Output is routed to the selected headphones/output device.
         </div>
 
         <div class="row small">
@@ -270,8 +270,6 @@
   <select id="instrTarget">
     <option value="realtime">realtime</option>
     <option value="tts">tts</option>
-    <option value="stt">stt</option>
-    <option value="agent1">agent1</option>
   </select>
 </div>
 
