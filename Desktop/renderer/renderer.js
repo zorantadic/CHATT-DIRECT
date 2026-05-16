@@ -1083,6 +1083,7 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
   let playhead = 0;
   let playbackDest = null;
   const activePlaybackSources = new Set();
+  let isAssistantSpeaking = false;
 
   // Realtime audio diagnostics (throttled logging)
   // Goal: detect any sample_rate / channels drift or duration mismatch without flooding the log.
@@ -1413,11 +1414,19 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
           pcmBytes.byteOffset,
           Math.floor(pcmBytes.byteLength / 2)
         );
+        isAssistantSpeaking = true;
         playPcm16(pcm16, msg.sample_rate || 24000, msg.channels || 1);
         return;
       }
       if (msg.type === "log") {
         push(msg.message || JSON.stringify(msg));
+        const logText = String(msg.event || msg.message || "");
+      if (logText.includes("input_audio_buffer.speech_started")) {
+         stopAudioNow();
+          try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
+          isAssistantSpeaking = false;
+           push("Barge-in detected: cancelled current response and stopped local playback");
+    }
         return;
       }
       if (msg.type === "error") {
@@ -1425,6 +1434,7 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
         return;
       }
       if (msg.type === "agent_done") {
+        isAssistantSpeaking = false;
         if (directRealtimeActive || directRealtimeStarting) {
           push("Direct Realtime response done");
           return;
@@ -1962,6 +1972,7 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
 
     directRealtimeActive = false;
     directRealtimeStarting = false;
+    isAssistantSpeaking = false;
     directAudioChunks = [];
     directAudioBytes = 0;
     directFramePending = [];
