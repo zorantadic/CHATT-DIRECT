@@ -14,6 +14,11 @@
     REALTIME_HTTP: "http://127.0.0.1:50505",
     REALTIME_WS: "ws://127.0.0.1:50505/voice/ws",
   };
+  const FULL_PIPELINE_TEST_AUDIO_URL = "../assets/test-audio/full-pipeline-test.wav";
+  const FULL_PIPELINE_TEST_INSTRUCTIONS =
+`This is a CHATT full pipeline system test.
+Respond with exactly this sentence and nothing else:
+Full pipeline test successful.`;
   // Persisted settings
   const LS_RT_DEVICE_ID = "chatt.rtOutputDeviceId";
   const LS_RT_DEVICE_LABEL = "chatt.rtOutputDeviceLabel";
@@ -197,6 +202,7 @@ Do not introduce new topics.`;
   const realtimeRateEl = $("realtimeRate");
   const realtimeRateVoiceEl = $("realtimeRateVoice");
   const btnResetSession = $("btnResetSession");
+  const btnTestFullPipeline = $("btnTestFullPipeline");
   // Pause/Resume (Voice audio) UI refs (created dynamically)
   let btnPauseAudio = null;
   let pauseInfoEl = null;
@@ -1259,11 +1265,17 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
       controlPingTimer = null;
       controlWs = null;
       refreshButtons();
+      if (fullPipelineTestActive) {
+        failFullPipelineTest("Control WS closed");
+      }
       if (desiredConnected) scheduleControlReconnect("closed");
       else setControlStatus("OFF");
     };
     controlWs.onerror = () => {
       push("Control WS error");
+      if (fullPipelineTestActive) {
+        failFullPipelineTest("Control WS error");
+      }
     };
     controlWs.onmessage = (e) => {
       if (typeof e.data !== "string") return;
@@ -1274,19 +1286,25 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
         if (!turnId || !text) return;
         push(`COMMAND SEND_TO_REALTIME (turnId=${turnId})`);
         activeTurnId = turnId;
-        const effInstr = getEffectiveInstructionsForEngine().toString();
-const cleanText = (text ?? "").toString();
-
-if (rtWs && rtWs.readyState === WebSocket.OPEN) {
-  rtWs.send(JSON.stringify({
-    type: "SEND_TEXT",
-    text: cleanText,
-    instructions: effInstr
-  }));
-} else {
-  push("ERROR: Realtime WS not open; cannot SEND_TEXT");
-}
-
+        const effInstr = fullPipelineTestActive
+          ? FULL_PIPELINE_TEST_INSTRUCTIONS
+          : getEffectiveInstructionsForEngine().toString();
+        const cleanText = (text ?? "").toString();
+        if (fullPipelineTestActive) {
+          push("Full pipeline test instructions override applied.");
+        }
+        if (rtWs && rtWs.readyState === WebSocket.OPEN) {
+          rtWs.send(JSON.stringify({
+            type: "SEND_TEXT",
+            text: cleanText,
+            instructions: effInstr
+          }));
+        } else {
+          push("ERROR: Realtime WS not open; cannot SEND_TEXT");
+          if (fullPipelineTestActive) {
+            failFullPipelineTest("Realtime WS not open when SEND_TO_REALTIME arrived");
+          }
+        }
       }
     };
   }
@@ -1321,6 +1339,9 @@ if (rtWs && rtWs.readyState === WebSocket.OPEN) {
       rtPingTimer = null;
       rtWs = null;
       refreshButtons();
+      if (fullPipelineTestActive) {
+        failFullPipelineTest("Realtime WS closed");
+      }
       if (rtReconnectSuppressOnce) {
         rtReconnectSuppressOnce = false;
         setRealtimeStatus("OFF");
@@ -1331,6 +1352,9 @@ if (rtWs && rtWs.readyState === WebSocket.OPEN) {
     };
     rtWs.onerror = () => {
       push("Realtime WS error");
+      if (fullPipelineTestActive) {
+        failFullPipelineTest("Realtime WS error");
+      }
     };
     rtWs.onmessage = async (e) => {
       if (typeof e.data !== "string") return;
@@ -1362,6 +1386,9 @@ if (rtWs && rtWs.readyState === WebSocket.OPEN) {
         activeTurnId = null;
         push(`agent_done (turnId=${turnId})`);
         await postTurnDone(turnId);
+        if (fullPipelineTestActive) {
+          finishFullPipelineTest(true);
+        }
       }
     };
   }
@@ -1376,7 +1403,11 @@ if (rtWs && rtWs.readyState === WebSocket.OPEN) {
   let sttPending = [];
   let sttBuffer = [];
   let flushTimer = null;
+  let fullPipelineTestActive = false;
+  let fullPipelineTestWs = null;
+  let fullPipelineTestTimer = null;
   const FLUSH_MS = 1200;
+  const FULL_PIPELINE_TEST_TIMEOUT_MS = 30000;
   function clearFlushTimer() {
     if (flushTimer) {
       window.clearTimeout(flushTimer);
@@ -1409,6 +1440,250 @@ if (rtWs && rtWs.readyState === WebSocket.OPEN) {
     if (!full) return;
     push(`STT_BUFFER_FLUSH: ${full}`);
     await postTranscript(full);
+  }
+  function handleSttMessage(msg) {
+    if (msg.type === "STT_FINAL") {
+      const chunk = (msg.transcript || "").trim();
+      if (!chunk) return;
+      push(`STT_FINAL: ${chunk}`);
+      sttBuffer.push(chunk);
+      const endsSentence = /[?.!]\s*$/.test(chunk);
+      clearFlushTimer();
+      const timeout = endsSentence ? 450 : FLUSH_MS;
+      flushTimer = window.setTimeout(() => {
+        flushSttBuffer().catch(() => {});
+        flushTimer = null;
+      }, timeout);
+    } else if (msg.type === "STT_ERROR") {
+      push(`STT_ERROR: ${msg.error || "unknown"}`);
+      if (fullPipelineTestActive) {
+        failFullPipelineTest(msg.error || "STT error");
+      }
+    } else if (msg.type === "STT_MODE") {
+      // Normalize server mode line for quick diagnostics (matches your log pattern).
+      const requested = (getSttLanguage() || "").toString();
+      const serverLang = (msg.language || msg.lang || msg.locale || "").toString();
+      const supported = Array.isArray(msg.supported) ? msg.supported.join(",") : (msg.supported || "");
+      push(`STT_MODE: mode=${msg.mode} requested=${requested} server=${serverLang || requested} supported=${supported}`);
+    } else {
+      push(`STT WS msg: ${JSON.stringify(msg)}`);
+    }
+  }
+  function handleSttMessageData(data) {
+    if (typeof data !== "string") return;
+    let msg;
+    try { msg = JSON.parse(data); } catch { return; }
+    handleSttMessage(msg);
+  }
+  function readAscii(view, offset, length) {
+    let out = "";
+    for (let i = 0; i < length; i++) out += String.fromCharCode(view.getUint8(offset + i));
+    return out;
+  }
+  function decodePcm16Wav(arrayBuffer) {
+    if (!(arrayBuffer instanceof ArrayBuffer) || arrayBuffer.byteLength < 44) {
+      throw new Error("WAV file is too small");
+    }
+    const view = new DataView(arrayBuffer);
+    if (readAscii(view, 0, 4) !== "RIFF" || readAscii(view, 8, 4) !== "WAVE") {
+      throw new Error("WAV file must be RIFF/WAVE");
+    }
+    let fmt = null;
+    let dataOffset = -1;
+    let dataSize = 0;
+    let offset = 12;
+    while (offset + 8 <= view.byteLength) {
+      const chunkId = readAscii(view, offset, 4);
+      const chunkSize = view.getUint32(offset + 4, true);
+      const chunkStart = offset + 8;
+      const chunkEnd = chunkStart + chunkSize;
+      if (chunkEnd > view.byteLength) {
+        throw new Error(`WAV chunk ${chunkId} exceeds file length`);
+      }
+      if (chunkId === "fmt ") {
+        if (chunkSize < 16) throw new Error("WAV fmt chunk is too small");
+        fmt = {
+          audioFormat: view.getUint16(chunkStart, true),
+          channels: view.getUint16(chunkStart + 2, true),
+          sampleRate: view.getUint32(chunkStart + 4, true),
+          bitsPerSample: view.getUint16(chunkStart + 14, true),
+        };
+      } else if (chunkId === "data") {
+        dataOffset = chunkStart;
+        dataSize = chunkSize;
+      }
+      offset = chunkEnd + (chunkSize % 2);
+    }
+    if (!fmt) throw new Error("WAV fmt chunk not found");
+    if (fmt.audioFormat !== 1) throw new Error(`WAV must be PCM format 1; found ${fmt.audioFormat}`);
+    if (fmt.channels !== 1) throw new Error(`WAV must be mono; found ${fmt.channels} channels`);
+    if (fmt.sampleRate !== 16000) throw new Error(`WAV must be 16000 Hz; found ${fmt.sampleRate} Hz`);
+    if (fmt.bitsPerSample !== 16) throw new Error(`WAV must be signed 16-bit; found ${fmt.bitsPerSample}-bit`);
+    if (dataOffset < 0 || dataSize <= 0) throw new Error("WAV data chunk not found");
+    if (dataSize % 2 !== 0) throw new Error("WAV PCM16 data length must be even");
+    return {
+      pcm: new Uint8Array(arrayBuffer, dataOffset, dataSize),
+      durationSec: dataSize / 2 / fmt.sampleRate,
+    };
+  }
+  function sleep(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+  function readArrayBufferWithXhr(url) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.responseType = "arraybuffer";
+      xhr.onload = () => {
+        if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
+          resolve(xhr.response);
+          return;
+        }
+        reject(new Error(`test audio load failed (${xhr.status})`));
+      };
+      xhr.onerror = () => reject(new Error("test audio load failed"));
+      xhr.send();
+    });
+  }
+  async function loadFullPipelineTestAudio() {
+    const url = new URL(FULL_PIPELINE_TEST_AUDIO_URL, window.location.href).toString();
+    let arrayBuffer;
+    try {
+      const res = await fetch(url);
+      if (!res.ok && res.status !== 0) throw new Error(`test audio load failed (${res.status})`);
+      arrayBuffer = await res.arrayBuffer();
+    } catch {
+      arrayBuffer = await readArrayBufferWithXhr(url);
+    }
+    const decoded = decodePcm16Wav(arrayBuffer);
+    push(`Full pipeline test audio loaded (${decoded.pcm.byteLength} bytes, ${decoded.durationSec.toFixed(2)}s)`);
+    return decoded.pcm;
+  }
+  function openFullPipelineTestSttWs() {
+    return new Promise((resolve, reject) => {
+      const { STT_WS } = cfg();
+      let opened = false;
+      push(`Full pipeline test connecting STT WS: ${STT_WS}`);
+      const ws = new WebSocket(STT_WS);
+      fullPipelineTestWs = ws;
+      ws.binaryType = "arraybuffer";
+      ws.onopen = () => {
+        opened = true;
+        push("Full pipeline test STT WS connected");
+        refreshButtons();
+        resolve(ws);
+      };
+      ws.onmessage = (evt) => handleSttMessageData(evt.data);
+      ws.onerror = () => {
+        if (!opened) {
+          reject(new Error("STT WS error"));
+          return;
+        }
+        if (fullPipelineTestActive) {
+          failFullPipelineTest("STT WS error");
+        }
+      };
+      ws.onclose = (evt) => {
+        const code = evt?.code;
+        const reason = evt?.reason;
+        const clean = evt?.wasClean;
+        push(`Full pipeline test STT WS closed (code=${code}, clean=${clean}, reason=${reason || ""})`);
+        if (fullPipelineTestWs === ws) fullPipelineTestWs = null;
+        refreshButtons();
+        if (!opened) {
+          reject(new Error(`STT WS closed before open (code=${code})`));
+          return;
+        }
+        if (fullPipelineTestActive && code !== 1000 && code !== 1005) {
+          failFullPipelineTest(`STT WS closed unexpectedly (code=${code})`);
+        }
+      };
+    });
+  }
+  async function streamFullPipelineTestAudio(ws, pcmBytes) {
+    const chunkBytes = 640;
+    for (let offset = 0; offset < pcmBytes.byteLength; offset += chunkBytes) {
+      if (!fullPipelineTestActive) return;
+      if (ws.readyState !== WebSocket.OPEN) throw new Error("STT WS closed while streaming test audio");
+      ws.send(pcmBytes.slice(offset, Math.min(offset + chunkBytes, pcmBytes.byteLength)));
+      await sleep(20);
+    }
+    const silence = new Uint8Array(chunkBytes);
+    for (let i = 0; i < 125; i++) {
+      if (!fullPipelineTestActive) return;
+      if (ws.readyState !== WebSocket.OPEN) throw new Error("STT WS closed while streaming test silence");
+      ws.send(silence);
+      await sleep(20);
+    }
+    push("Full pipeline test trailing silence streamed (2500ms)");
+  }
+  function clearFullPipelineTestTimer() {
+    if (fullPipelineTestTimer) {
+      window.clearTimeout(fullPipelineTestTimer);
+      fullPipelineTestTimer = null;
+    }
+  }
+  function closeFullPipelineTestWs() {
+    const ws = fullPipelineTestWs;
+    fullPipelineTestWs = null;
+    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+      try { ws.close(1000, "full-pipeline-test-complete"); } catch {}
+    }
+  }
+  function finishFullPipelineTest(success, reason) {
+    const wasActive = fullPipelineTestActive;
+    fullPipelineTestActive = false;
+    clearFullPipelineTestTimer();
+    closeFullPipelineTestWs();
+    if (!success) {
+      clearFlushTimer();
+      sttBuffer = [];
+    }
+    refreshButtons();
+    if (success) {
+      push("Full pipeline test completed");
+    } else if (wasActive) {
+      push(`Full pipeline test failed: ${reason || "unknown error"}`);
+    }
+  }
+  function failFullPipelineTest(reason) {
+    finishFullPipelineTest(false, reason);
+  }
+  async function startFullPipelineTest() {
+    if (fullPipelineTestActive) {
+      push("Full pipeline test failed: already running");
+      return;
+    }
+    const controlOk = controlWs && controlWs.readyState === WebSocket.OPEN;
+    const rtOk = rtWs && rtWs.readyState === WebSocket.OPEN;
+    if (!controlOk || !rtOk) {
+      push("Full pipeline test requires Control WS and Realtime WS to be connected.");
+      return;
+    }
+    if (sttWs && sttWs.readyState !== WebSocket.CLOSED) {
+      push("Full pipeline test requires live STT to be stopped first.");
+      return;
+    }
+    fullPipelineTestActive = true;
+    clearFlushTimer();
+    sttBuffer = [];
+    push("Full pipeline test started");
+    fullPipelineTestTimer = window.setTimeout(() => {
+      failFullPipelineTest("timeout waiting for STT/Agent/Realtime");
+    }, FULL_PIPELINE_TEST_TIMEOUT_MS);
+    refreshButtons();
+    try {
+      const pcmBytes = await loadFullPipelineTestAudio();
+      if (!fullPipelineTestActive) return;
+      const ws = await openFullPipelineTestSttWs();
+      if (!fullPipelineTestActive) return;
+      await streamFullPipelineTestAudio(ws, pcmBytes);
+      if (!fullPipelineTestActive) return;
+      push("Full pipeline test audio streamed");
+      push("Full pipeline test waiting for STT/Agent/Realtime");
+    } catch (e) {
+      failFullPipelineTest(e?.message || e);
+    }
   }
   async function getLoopbackStream() {
     await window.electronAPI.enableLoopbackAudio();
@@ -1487,32 +1762,7 @@ if (rtWs && rtWs.readyState === WebSocket.OPEN) {
     };
     sttWs.onerror = () => push("STT WS error");
     sttWs.onmessage = (evt) => {
-      if (typeof evt.data !== "string") return;
-      let msg;
-      try { msg = JSON.parse(evt.data); } catch { return; }
-      if (msg.type === "STT_FINAL") {
-        const chunk = (msg.transcript || "").trim();
-        if (!chunk) return;
-        push(`STT_FINAL: ${chunk}`);
-        sttBuffer.push(chunk);
-        const endsSentence = /[?.!]\s*$/.test(chunk);
-        clearFlushTimer();
-        const timeout = endsSentence ? 450 : FLUSH_MS;
-        flushTimer = window.setTimeout(() => {
-          flushSttBuffer().catch(() => {});
-          flushTimer = null;
-        }, timeout);
-      } else if (msg.type === "STT_ERROR") {
-        push(`STT_ERROR: ${msg.error || "unknown"}`);
-      } else if (msg.type === "STT_MODE") {
-        // Normalize server mode line for quick diagnostics (matches your log pattern).
-        const requested = (getSttLanguage() || "").toString();
-        const serverLang = (msg.language || msg.lang || msg.locale || "").toString();
-        const supported = Array.isArray(msg.supported) ? msg.supported.join(",") : (msg.supported || "");
-        push(`STT_MODE: mode=${msg.mode} requested=${requested} server=${serverLang || requested} supported=${supported}`);
-      } else {
-        push(`STT WS msg: ${JSON.stringify(msg)}`);
-      }
+      handleSttMessageData(evt.data);
     };
     setPill("sttStatus", "ok", "STT: ON");
     push(`STT streaming started (PCM16@16k mono). Language=${getSttLanguage()}`);
@@ -1542,14 +1792,20 @@ if (rtWs && rtWs.readyState === WebSocket.OPEN) {
       btnPauseAudio.disabled = !rtOk;
     }
     const enabled = getSttEnabled();
-    $("btnStart").disabled = !(controlOk && rtOk) || sttOk || !enabled;
+    $("btnStart").disabled = !(controlOk && rtOk) || sttOk || !enabled || fullPipelineTestActive;
     $("btnStop").disabled = !sttOk;
+    if (btnTestFullPipeline) {
+      btnTestFullPipeline.disabled = !(controlOk && rtOk) || sttOk || fullPipelineTestActive;
+    }
   }
   // ------------------------------
   // Reset Session (Ready state; user clicks Connect)
   // ------------------------------
   async function resetSessionToReady() {
     push("Reset session requested...");
+    if (fullPipelineTestActive) {
+      failFullPipelineTest("session reset");
+    }
     desiredConnected = false;
     clearReconnectTimers();
     clearPingTimers();
@@ -2465,6 +2721,15 @@ if (realtimeRateVoiceEl) {
   $("btnStop").addEventListener("click", async () => {
     await stopStt();
   });
+  if (btnTestFullPipeline) {
+    btnTestFullPipeline.addEventListener("click", async () => {
+      try {
+        await startFullPipelineTest();
+      } catch (e) {
+        failFullPipelineTest(e?.message || e);
+      }
+    });
+  }
   if (btnResetSession) {
     btnResetSession.addEventListener("click", async () => {
       try {
@@ -2485,12 +2750,15 @@ if (realtimeRateVoiceEl) {
     desiredConnected = false;
     clearReconnectTimers();
     clearPingTimers();
+    clearFullPipelineTestTimer();
     try { controlWs?.close(1000, "reset"); } catch {}
     try { rtWs?.close(1000, "reset"); } catch {}
     try { sttWs?.close(1000, "stop"); } catch {}
+    try { fullPipelineTestWs?.close(1000, "window unload"); } catch {}
     controlWs = null;
     rtWs = null;
     sttWs = null;
+    fullPipelineTestWs = null;
     try {
       if (navigator?.mediaDevices) {
         navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
