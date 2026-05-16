@@ -72,7 +72,7 @@
 
 </head>
   <body>
-    <h2>CHATT Desktop – Full Pipeline (Loopback STT → Orchestrator → Realtime Audio)</h2>
+    <h2>CHATT Direct - Direct Realtime Voice</h2>
 
     <div class="nav">
       <button id="navVoice" type="button" class="active">Voice</button>
@@ -88,7 +88,7 @@
         <div class="box">
         <div class="row">
           <div><b>SessionId:</b> <span id="sid" class="mono"></span></div>
-          <span id="sttStatus" class="pill bad">STT: OFF</span>
+          <span id="sttStatus" class="pill bad">DIRECT: OFF</span>
           <span id="controlStatus" class="pill bad">CONTROL: OFF</span>
           <span id="rtStatus" class="pill bad">REALTIME: OFF</span>
         </div>
@@ -112,9 +112,9 @@
         </div>
 
         <div class="row">
-          <button id="btnConnect" type="button">Connect Control + Realtime</button>
-          <button id="btnStart" type="button" disabled>Start STT (loopback)</button>
-          <button id="btnStop" type="button" disabled>Stop STT</button>
+          <button id="btnConnect" type="button">Connect Realtime</button>
+          <button id="btnStart" type="button" disabled>Start Direct Realtime</button>
+          <button id="btnStop" type="button" disabled>Stop Direct Realtime</button>
           <button id="btnTestFullPipeline" type="button" disabled>Test Full Pipeline</button>
           <button id="btnReloadInstr" type="button">Reload instructions</button>
           <button id="btnResetSession" type="button" title="Generate a new sessionId and reset local state (Ready state, no auto-connect).">
@@ -245,8 +245,8 @@
         </div>
 
         <div class="row small">
-          STT šalje <b>PCM16 16k mono</b> bytes na <code>/stt/ws/{sid}</code>.
-          Orchestrator prima transcript na <code>/v1/sessions/{sid}/transcripts</code>.
+          Direct Realtime salje <b>PCM16 24k mono</b> loopback audio bytes na <code>/voice/ws</code>.
+          Azure Realtime VAD kontrolise turn detection i interruption.
         </div>
 
         <div class="row small">

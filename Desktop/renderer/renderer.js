@@ -365,6 +365,7 @@ const cfg = () => {
   let desiredConnected = false;
   let controlWs = null;
   let rtWs = null;
+  let rtWsEngine = "";
   let controlReconnectAttempt = 0;
   let rtReconnectAttempt = 0;
   let controlReconnectTimer = null;
@@ -990,8 +991,8 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
   }
   async function applyRealtimeSink() {
     if (typeof rtOutEl.setSinkId !== "function") {
-      push("WARN: rtOut.setSinkId is NOT supported in this Electron build. Realtime will use Windows default output.");
-      return;
+      push("ERROR: rtOut.setSinkId is not supported in this Electron build. Direct Realtime requires headphones output.");
+      return false;
     }
     const outputs = await enumerateAudioOutputs();
     // Candidate sources
@@ -1021,7 +1022,12 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     // 3) Preferred label match (useful after unplug/replug -> new deviceId)
     if (!candidateId && preferredLabel) {
       const byLabel = await findDeviceIdByExactLabel(outputs, preferredLabel);
-      if (byLabel) candidateId = byLabel;
+      if (byLabel) {
+        const lbl = getOutputLabelById(outputs, byLabel);
+        if (!REALTIME_HEADPHONES_ONLY || isHeadphonesLabel(lbl)) {
+          candidateId = byLabel;
+        }
+      }
     }
     // 4) Heuristic: any headphones/headset
     if (!candidateId) {
@@ -1030,14 +1036,14 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     // If still none: do NOT switch to speakers. Hold current sink.
     if (!candidateId) {
       if (REALTIME_HEADPHONES_ONLY) {
-        push("Realtime sink: no headphones device available right now. Holding previous sink (no fallback to speakers).");
-        return;
+        push("ERROR: Realtime sink: no headphones device available. Direct Realtime will not start.");
+        return false;
       }
       push("WARN: No suitable output device found. Realtime will stay on current sink.");
-      return;
+      return false;
     }
     // If candidate is unchanged, skip
-    if (candidateId === lastAppliedSinkId) return;
+    if (candidateId === lastAppliedSinkId) return true;
     try {
       await rtOutEl.setSinkId(candidateId);
       // Update UI selection if possible
@@ -1048,9 +1054,11 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
       saveRtDeviceSelection(candidateId, label);
       lastAppliedSinkId = candidateId;
       push(`Realtime output sink set to: ${label}`);
+      return true;
     } catch (e) {
       const msg = e?.message || e;
       push(`ERROR: setSinkId failed: ${msg}`);
+      return false;
     }
   }
   // Auto re-bind on device changes (debounced)
@@ -1195,16 +1203,18 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
   }
 
   async function ensurePlayback() {
+    let sinkOk = false;
     if (!playbackCtx) {
       playbackCtx = new AudioContext({ sampleRate: 24000 });
       playbackDest = playbackCtx.createMediaStreamDestination();
       rtOutEl.srcObject = playbackDest.stream;
       try { await rtOutEl.play(); } catch {}
       push(`Playback AudioContext sampleRate=${playbackCtx.sampleRate}`);
-      await applyRealtimeSink();
+      sinkOk = await applyRealtimeSink();
     } else {
-      await applyRealtimeSink();
+      sinkOk = await applyRealtimeSink();
     }
+    return sinkOk;
   }
   function playPcm16(pcm16, sampleRate, channels) {
     if (!playbackCtx || !playbackDest) return;
@@ -1316,13 +1326,20 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
       return;
     }
     const { VOICE_WS, VOICE_ENGINE, REALTIME_RATE } = cfg();
-    await ensurePlayback();
+    const playbackReady = await ensurePlayback();
+    if (!playbackReady) {
+      setRealtimeStatus("OFF");
+      refreshButtons();
+      return;
+    }
     rtWs = new WebSocket(VOICE_WS);
+    rtWsEngine = VOICE_ENGINE;
     setRealtimeStatus("RECONNECTING");
     rtWs.onopen = () => {
       setRealtimeStatus("ON");
       push(`Voice WS connected (engine=${VOICE_ENGINE}${VOICE_ENGINE === "realtime" ? " rate=" + REALTIME_RATE : ""})`);
       startRealtimePing();
+      flushDirectFramePending();
       rtReconnectAttempt = 0;
       if (rtReconnectTimer) {
         try { window.clearTimeout(rtReconnectTimer); } catch {}
@@ -1338,7 +1355,12 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
       try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
       rtPingTimer = null;
       rtWs = null;
+      rtWsEngine = "";
       refreshButtons();
+      if (directRealtimeActive || directRealtimeStarting) {
+        stopDirectRealtime({ closeRealtime: false, silent: true }).catch(() => {});
+        push("Direct Realtime stopped because Voice WS closed.");
+      }
       if (fullPipelineTestActive) {
         failFullPipelineTest("Realtime WS closed");
       }
@@ -1377,7 +1399,19 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
         playPcm16(pcm16, msg.sample_rate || 24000, msg.channels || 1);
         return;
       }
+      if (msg.type === "log") {
+        push(msg.message || JSON.stringify(msg));
+        return;
+      }
+      if (msg.type === "error") {
+        push(`ERROR(Realtime): ${msg.message || "unknown error"}`);
+        return;
+      }
       if (msg.type === "agent_done") {
+        if (directRealtimeActive || directRealtimeStarting) {
+          push("Direct Realtime response done");
+          return;
+        }
         if (!activeTurnId) {
           push("agent_done received but no activeTurnId");
           return;
@@ -1406,8 +1440,19 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
   let fullPipelineTestActive = false;
   let fullPipelineTestWs = null;
   let fullPipelineTestTimer = null;
+  let directRealtimeActive = false;
+  let directRealtimeStarting = false;
+  let directStream = null;
+  let directCtx = null;
+  let directSource = null;
+  let directNode = null;
+  let directAudioChunks = [];
+  let directAudioBytes = 0;
+  let directFramePending = [];
   const FLUSH_MS = 1200;
   const FULL_PIPELINE_TEST_TIMEOUT_MS = 30000;
+  const DIRECT_PCM_CHUNK_BYTES = 960; // 20ms @ 24kHz mono PCM16
+  const DIRECT_FRAME_PENDING_LIMIT = 80;
   function clearFlushTimer() {
     if (flushTimer) {
       window.clearTimeout(flushTimer);
@@ -1701,6 +1746,245 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
       try { await window.electronAPI.disableLoopbackAudio(); } catch {}
     }
   }
+  function setDirectStatusOn(on, text) {
+    setPill("sttStatus", on ? "ok" : "bad", text || (on ? "DIRECT: ON" : "DIRECT: OFF"));
+  }
+  function forceRealtimeEngineForDirect() {
+    if (getVoiceEngine() === "realtime") return false;
+    try { if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = "realtime"; } catch {}
+    try { if (voiceEngineEl) voiceEngineEl.value = "realtime"; } catch {}
+    saveStrLS(LS_VOICE_ENGINE, "realtime");
+    applyVoiceEngineUiState("realtime");
+    updateVoiceInstructionsUI();
+    push("Direct Realtime forced Voice Engine to realtime.");
+    return true;
+  }
+  async function prepareRealtimeSocketForDirect() {
+    forceRealtimeEngineForDirect();
+    if (rtWs && rtWsEngine && rtWsEngine !== "realtime") {
+      rtReconnectSuppressOnce = true;
+      try { rtWs.close(1000, "direct-realtime-engine-switch"); } catch {}
+      rtWs = null;
+      rtWsEngine = "";
+      await sleep(100);
+    }
+  }
+  function waitForRealtimeOpen(timeoutMs) {
+    return new Promise((resolve, reject) => {
+      if (rtWs && rtWs.readyState === WebSocket.OPEN) {
+        resolve();
+        return;
+      }
+      if (!rtWs) {
+        reject(new Error("Realtime WS was not created"));
+        return;
+      }
+
+      let timer = null;
+      const ws = rtWs;
+      const cleanup = () => {
+        try { ws.removeEventListener("open", onOpen); } catch {}
+        try { ws.removeEventListener("error", onError); } catch {}
+        try { ws.removeEventListener("close", onClose); } catch {}
+        try { if (timer) window.clearTimeout(timer); } catch {}
+      };
+      const onOpen = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error("Realtime WS error while opening"));
+      };
+      const onClose = () => {
+        cleanup();
+        reject(new Error("Realtime WS closed before opening"));
+      };
+
+      try { ws.addEventListener("open", onOpen); } catch {}
+      try { ws.addEventListener("error", onError); } catch {}
+      try { ws.addEventListener("close", onClose); } catch {}
+      timer = window.setTimeout(() => {
+        cleanup();
+        reject(new Error("Timed out waiting for Realtime WS"));
+      }, timeoutMs || 10000);
+    });
+  }
+  function flushDirectFramePending() {
+    if (!rtWs || rtWs.readyState !== WebSocket.OPEN || directFramePending.length === 0) return;
+    const queued = directFramePending.splice(0, directFramePending.length);
+    for (const buf of queued) {
+      try { rtWs.send(buf); } catch {}
+    }
+  }
+  function sendDirectFrame(buf) {
+    if (!buf || (!directRealtimeActive && !directRealtimeStarting)) return;
+    if (rtWs && rtWs.readyState === WebSocket.OPEN) {
+      try { rtWs.send(buf); } catch {}
+      return;
+    }
+    if (rtWs && rtWs.readyState === WebSocket.CONNECTING) {
+      directFramePending.push(buf);
+      while (directFramePending.length > DIRECT_FRAME_PENDING_LIMIT) directFramePending.shift();
+    }
+  }
+  function flushDirectAudioChunks() {
+    if (directAudioBytes <= 0) return;
+    const out = new Uint8Array(directAudioBytes);
+    let offset = 0;
+    for (const chunk of directAudioChunks) {
+      out.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    directAudioChunks = [];
+    directAudioBytes = 0;
+    sendDirectFrame(out.buffer);
+  }
+  function queueDirectAudio(buf) {
+    if (!buf || !directRealtimeActive) return;
+    const bytes = new Uint8Array(buf);
+    directAudioChunks.push(bytes);
+    directAudioBytes += bytes.byteLength;
+    if (directAudioBytes >= DIRECT_PCM_CHUNK_BYTES) flushDirectAudioChunks();
+  }
+  async function stopLegacySttCaptureOnly(reason) {
+    clearFlushTimer();
+    sttBuffer = [];
+    sttPending = [];
+    stopAnalyser();
+    try { sttWs?.close(1000, reason || "direct-realtime"); } catch {}
+    sttWs = null;
+    try { sttStream?.getTracks().forEach((t) => t.stop()); } catch {}
+    sttStream = null;
+    try { loopMonitor.pause(); loopMonitor.srcObject = null; } catch {}
+    try { await sttCtx?.close(); } catch {}
+    sttCtx = null;
+  }
+  function disconnectControlForDirect() {
+    if (!controlWs) return;
+    const ws = controlWs;
+    controlWs = null;
+    try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
+    controlPingTimer = null;
+    try { ws.onclose = null; } catch {}
+    try { ws.onerror = null; } catch {}
+    try { ws.onmessage = null; } catch {}
+    try { ws.close(1000, "direct-realtime"); } catch {}
+    setControlStatus("OFF");
+  }
+  async function startDirectRealtime() {
+    if (directRealtimeActive || directRealtimeStarting) {
+      push("Direct Realtime is already running.");
+      return;
+    }
+    if (fullPipelineTestActive) {
+      push("Direct Realtime cannot start while Full Pipeline Test is running.");
+      return;
+    }
+
+    directRealtimeStarting = true;
+    setDirectStatusOn(false, "DIRECT: STARTING");
+    refreshButtons();
+
+    try {
+      if (sttWs || sttStream || sttCtx) {
+        await stopLegacySttCaptureOnly("direct-realtime-start");
+      }
+      disconnectControlForDirect();
+
+      await prepareRealtimeSocketForDirect();
+      await refreshOutputDevicesUI();
+      const playbackReady = await ensurePlayback();
+      if (!playbackReady) throw new Error("Headphones output is required for Direct Realtime.");
+
+      desiredConnected = true;
+      clearReconnectTimers();
+      if (!rtWs || (rtWs.readyState !== WebSocket.OPEN && rtWs.readyState !== WebSocket.CONNECTING)) {
+        await connectRealtime();
+      }
+      await waitForRealtimeOpen(10000);
+
+      directStream = await getLoopbackStream();
+      const audioTracks = directStream.getAudioTracks();
+      if (!audioTracks.length) throw new Error("Loopback capture returned no audio tracks.");
+      push(`Direct loopback audio tracks: ${audioTracks.length}`);
+      audioTracks.forEach((t, i) =>
+        push(`  [${i}] label="${t.label}" enabled=${t.enabled} muted=${t.muted} readyState=${t.readyState}`)
+      );
+
+      loopMonitor.srcObject = directStream;
+      try { await loopMonitor.play(); } catch {}
+
+      directCtx = new AudioContext();
+      push(`Direct AudioContext sampleRate=${directCtx.sampleRate}`);
+      const workletUrl = new URL("stt-worklet-processor.js", window.location.href).toString();
+      await directCtx.audioWorklet.addModule(workletUrl);
+
+      directSource = directCtx.createMediaStreamSource(directStream);
+      directNode = new AudioWorkletNode(directCtx, "direct-realtime-pcm16-24k");
+      directNode.port.onmessage = (e) => queueDirectAudio(e.data);
+
+      directRealtimeActive = true;
+      directSource.connect(directNode);
+      setDirectStatusOn(true);
+      push("Direct Realtime streaming started (loopback PCM16@24k mono -> /voice/ws).");
+    } catch (e) {
+      push(`ERROR(Direct Realtime start): ${e?.message || e}`);
+      await stopDirectRealtime({ closeRealtime: true, silent: true });
+      setDirectStatusOn(false);
+    } finally {
+      directRealtimeStarting = false;
+      refreshButtons();
+    }
+  }
+  async function stopDirectRealtime(options) {
+    const opts = options || {};
+    const closeRealtime = opts.closeRealtime !== false;
+    const silent = !!opts.silent;
+    const wasRunning = directRealtimeActive || directRealtimeStarting || !!directStream || !!directCtx;
+
+    directRealtimeActive = false;
+    directRealtimeStarting = false;
+    directAudioChunks = [];
+    directAudioBytes = 0;
+    directFramePending = [];
+
+    try { directNode?.port && (directNode.port.onmessage = null); } catch {}
+    try { directNode?.disconnect(); } catch {}
+    directNode = null;
+    try { directSource?.disconnect(); } catch {}
+    directSource = null;
+
+    const oldStream = directStream;
+    directStream = null;
+    try { oldStream?.getTracks().forEach((t) => t.stop()); } catch {}
+    try { loopMonitor.pause(); loopMonitor.srcObject = null; } catch {}
+
+    const oldCtx = directCtx;
+    directCtx = null;
+    try { await oldCtx?.close(); } catch {}
+
+    try { clearBufferedAudio(); } catch {}
+    activeTurnId = null;
+
+    if (closeRealtime) {
+      desiredConnected = false;
+      clearReconnectTimers();
+      try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
+      rtPingTimer = null;
+      const ws = rtWs;
+      rtWs = null;
+      rtWsEngine = "";
+      if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+        try { ws.close(1000, "direct-realtime-stop"); } catch {}
+      }
+      setRealtimeStatus("OFF");
+    }
+
+    setDirectStatusOn(false);
+    refreshButtons();
+    if (!silent && wasRunning) push("Direct Realtime stopped.");
+  }
   async function startStt() {
     if (!getSttEnabled()) {
       push("STT is disabled (STT Enabled is OFF).");
@@ -1787,15 +2071,15 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     const controlOk = controlWs && controlWs.readyState === WebSocket.OPEN;
     const rtOk = rtWs && rtWs.readyState === WebSocket.OPEN;
     const sttOk = !!sttWs && sttWs.readyState !== WebSocket.CLOSED;
+    const directBusy = directRealtimeActive || directRealtimeStarting;
     // Pause/Resume button is enabled only when Voice WS is open.
     if (btnPauseAudio) {
       btnPauseAudio.disabled = !rtOk;
     }
-    const enabled = getSttEnabled();
-    $("btnStart").disabled = !(controlOk && rtOk) || sttOk || !enabled || fullPipelineTestActive;
-    $("btnStop").disabled = !sttOk;
+    $("btnStart").disabled = directBusy || fullPipelineTestActive;
+    $("btnStop").disabled = !(directBusy || sttOk);
     if (btnTestFullPipeline) {
-      btnTestFullPipeline.disabled = !(controlOk && rtOk) || sttOk || fullPipelineTestActive;
+      btnTestFullPipeline.disabled = !(controlOk && rtOk) || sttOk || directBusy || fullPipelineTestActive;
     }
   }
   // ------------------------------
@@ -1809,11 +2093,13 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     desiredConnected = false;
     clearReconnectTimers();
     clearPingTimers();
-    try { await stopStt(); } catch {}
+    try { await stopDirectRealtime({ closeRealtime: true, silent: true }); } catch {}
+    try { await stopLegacySttCaptureOnly("reset"); } catch {}
     try { controlWs?.close(1000, "reset"); } catch {}
     try { rtWs?.close(1000, "reset"); } catch {}
     controlWs = null;
     rtWs = null;
+    rtWsEngine = "";
     activeTurnId = null;
     playhead = 0;
     try { clearBufferedAudio(); } catch {}
@@ -1824,11 +2110,11 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
         ? crypto.randomUUID()
         : ("test-" + Math.random().toString(16).slice(2));
     $("sid").textContent = sid;
-    setPill("sttStatus", "bad", "STT: OFF");
+    setDirectStatusOn(false);
     setControlStatus("OFF");
     setRealtimeStatus("OFF");
     refreshButtons();
-    push(`Session reset complete. New sessionId=${sid}. Ready (click Connect).`);
+    push(`Session reset complete. New sessionId=${sid}. Ready for Direct Realtime.`);
   }
   // ------------------------------
   // Instructions Page (editor + profiles)
@@ -2574,6 +2860,13 @@ async function reconnectVoiceWs(reason) {
 
 if (voiceEngineEl) {
   voiceEngineEl.addEventListener("change", async () => {
+    if ((directRealtimeActive || directRealtimeStarting) && normalizeVoiceEngine(voiceEngineEl.value) !== "realtime") {
+      try { voiceEngineEl.value = "realtime"; } catch {}
+      try { if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = "realtime"; } catch {}
+      saveStrLS(LS_VOICE_ENGINE, "realtime");
+      push("Direct Realtime requires Voice Engine = realtime.");
+      return;
+    }
     // Keep Voice tab selector in sync
     try { if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = voiceEngineEl.value; } catch {}
     const engine = getVoiceEngine();
@@ -2586,6 +2879,13 @@ if (voiceEngineEl) {
 }
 if (voiceEngineVoiceEl) {
   voiceEngineVoiceEl.addEventListener("change", async () => {
+    if ((directRealtimeActive || directRealtimeStarting) && normalizeVoiceEngine(voiceEngineVoiceEl.value) !== "realtime") {
+      try { voiceEngineVoiceEl.value = "realtime"; } catch {}
+      try { if (voiceEngineEl) voiceEngineEl.value = "realtime"; } catch {}
+      saveStrLS(LS_VOICE_ENGINE, "realtime");
+      push("Direct Realtime requires Voice Engine = realtime.");
+      return;
+    }
     // Sync Settings selector
     try { if (voiceEngineEl) voiceEngineEl.value = voiceEngineVoiceEl.value; } catch {}
     const engine = getVoiceEngine();
@@ -2700,10 +3000,10 @@ if (realtimeRateVoiceEl) {
     await applyRealtimeSink();
   });
   $("btnConnect").addEventListener("click", async () => {
+    await prepareRealtimeSocketForDirect();
     desiredConnected = true;
     clearReconnectTimers();
     await refreshOutputDevicesUI();
-    connectControl();
     await connectRealtime();
     await loadInstructionsEffective();
     refreshButtons();
@@ -2713,13 +3013,19 @@ if (realtimeRateVoiceEl) {
   });
   $("btnStart").addEventListener("click", async () => {
     try {
-      await startStt();
+      await startDirectRealtime();
     } catch (e) {
-      push(`ERROR(STT start): ${e?.message || e}`);
+      push(`ERROR(Direct Realtime start): ${e?.message || e}`);
     }
   });
   $("btnStop").addEventListener("click", async () => {
-    await stopStt();
+    if (directRealtimeActive || directRealtimeStarting || directStream || directCtx) {
+      await stopDirectRealtime();
+    } else {
+      await stopLegacySttCaptureOnly("manual-stop");
+      setDirectStatusOn(false);
+      refreshButtons();
+    }
   });
   if (btnTestFullPipeline) {
     btnTestFullPipeline.addEventListener("click", async () => {
@@ -2751,12 +3057,14 @@ if (realtimeRateVoiceEl) {
     clearReconnectTimers();
     clearPingTimers();
     clearFullPipelineTestTimer();
+    try { stopDirectRealtime({ closeRealtime: false, silent: true }); } catch {}
     try { controlWs?.close(1000, "reset"); } catch {}
     try { rtWs?.close(1000, "reset"); } catch {}
     try { sttWs?.close(1000, "stop"); } catch {}
     try { fullPipelineTestWs?.close(1000, "window unload"); } catch {}
     controlWs = null;
     rtWs = null;
+    rtWsEngine = "";
     sttWs = null;
     fullPipelineTestWs = null;
     try {
@@ -2766,7 +3074,7 @@ if (realtimeRateVoiceEl) {
     } catch {}
   });
   // Initial UI state
-  setPill("sttStatus", "bad", "STT: OFF");
+  setDirectStatusOn(false);
   setControlStatus("OFF");
   setRealtimeStatus("OFF");
   (async () => {
@@ -2777,5 +3085,5 @@ if (realtimeRateVoiceEl) {
     } catch {}
     refreshButtons();
   })();
-  push("Ready. Click: Connect Control + Realtime, then Start STT.");
+  push("Ready. Click Start Direct Realtime to stream loopback/system audio to /voice/ws.");
 })();

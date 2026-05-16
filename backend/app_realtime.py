@@ -656,7 +656,7 @@ async def voice_ws(ws: WebSocket):
             pass
 
     async def apply_session_update(rws, voice_rate: str, instructions: Optional[str] = None):
-        # Determine effective instructions (client -> file current -> file default).
+        # Determine effective instructions (file current -> file default -> fallback).
         eff_instructions = (instructions or "").strip()
         if not eff_instructions:
             eff_instructions = (realtime_instr or "").strip()
@@ -674,8 +674,13 @@ async def voice_ws(ws: WebSocket):
                 {
                     "type": "session.update",
                     "session": {
-                        "turn_detection": {"type": "none"},
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "create_response": True,
+                            "interrupt_response": True,
+                        },
                         "modalities": ["audio"],
+                        "input_audio_format": "pcm16",
                         "output_audio_format": "pcm16",
                         "voice": {
                             "name": "en-US-Ava:DragonHDLatestNeural",
@@ -689,21 +694,17 @@ async def voice_ws(ws: WebSocket):
             )
         )
 
-    async def send_text_to_realtime(rws, text: str, voice_rate: str, instructions: Optional[str] = None):
-        await apply_session_update(rws, voice_rate, instructions)
+    async def append_audio_to_realtime(rws, audio_bytes: bytes):
+        if not audio_bytes:
+            return
         await rws.send(
             json.dumps(
                 {
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "message",
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": text}],
-                    },
+                    "type": "input_audio_buffer.append",
+                    "audio": base64.b64encode(audio_bytes).decode("ascii"),
                 }
             )
         )
-        await rws.send(json.dumps({"type": "response.create", "response": {"modalities": ["audio"]}}))
 
     try:
         async with websockets.connect(realtime_url, extra_headers=headers) as rws:
@@ -723,7 +724,7 @@ async def voice_ws(ws: WebSocket):
                             continue
 
                         t = msg.get("type")
-                        if t == "response.audio.delta":
+                        if t in {"response.audio.delta", "response.output_audio.delta"}:
                             b64 = msg.get("delta", "")
                             if b64:
                                 await safe_send(
@@ -735,9 +736,19 @@ async def voice_ws(ws: WebSocket):
                                         "data": b64,
                                     }
                                 )
-                        elif t == "response.audio.done":
+                        elif t in {"response.audio.done", "response.output_audio.done"}:
                             await safe_send({"type": "agent_done"})
+                        elif t in {
+                            "input_audio_buffer.speech_started",
+                            "input_audio_buffer.speech_stopped",
+                            "input_audio_buffer.committed",
+                        }:
+                            if DEBUG:
+                                print("[direct-realtime]", t, msg)
+                            await safe_send({"type": "log", "message": f"direct realtime: {t}", "event": t})
                         elif t == "error":
+                            if DEBUG:
+                                print("[direct-realtime] error", msg)
                             await safe_send({"type": "error", "message": msg.get("message", "Realtime error"), "raw": msg})
                 except Exception:
                     pass
@@ -751,6 +762,16 @@ async def voice_ws(ws: WebSocket):
                     except (WebSocketDisconnect, RuntimeError):
                         break
 
+                    audio_bytes = incoming.get("bytes")
+                    if audio_bytes is not None:
+                        try:
+                            await append_audio_to_realtime(rws, audio_bytes)
+                        except Exception as e:
+                            if DEBUG:
+                                print("append_audio_to_realtime error:", repr(e))
+                            await safe_send({"type": "error", "message": str(e)})
+                        continue
+
                     txt = incoming.get("text")
                     if not txt:
                         continue
@@ -760,27 +781,15 @@ async def voice_ws(ws: WebSocket):
                     except Exception:
                         continue
 
-                    if data.get("type") != "SEND_TEXT":
-                        continue
-
-                    text = (data.get("text") or "").strip()
-                    if not text:
-                        continue
-
-                    msg_instructions = data.get("instructions")
-                    if msg_instructions is None or str(msg_instructions).strip() == "":
-                        msg_instructions = realtime_instr
-                    else:
-                        msg_instructions = str(msg_instructions)
-                    if DEBUG:
-                        print("[DBG] client instructions head:", str(msg_instructions)[:120])
-
-                    try:
-                        await send_text_to_realtime(rws, text, voice_rate=rate, instructions=msg_instructions)
-                    except Exception as e:
-                        if DEBUG:
-                            print("send_text_to_realtime error:", repr(e))
-                        await safe_send({"type": "error", "message": str(e)})
+                    if data.get("type") == "response.cancel":
+                        try:
+                            await rws.send(json.dumps({"type": "response.cancel"}))
+                        except Exception as e:
+                            if DEBUG:
+                                print("response.cancel error:", repr(e))
+                            await safe_send({"type": "error", "message": str(e)})
+                    elif DEBUG and data.get("type") not in {"ping"}:
+                        print("[direct-realtime] ignored desktop text frame:", data.get("type"))
 
             finally:
                 try:
