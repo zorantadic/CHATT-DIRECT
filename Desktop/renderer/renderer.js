@@ -1082,6 +1082,7 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
   let playbackCtx = null;
   let playhead = 0;
   let playbackDest = null;
+  const activePlaybackSources = new Set();
 
   // Realtime audio diagnostics (throttled logging)
   // Goal: detect any sample_rate / channels drift or duration mismatch without flooding the log.
@@ -1093,9 +1094,8 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
   };
 
   // ------------------------------
-  // Pause/Resume + bounded buffer (120s) for Voice audio
-  // - While paused: buffer decoded PCM bytes (bounded ring buffer).
-  // - On resume: flush buffered audio into the existing playback pipeline.
+  // Legacy pause/buffer state. Direct Realtime audio is no longer enqueued;
+  // incoming audio is played immediately and cleanup uses stopAudioNow().
   // ------------------------------
   const BUFFER_SECONDS = 120;
   let isAudioPaused = false;
@@ -1151,6 +1151,24 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     for (const chunk of queued) {
       playPcm16Bytes(chunk.bytes, chunk.sampleRate, chunk.channels);
     }
+  }
+  function stopAudioNow() {
+    for (const src of Array.from(activePlaybackSources)) {
+      try { src.stop(0); } catch {}
+      try { src.disconnect(); } catch {}
+    }
+    activePlaybackSources.clear();
+    audioQueue.length = 0;
+    bufferedBytes = 0;
+    lastFormat = null;
+    isAudioPaused = false;
+    updatePauseUi();
+    try {
+      playhead = playbackCtx ? playbackCtx.currentTime : 0;
+    } catch {
+      playhead = 0;
+    }
+    push("Audio stopped immediately");
   }
   async function setAudioPaused(paused) {
     const next = !!paused;
@@ -1239,6 +1257,10 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     src.connect(playbackDest);
+    activePlaybackSources.add(src);
+    src.onended = () => {
+      activePlaybackSources.delete(src);
+    };
     const now = ctx.currentTime;
     if (playhead < now) playhead = now;
     src.start(playhead);
@@ -1384,11 +1406,6 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
       try { msg = JSON.parse(e.data); } catch { return; }
       if (msg.type === "audio") {
         const pcmBytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
-        if (isAudioPaused) {
-          // While paused, buffer decoded PCM bytes (bounded ring buffer).
-          enqueueAudio({ bytes: pcmBytes, sampleRate: msg.sample_rate || 24000, channels: msg.channels || 1 });
-          return;
-        }
         // Diagnostics: log expected duration and metadata (throttled).
         logRealtimeAudioChunk(pcmBytes.byteLength, msg.sample_rate || 24000, msg.channels || 1);
         const pcm16 = new Int16Array(
@@ -1948,6 +1965,7 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     directAudioChunks = [];
     directAudioBytes = 0;
     directFramePending = [];
+    try { stopAudioNow(); } catch {}
 
     try { directNode?.port && (directNode.port.onmessage = null); } catch {}
     try { directNode?.disconnect(); } catch {}
@@ -1964,7 +1982,6 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     directCtx = null;
     try { await oldCtx?.close(); } catch {}
 
-    try { clearBufferedAudio(); } catch {}
     activeTurnId = null;
 
     if (closeRealtime) {
@@ -2101,8 +2118,6 @@ if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructio
     rtWs = null;
     rtWsEngine = "";
     activeTurnId = null;
-    playhead = 0;
-    try { clearBufferedAudio(); } catch {}
     controlReconnectAttempt = 0;
     rtReconnectAttempt = 0;
     sid =
@@ -2948,41 +2963,11 @@ if (realtimeRateVoiceEl) {
   // ------------------------------
 
   // ------------------------------
-  // Pause button is injected into the existing Voice controls row (no HTML change).
+  // Pause/buffer UI is disabled for Direct Realtime no-buffer playback.
   // ------------------------------
   function initPauseUi() {
-    try {
-      const btnConnectEl = $("btnConnect");
-      const btnStopEl = $("btnStop");
-      if (!btnConnectEl) return;
-      const host = btnConnectEl.parentElement;
-      if (!host) return;
-      // Create Pause/Resume button
-      btnPauseAudio = document.createElement("button");
-      btnPauseAudio.id = "btnPauseAudio";
-      btnPauseAudio.type = "button";
-      btnPauseAudio.textContent = "Pause audio";
-      btnPauseAudio.disabled = true;
-      btnPauseAudio.title = "Pause/resume Voice audio. While paused, audio is buffered (max 120s).";
-      btnPauseAudio.addEventListener("click", async () => {
-        await setAudioPaused(!isAudioPaused);
-        refreshButtons();
-      });
-      // Small status text (optional)
-      pauseInfoEl = document.createElement("span");
-      pauseInfoEl.id = "pauseInfo";
-      pauseInfoEl.className = "small";
-      pauseInfoEl.style.marginLeft = "8px";
-      pauseInfoEl.textContent = "";
-      // Insert after Stop STT if present; otherwise after Connect
-      if (btnStopEl && btnStopEl.parentElement === host) {
-        host.insertBefore(btnPauseAudio, btnStopEl.nextSibling);
-      } else {
-        host.appendChild(btnPauseAudio);
-      }
-      host.appendChild(pauseInfoEl);
-      updatePauseUi();
-    } catch {}
+    btnPauseAudio = null;
+    pauseInfoEl = null;
   }
 
   initPauseUi();
