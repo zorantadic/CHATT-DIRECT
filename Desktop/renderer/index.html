@@ -115,6 +115,7 @@
           <button id="btnConnect" type="button" class="hidden">Connect Realtime</button>
           <button id="btnStart" type="button" disabled>Start Direct Realtime</button>
           <button id="btnStop" type="button" disabled>Stop Direct Realtime</button>
+          <button id="btnInstrRefresh" type="button">Refresh Instructions</button>
           <button id="btnTestFullPipeline" type="button" class="hidden">Test Direct Pipeline</button>
           <button id="btnReloadInstr" type="button" class="hidden">Reload instructions</button>
           <button id="btnResetSession" type="button" title="Generate a new sessionId and reset local state (Ready state, no auto-connect).">
@@ -266,38 +267,38 @@
         <h3>Instructions</h3>
 
         <div class="row">
-  <label>Target</label>
-  <select id="instrTarget">
-    <option value="realtime">realtime</option>
-    <option value="tts">tts</option>
-  </select>
-</div>
+          <label>Instruction Preset</label>
+          <select id="instructionPreset">
+            <option value="neutral_conversation">Neutral Conversation</option>
+            <option value="cloud_solution_architect">Cloud Solution Architect</option>
+            <option value="interview_candidate">Interview Candidate</option>
+          </select>
+        </div>
 
-<div class="row small">
+        <div class="small">
+          Selected preset is applied as the full Realtime session instructions when the Direct Realtime session starts.
+        </div>
+
+        <div class="small" style="margin-top:6px;">
           Backend: <span id="instrBackend" class="mono"></span>
         </div>
 
         <h3>Current Instructions</h3>
-        <textarea id="instrCurrent" rows="14" class="mono"></textarea>
+        <textarea id="instrCurrent" rows="18" class="mono"></textarea>
+
         <div class="row small">
           updatedAt: <span id="instrUpdatedAt" class="mono"></span>
         </div>
+
         <div class="row">
           <button id="btnInstrLoad" type="button">Load</button>
           <button id="btnInstrSave" type="button">Save</button>
-          <button id="btnInstrReset" type="button">Reset to Default</button>
+          <button id="btnInstrReset" type="button">Reset to preset default</button>
           <span id="instrStatus" class="small"></span>
         </div>
 
-        <h3>Style Profiles</h3>
-        <div id="profilesError" class="small" style="color:crimson;"></div>
-        <div id="profilesStyles"></div>
-
-        <h3>Domain Profiles</h3>
-        <div id="profilesDomains"></div>
-
         <h3>Default Instructions</h3>
-        <textarea id="instrDefault" rows="10" class="mono" readonly></textarea>
+        <textarea id="instrDefault" rows="14" class="mono" readonly></textarea>
       </div>
     </div>
 
