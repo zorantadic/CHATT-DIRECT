@@ -1065,7 +1065,6 @@ if (instructionPresetEl) {
     });
   });
 }
-if (btnInstrLoad) btnInstrLoad.addEventListener("click", () => loadInstructionsFromBackendExplicit().catch(() => {}));
 if (btnInstrSave) btnInstrSave.addEventListener("click", () => saveInstructionsToBackend().catch(() => {}));
 if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructionsToDefault().catch(() => {}));
 if (btnInstrRefresh) {
