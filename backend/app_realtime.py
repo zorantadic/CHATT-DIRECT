@@ -3,6 +3,13 @@ import json
 import asyncio
 import tempfile
 import base64
+from provider_config import (
+    get_active_provider_config,
+    load_provider_capabilities,
+    load_provider_config,
+    save_provider_config,
+    test_provider_config,
+)
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse
@@ -272,6 +279,32 @@ async def reset_instructions(target: str = Query("realtime")):
         _instructions_cache[t]["updatedAt"] = now
         return JSONResponse(_instructions_snapshot(t))
 
+# ----------------------------
+# Provider Configuration API
+# ----------------------------
+@app.get("/v1/provider/capabilities")
+async def provider_capabilities():
+    return load_provider_capabilities()
+
+
+@app.get("/v1/provider/config")
+async def provider_config_get():
+    return load_provider_config()
+
+
+@app.post("/v1/provider/config")
+async def provider_config_save(payload: Dict[str, Any]):
+    return save_provider_config(payload)
+
+
+@app.get("/v1/provider/active")
+async def provider_active_get():
+    return get_active_provider_config()
+
+
+@app.post("/v1/provider/test")
+async def provider_config_test(payload: Optional[Dict[str, Any]] = None):
+    return test_provider_config(payload)
 
 @app.get("/")
 async def root():
