@@ -379,6 +379,17 @@ const cfg = () => {
     VOICE_WS: buildVoiceWsUrl(rtWsBase, rate),
   };
 };
+
+function directRealtimeCfg() {
+  const rate = getRealtimeRate();
+  const rtWsBase = $("rtWs").value.replace(/\/+$/, "");
+  return {
+    REALTIME_HTTP: $("rtHttp").value.replace(/\/+$/, ""),
+    REALTIME_WS: rtWsBase,
+    REALTIME_RATE: rate,
+    VOICE_WS: buildVoiceWsUrl(rtWsBase, rate),
+  };
+}
   // ------------------------------
   // Desired connection state + reconnect (Control/Realtime)
   // ------------------------------
@@ -1550,7 +1561,7 @@ if (btnInstrRefresh) {
     if (rtWs && (rtWs.readyState === WebSocket.OPEN || rtWs.readyState === WebSocket.CONNECTING)) {
       return;
     }
-    const { VOICE_WS, REALTIME_RATE } = cfg();
+    const { VOICE_WS, REALTIME_RATE } = directRealtimeCfg();
     const playbackReady = await ensurePlayback();
     if (!playbackReady) {
       setRealtimeStatus("OFF");
