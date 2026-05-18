@@ -215,14 +215,11 @@ Do not introduce new topics.`;
   const rtDeviceSel = $("rtDevice");
   const listenStatusEl = $("listenStatus");
   const speakStatusEl = $("speakStatus");
-  const sttEnabledEl = $("sttEnabled");
-  const sttLangEl = $("sttLang");
   const realtimeRateEl = $("realtimeRate");
   const realtimeRateVoiceEl = $("realtimeRateVoice");
   const playbackVolumeEl = $("playbackVolume");
   const playbackVolumeValueEl = $("playbackVolumeValue");
   const btnResetSession = $("btnResetSession");
-  const btnTestFullPipeline = $("btnTestFullPipeline");
   // Pause/Resume (Voice audio) UI refs (created dynamically)
   let btnPauseAudio = null;
   let pauseInfoEl = null;
@@ -274,12 +271,6 @@ Do not introduce new topics.`;
     $("rtHttp").value = loadStrLS(LS_RT_HTTP, DEFAULTS.REALTIME_HTTP);
     $("rtWs").value = loadStrLS(LS_RT_WS, DEFAULTS.REALTIME_WS);
   }
-  function loadSttSettingsIntoInputs() {
-    const enabled = loadBoolLS(LS_STT_ENABLED, true);
-    const lang = normalizeLang(loadStrLS(LS_STT_LANGUAGE, DEFAULT_LANG));
-    if (sttEnabledEl) sttEnabledEl.checked = enabled;
-    if (sttLangEl) sttLangEl.value = lang;
-  }
 function loadVoiceSettingsIntoInputs() {
   const rate = normalizeRealtimeRate(loadStrLS(LS_REALTIME_RATE, DEFAULT_REALTIME_RATE));
   if (realtimeRateEl) realtimeRateEl.value = rate;
@@ -317,7 +308,6 @@ function loadInstructionsTargetIntoInputs() {
     if (authStatusEl) authStatusEl.textContent = token ? "Token set" : "No token";
   }
   loadEndpointSettingsIntoInputs();
-  loadSttSettingsIntoInputs();
   initAuthUi();
   loadVoiceSettingsIntoInputs();
   applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
@@ -326,10 +316,10 @@ function loadInstructionsTargetIntoInputs() {
   // STT settings
   // ------------------------------
   function getSttEnabled() {
-    return !!sttEnabledEl?.checked;
+    return loadBoolLS(LS_STT_ENABLED, true);
   }
   function getSttLanguage() {
-    return normalizeLang(sttLangEl?.value || DEFAULT_LANG);
+    return normalizeLang(loadStrLS(LS_STT_LANGUAGE, DEFAULT_LANG));
   }
   function buildSttWsUrl(base, sessionId, lang) {
     const b = (base || "").replace(/\/+$/, "");
@@ -2302,9 +2292,6 @@ if (btnInstrRefresh) {
     }
     $("btnStart").disabled = directBusy || fullPipelineTestActive;
     $("btnStop").disabled = !(directBusy || sttOk);
-    if (btnTestFullPipeline) {
-      btnTestFullPipeline.disabled = directBusy;
-    }
   }
   // ------------------------------
   // Reset Session (Ready state; user clicks Connect)
@@ -2380,24 +2367,6 @@ if (btnInstrRefresh) {
     resetSettingsToDefaults();
     try { refreshInstructionsPage().catch(() => {}); } catch {}
   });
-  if (sttEnabledEl) {
-    sttEnabledEl.addEventListener("change", async () => {
-      const enabled = getSttEnabled();
-      saveBoolLS(LS_STT_ENABLED, enabled);
-      push(`STT Enabled set to: ${enabled ? "ON" : "OFF"}`);
-      if (!enabled && sttWs) {
-        await stopStt();
-      }
-      refreshButtons();
-    });
-  }
-  if (sttLangEl) {
-    sttLangEl.addEventListener("change", () => {
-      const lang = getSttLanguage();
-      saveStrLS(LS_STT_LANGUAGE, lang);
-      push(`STT language set to: ${lang} (will apply on next STT start)`);
-    });
-  }
 // Realtime rate
 async function reconnectVoiceWs(reason) {
   if (!desiredConnected) return;
@@ -2499,17 +2468,6 @@ if (playbackVolumeEl) {
     }
     await applyRealtimeSink();
   });
-  $("btnConnect")?.addEventListener("click", async () => {
-    desiredConnected = true;
-    clearReconnectTimers();
-    await refreshOutputDevicesUI();
-    await connectRealtime();
-    await loadInstructionsEffective();
-    refreshButtons();
-  });
-  $("btnReloadInstr")?.addEventListener("click", async () => {
-    await loadInstructionsEffective();
-  });
   $("btnStart").addEventListener("click", async () => {
     try {
       await startDirectRealtime();
@@ -2526,11 +2484,6 @@ if (playbackVolumeEl) {
       refreshButtons();
     }
   });
-  if (btnTestFullPipeline) {
-    btnTestFullPipeline.addEventListener("click", () => {
-      push("Test Direct Pipeline is not implemented yet.");
-    });
-  }
   if (btnResetSession) {
     btnResetSession.addEventListener("click", async () => {
       try {
