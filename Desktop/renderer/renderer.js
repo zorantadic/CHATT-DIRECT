@@ -96,6 +96,26 @@ Do not introduce new topics.`;
     el.classList.add(state);
     el.textContent = text;
   }
+  function setListeningIndicator(active) {
+    if (!listenStatusEl) return;
+    if (active) {
+      listenStatusEl.classList.remove("bad");
+      listenStatusEl.classList.add("ok");
+    } else {
+      listenStatusEl.classList.remove("ok");
+      listenStatusEl.classList.add("bad");
+    }
+  }
+  function setSpeakingIndicator(active) {
+    if (!speakStatusEl) return;
+    if (active) {
+      speakStatusEl.classList.remove("bad");
+      speakStatusEl.classList.add("ok");
+    } else {
+      speakStatusEl.classList.remove("ok");
+      speakStatusEl.classList.add("bad");
+    }
+  }
   // ------------------------------
   // Navigation (Views)
   // ------------------------------
@@ -197,6 +217,8 @@ Do not introduce new topics.`;
   const loopMonitor = $("loopMonitor");
   const rtOutEl = $("rtOut");
   const rtDeviceSel = $("rtDevice");
+  const listenStatusEl = $("listenStatus");
+  const speakStatusEl = $("speakStatus");
   const sttEnabledEl = $("sttEnabled");
   const sttLangEl = $("sttLang");
   const voiceEngineEl = $("voiceEngine");
@@ -244,6 +266,10 @@ Do not introduce new topics.`;
   let playbackGainNode = null;
   const activePlaybackSources = new Set();
   let isAssistantSpeaking = false;
+  function setAssistantSpeaking(active) {
+    isAssistantSpeaking = !!active;
+    setSpeakingIndicator(isAssistantSpeaking);
+  }
 
   // ------------------------------
   // Initialize settings into inputs
@@ -1387,6 +1413,7 @@ if (btnInstrRefresh) {
     bufferedBytes = 0;
     lastFormat = null;
     isAudioPaused = false;
+    setAssistantSpeaking(false);
     updatePauseUi();
     try {
       playhead = playbackCtx ? playbackCtx.currentTime : 0;
@@ -1491,7 +1518,7 @@ if (btnInstrRefresh) {
     src.connect(playbackGainNode || playbackDest);
     activePlaybackSources.add(src);
     src.onended = () => {
-      activePlaybackSources.delete(src);
+     activePlaybackSources.delete(src);
     };
     const now = ctx.currentTime;
     if (playhead < now) playhead = now;
@@ -1610,6 +1637,8 @@ if (btnInstrRefresh) {
       rtPingTimer = null;
       rtWs = null;
       rtWsEngine = "";
+      setAssistantSpeaking(false);
+      setListeningIndicator(false);
       refreshButtons();
       if (directRealtimeActive || directRealtimeStarting) {
         stopDirectRealtime({ closeRealtime: false, silent: true }).catch(() => {});
@@ -1645,19 +1674,23 @@ if (btnInstrRefresh) {
           pcmBytes.byteOffset,
           Math.floor(pcmBytes.byteLength / 2)
         );
-        isAssistantSpeaking = true;
+        setAssistantSpeaking(true);
         playPcm16(pcm16, msg.sample_rate || 24000, msg.channels || 1);
         return;
       }
       if (msg.type === "log") {
         push(msg.message || JSON.stringify(msg));
         const logText = String(msg.event || msg.message || "");
-      if (logText.includes("input_audio_buffer.speech_started")) {
-         stopAudioNow();
+        if (logText.includes("input_audio_buffer.speech_started")) {
+          setListeningIndicator(true);
+          stopAudioNow();
           try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
-          isAssistantSpeaking = false;
-           push("Barge-in detected: cancelled current response and stopped local playback");
-    }
+          setAssistantSpeaking(false);
+          push("Barge-in detected: cancelled current response and stopped local playback");
+        }
+        if (logText.includes("input_audio_buffer.speech_stopped")) {
+          setListeningIndicator(false);
+        }
         return;
       }
       if (msg.type === "error") {
@@ -1665,7 +1698,7 @@ if (btnInstrRefresh) {
         return;
       }
       if (msg.type === "agent_done") {
-        isAssistantSpeaking = false;
+        setAssistantSpeaking(false);
         if (directRealtimeActive || directRealtimeStarting) {
           push("Direct Realtime response done");
           return;
@@ -2203,7 +2236,8 @@ if (btnInstrRefresh) {
 
     directRealtimeActive = false;
     directRealtimeStarting = false;
-    isAssistantSpeaking = false;
+    setAssistantSpeaking(false);
+    setListeningIndicator(false);
     directAudioChunks = [];
     directAudioBytes = 0;
     directFramePending = [];
@@ -2362,6 +2396,8 @@ if (btnInstrRefresh) {
     activeTurnId = null;
     controlReconnectAttempt = 0;
     rtReconnectAttempt = 0;
+    setAssistantSpeaking(false);
+    setListeningIndicator(false);
     sid =
       (typeof crypto !== "undefined" && crypto.randomUUID)
         ? crypto.randomUUID()
@@ -3101,6 +3137,8 @@ markSettingsSaved("Saved");
 async function reconnectVoiceWs(reason) {
   if (!desiredConnected) return;
   try {
+    setAssistantSpeaking(false);
+    setListeningIndicator(false);
     rtReconnectSuppressOnce = true;
     try { rtWs?.close(1000, reason || "reconfigure"); } catch {}
     rtWs = null;
@@ -3290,6 +3328,8 @@ if (playbackVolumeEl) {
     clearReconnectTimers();
     clearPingTimers();
     clearFullPipelineTestTimer();
+    setAssistantSpeaking(false);
+    setListeningIndicator(false);
     try { stopDirectRealtime({ closeRealtime: false, silent: true }); } catch {}
     try { controlWs?.close(1000, "reset"); } catch {}
     try { rtWs?.close(1000, "reset"); } catch {}
@@ -3310,6 +3350,8 @@ if (playbackVolumeEl) {
   setDirectStatusOn(false);
   setControlStatus("OFF");
   setRealtimeStatus("OFF");
+  setListeningIndicator(false);
+  setSpeakingIndicator(false);
   (async () => {
     try {
       await refreshOutputDevicesUI();
