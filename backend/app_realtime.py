@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
 
 load_dotenv()
 
@@ -62,7 +62,6 @@ PORT = int(os.getenv("PORT", "50505"))
 
 # Flat-file stores
 INSTRUCTIONS_PATH = os.getenv("INSTRUCTIONS_PATH", "instructions.json")
-INSTRUCTION_PROFILES_PATH = os.getenv("INSTRUCTION_PROFILES_PATH", "instruction_profiles.json")
 
 MAX_INSTRUCTIONS_LEN = int(os.getenv("MAX_INSTRUCTIONS_LEN", "8192"))
 
@@ -321,16 +320,6 @@ async def reset_instructions(target: str = Query("realtime")):
         _instructions_cache[t]["current"] = data[t]["current"]
         _instructions_cache[t]["updatedAt"] = now
         return JSONResponse(_instructions_snapshot(t))
-
-
-@app.get("/instruction_profiles.json")
-async def get_instruction_profiles():
-    if not os.path.exists(INSTRUCTION_PROFILES_PATH):
-        return JSONResponse(
-            {"error": "NOT_FOUND", "message": f"{INSTRUCTION_PROFILES_PATH} not found"},
-            status_code=404,
-        )
-    return FileResponse(INSTRUCTION_PROFILES_PATH, media_type="application/json")
 
 
 @app.get("/")
