@@ -322,7 +322,7 @@ function loadInstructionsTargetIntoInputs() {
     if (providerApiVersionRow) providerApiVersionRow.style.display = caps.requiresApiVersion ? "" : "none";
 
     if (providerModelLabelEl) providerModelLabelEl.textContent = caps.modelLabel || "Model";
-    if (providerRegionEl) providerRegionEl.value = cfgProvider.region || "";
+    fillSelectOptions(providerRegionEl, caps.supportedRegions || [], cfgProvider.region || "eastus2");
     if (providerEndpointEl) providerEndpointEl.value = cfgProvider.endpoint || "";
     if (providerApiVersionEl) providerApiVersionEl.value = cfgProvider.apiVersion || caps.defaultApiVersion || "";
     if (providerModelEl) providerModelEl.value = cfgProvider.model || caps.defaultModel || "";
@@ -331,6 +331,31 @@ function loadInstructionsTargetIntoInputs() {
     fillSelectOptions(providerVoiceEl, caps.supportedVoices || [], cfgProvider.voice || caps.defaultVoice);
     fillSelectOptions(providerIncomingLanguageEl, caps.supportedIncomingLanguages || [], cfgProvider.incomingLanguage || caps.defaultIncomingLanguage || "en");
     fillSelectOptions(providerOutgoingLanguageEl, caps.supportedOutgoingLanguages || [], cfgProvider.outgoingLanguage || caps.defaultOutgoingLanguage || "en");
+  }
+  function buildProviderConfigFromUi() {
+
+    const activeProvider = getSelectedProviderId();
+    const currentProviders = providerConfigState?.providers || {};
+    const nextProviders = JSON.parse(JSON.stringify(currentProviders));
+    const existing = nextProviders[activeProvider] || {};
+
+    nextProviders[activeProvider] = {
+      ...existing,
+      region: (providerRegionEl?.value || "").trim(),
+      endpoint: (providerEndpointEl?.value || "").trim(),
+      apiVersion: (providerApiVersionEl?.value || "").trim(),
+      model: (providerModelEl?.value || "").trim(),
+      voice: (providerVoiceEl?.value || "").trim(),
+      incomingLanguage: (providerIncomingLanguageEl?.value || "").trim(),
+      outgoingLanguage: (providerOutgoingLanguageEl?.value || "").trim(),
+      apiKey: (providerApiKeyEl?.value || "").trim(),
+    };
+
+    return {
+      version: providerConfigState?.version || 1,
+      activeProvider,
+      providers: nextProviders,
+    };
   }
 
   async function loadProviderUi() {
@@ -1821,7 +1846,34 @@ if (btnInstrRefresh) {
       setProviderStatus("Provider changed. Save provider to persist.");
     });
   }
-  // Realtime rate
+
+  if (btnProviderSave) {
+    btnProviderSave.addEventListener("click", async () => {
+      if (directRealtimeActive || directRealtimeStarting) {
+        setProviderStatus("Stop Direct Realtime before saving provider settings.");
+        return;
+      }
+
+      try {
+        const c = directRealtimeCfg();
+        const payload = buildProviderConfigFromUi();
+        const res = await fetch(`${c.REALTIME_HTTP}/v1/provider/config`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        providerConfigState = await res.json();
+        applyProviderUi(providerConfigState.activeProvider);
+        setProviderStatus("Provider config saved");
+      } catch (e) {
+        setProviderStatus(`Provider save failed: ${e?.message || e}`);
+      }
+    });
+  }
+
+  // Realtime rate  // Realtime rate
 async function reconnectVoiceWs(reason) {
   if (!desiredConnected) return;
   try {

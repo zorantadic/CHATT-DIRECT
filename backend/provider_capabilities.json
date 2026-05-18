@@ -9,6 +9,9 @@
       "requiresEndpoint": true,
       "requiresApiVersion": true,
       "requiresApiKey": true,
+      "supportedRegions": [
+        { "code": "eastus2", "label": "East US 2" }
+      ],
       "modelLabel": "Deployment / model name",
       "defaultApiVersion": "2025-05-01-preview",
       "defaultModel": "gpt-realtime-1.5",
