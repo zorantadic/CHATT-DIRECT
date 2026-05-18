@@ -9,10 +9,10 @@
            style-src 'self' 'unsafe-inline';
            media-src 'self' blob:;
            connect-src 'self' https: wss:
-             ws://127.0.0.1:50505 ws://127.0.0.1:50506 ws://127.0.0.1:50507
-             ws://localhost:50505 ws://localhost:50506 ws://localhost:50507
-             http://127.0.0.1:50505 http://127.0.0.1:50506 http://127.0.0.1:50507
-             http://localhost:50505 http://localhost:50506 http://localhost:50507;"
+             ws://127.0.0.1:50505
+             ws://localhost:50505
+             http://127.0.0.1:50505
+             http://localhost:50505;"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CHATT Direct – Realtime Voice</title>
@@ -85,7 +85,7 @@
 
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https: wss: http: ws: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*;"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https: wss: http://127.0.0.1:50505 ws://127.0.0.1:50505 http://localhost:50505 ws://localhost:50505;"
     />
   </head>
 
