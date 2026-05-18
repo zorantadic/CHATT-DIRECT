@@ -38,7 +38,8 @@ Full pipeline test successful.`;
   const DEFAULT_LANG = "en-US";
 // Voice output settings (Paket 1)
 const LS_VOICE_ENGINE = "chatt.voice.engine";       // "realtime" | "tts"
-const LS_REALTIME_RATE = "chatt.realtime.rate";     // "1" | "0.9" | "0.8"
+const LS_REALTIME_RATE = "chatt.realtime.rate";
+const LS_PLAYBACK_VOLUME = "chatt.realtime.playbackVolume";
 const LS_INSTR_TARGET = "chatt.instructions.target"; // Direct Instructions target; always "realtime"
 const LS_INSTRUCTION_PRESET = "chatt.instructions.preset";
 const ALLOWED_VOICE_ENGINES = ["realtime", "tts"];
@@ -202,6 +203,8 @@ Do not introduce new topics.`;
   const voiceEngineVoiceEl = $("voiceEngineVoice");
   const realtimeRateEl = $("realtimeRate");
   const realtimeRateVoiceEl = $("realtimeRateVoice");
+  const playbackVolumeEl = $("playbackVolume");
+  const playbackVolumeValueEl = $("playbackVolumeValue");
   const btnResetSession = $("btnResetSession");
   const btnTestFullPipeline = $("btnTestFullPipeline");
   // Pause/Resume (Voice audio) UI refs (created dynamically)
@@ -233,6 +236,15 @@ Do not introduce new topics.`;
   const profilesDomainsEl = $("profilesDomains");
   let profilesCache = null; // {version, styles, domains} loaded (local first, backend fallback)
 
+  // Playback pipeline (Realtime) routed to rtOutEl via MediaStreamDestination
+  let playbackCtx = null;
+  let playhead = 0;
+  let playbackDest = null;
+  let playbackVolume = 1.0;
+  let playbackGainNode = null;
+  const activePlaybackSources = new Set();
+  let isAssistantSpeaking = false;
+
   // ------------------------------
   // Initialize settings into inputs
   // ------------------------------
@@ -258,6 +270,26 @@ function loadVoiceSettingsIntoInputs() {
   if (realtimeRateVoiceEl) realtimeRateVoiceEl.value = rate;
   applyVoiceEngineUiState(engine);
 }
+function normalizePlaybackVolume(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1.0;
+  return Math.min(2.0, Math.max(0.0, n));
+}
+
+function updatePlaybackVolumeUi() {
+  if (playbackVolumeEl) playbackVolumeEl.value = String(playbackVolume);
+  if (playbackVolumeValueEl) playbackVolumeValueEl.textContent = playbackVolume.toFixed(2);
+}
+
+function applyPlaybackVolume(value) {
+  playbackVolume = normalizePlaybackVolume(value);
+  saveStrLS(LS_PLAYBACK_VOLUME, String(playbackVolume));
+  updatePlaybackVolumeUi();
+
+  if (playbackGainNode) {
+    playbackGainNode.gain.value = playbackVolume;
+  }
+}
 function loadInstructionsTargetIntoInputs() {
   const target = "realtime";
   if (instrTargetEl) instrTargetEl.value = target;
@@ -273,6 +305,7 @@ function loadInstructionsTargetIntoInputs() {
   loadSttSettingsIntoInputs();
   initAuthUi();
   loadVoiceSettingsIntoInputs();
+  applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
   loadInstructionsTargetIntoInputs();
   // ------------------------------
   // STT settings
@@ -1275,11 +1308,6 @@ if (btnInstrRefresh) {
   // ------------------------------
   // Playback pipeline (Realtime) routed to rtOutEl via MediaStreamDestination
   // ------------------------------
-  let playbackCtx = null;
-  let playhead = 0;
-  let playbackDest = null;
-  const activePlaybackSources = new Set();
-  let isAssistantSpeaking = false;
 
   // Realtime audio diagnostics (throttled logging)
   // Goal: detect any sample_rate / channels drift or duration mismatch without flooding the log.
@@ -1420,8 +1448,15 @@ if (btnInstrRefresh) {
   async function ensurePlayback() {
     let sinkOk = false;
     if (!playbackCtx) {
-      playbackCtx = new AudioContext({ sampleRate: 24000 });
+           playbackCtx = new AudioContext({ sampleRate: 24000 });
+
+      playbackGainNode = playbackCtx.createGain();
+      playbackGainNode.gain.value = playbackVolume;
+
       playbackDest = playbackCtx.createMediaStreamDestination();
+
+      playbackGainNode.connect(playbackDest);
+
       rtOutEl.srcObject = playbackDest.stream;
       try { await rtOutEl.play(); } catch {}
       push(`Playback AudioContext sampleRate=${playbackCtx.sampleRate}`);
@@ -1453,7 +1488,7 @@ if (btnInstrRefresh) {
     }
     const src = ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(playbackDest);
+    src.connect(playbackGainNode || playbackDest);
     activePlaybackSources.add(src);
     src.onended = () => {
       activePlaybackSources.delete(src);
@@ -3143,6 +3178,11 @@ if (realtimeRateVoiceEl) {
     }
     push(`Realtime rate set to: ${rate} (will apply immediately if connected)`);
     if (getVoiceEngine() === "realtime") await reconnectVoiceWs("rate-change");
+  });
+}
+if (playbackVolumeEl) {
+  playbackVolumeEl.addEventListener("input", () => {
+    applyPlaybackVolume(playbackVolumeEl.value);
   });
 }
 
