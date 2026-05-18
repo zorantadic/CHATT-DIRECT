@@ -788,6 +788,28 @@ async def voice_ws(ws: WebSocket):
                             if DEBUG:
                                 print("response.cancel error:", repr(e))
                             await safe_send({"type": "error", "message": str(e)})
+
+                    elif data.get("type") == "refresh_instructions":
+                        try:
+                            async with _instructions_lock:
+                                refreshed_instr = _instructions_cache["realtime"]["current"]
+
+                            await apply_session_update(rws, rate, refreshed_instr)
+
+                            await safe_send({
+                                "type": "log",
+                                "message": "Realtime session instructions refreshed"
+                            })
+
+                        except Exception as e:
+                            if DEBUG:
+                                print("refresh_instructions error:", repr(e))
+
+                            await safe_send({
+                                "type": "error",
+                                "message": f"Instruction refresh failed: {str(e)}"
+                            })
+
                     elif DEBUG and data.get("type") not in {"ping"}:
                         print("[direct-realtime] ignored desktop text frame:", data.get("type"))
 

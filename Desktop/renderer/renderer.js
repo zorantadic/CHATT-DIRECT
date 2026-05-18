@@ -1069,7 +1069,20 @@ if (btnInstrSave) btnInstrSave.addEventListener("click", () => saveInstructionsT
 if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructionsToDefault().catch(() => {}));
 if (btnInstrRefresh) {
   btnInstrRefresh.addEventListener("click", () => {
-    push("Refresh Instructions requested; websocket refresh will be implemented next.");
+    if (!rtWs || rtWs.readyState !== WebSocket.OPEN) {
+      push("WARN: Realtime WS not connected; cannot refresh instructions.");
+      return;
+    }
+
+    try {
+      rtWs.send(JSON.stringify({
+        type: "refresh_instructions"
+      }));
+
+      push("Refresh Instructions sent to realtime session.");
+    } catch (e) {
+      push(`ERROR: Instruction refresh failed: ${e?.message || e}`);
+    }
   });
 }
 
