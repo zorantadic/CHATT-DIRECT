@@ -18,12 +18,6 @@
 !Desktop/
 !Desktop/**
 
-# Keep already tracked web folders visible
-!frontend/
-!frontend/**
-!manual-frontend/
-!manual-frontend/**
-
 # Ignore secrets / environment files
 .env
 .env.*
