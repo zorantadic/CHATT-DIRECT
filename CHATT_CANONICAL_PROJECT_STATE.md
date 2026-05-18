@@ -1,763 +1,392 @@
-# CHATT Canonical Project State
-
-Last updated: 2026-05-15
-
-This file is the canonical working state for the CHATT project.  
-Use it as the first reference before making architecture, configuration, Codex, backend, Desktop, or deployment changes.
-
+CHATT Canonical Project State
+Last updated: 2026-05-18
+This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
+Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
+For detailed Direct Realtime runtime implementation details, use:
+```text
+CHATT_DIRECT_CANONICAL_STATE.md
+```
 ---
-
-## 1. Project Direction
-
-CHATT is a personal-use real voice chat project.
-
-The current priority is:
-
+1. Project Identity
+`CHATT-DIRECT` is now a Windows/Electron Direct Realtime voice application.
+The project is no longer the old multi-service CHATT architecture.
+Current product direction:
 ```text
-Windows Electron Desktop app first
-Shared backend local development second
-Web frontend later / secondary
-Docker and Azure Container Apps only after local validation
+Windows Electron desktop app
+Direct Azure OpenAI Realtime voice
+single-engine runtime
+BYOK provider/API configuration
+packaged Windows app
 ```
-
-The immediate development target is the Windows Desktop/Electron application using the shared backend.
-
-The web frontend is not the current priority.
-
-Manual scenario exists but is out of scope for the current phase.
-
+Primary value:
+```text
+stable Direct Realtime voice workflow
+low latency
+headphones/output-device routing
+clean local setup
+user-owned provider credentials
+workflow-specific voice assistant use cases
+```
 ---
-
-## 2. Main Runtime Scenario
-
-Canonical main flow:
-
+2. Canonical File Roles
+This file:
 ```text
-Browser/web-session/system audio
-→ STT
-→ Orchestrator
-→ Agent1
-→ Orchestrator
-→ Realtime voice model or TTS
-→ headphones/output device selected by the app
+CHATT_CANONICAL_PROJECT_STATE.md
 ```
-
-Important invariant:
-
+Purpose:
 ```text
-Microphone must never be routed to STT in the main scenario.
+project-level canonical state
+repository direction
+active vs removed architecture
+current workflow
+cleanup baseline
+work rules
+next-step guardrails
 ```
-
-STT receives only captured session/system/browser audio.
-
+Detailed Direct runtime file:
+```text
+CHATT_DIRECT_CANONICAL_STATE.md
+```
+Purpose:
+```text
+Direct Realtime runtime details
+Desktop/backend runtime flow
+audio capture rule
+port 50505 backend
+Realtime configuration
+worklet naming issue
+runtime validation baseline
+```
+Both files are current.
 ---
-
-## 3. Current Primary Client
-
-Primary client:
-
+3. Current Active Architecture
+Canonical active runtime:
 ```text
-C:\Projects\chatt\Desktop
+Electron Desktop app
+-> loopback/system/browser audio capture
+-> backend/app_realtime.py /voice/ws on port 50505
+-> Azure OpenAI Realtime session
+-> Azure Realtime VAD/interruption
+-> audio response
+-> Desktop playback pipeline
+-> selected headphones/output device
 ```
-
-Desktop package:
-
+Only active backend service:
 ```text
-C:\Projects\chatt\Desktop\package.json
+backend/app_realtime.py
+port 50505
 ```
-
-Desktop start command:
-
-```powershell
-cd C:\Projects\chatt\Desktop
-npm start
-```
-
-This runs:
-
+Active local endpoints:
 ```text
-electron .
-```
-
----
-
-## 4. Active Backend Services
-
-The backend is currently a Python/FastAPI backend under:
-
-```text
-C:\Projects\chatt\backend
-```
-
-Active services:
-
-| Service | File | Port | Purpose |
-|---|---|---:|---|
-| Realtime/TTS backend | `backend/app_realtime.py` | 50505 | Voice answer via Realtime or TTS |
-| Orchestrator | `backend/orchestrator/server.py` | 50506 | Transcript intake, Agent1 call, turn control |
-| STT backend | `backend/speech_server.py` | 50507 | Speech-to-text WebSocket service |
-
-Current local run model is manual VS Code terminals.  
-No `ps1` startup scripts are part of the current active workflow.
-
----
-
-## 5. Manual Local Backend Startup
-
-Each backend service is started from:
-
-```text
-C:\Projects\chatt\backend
-```
-
-Every terminal must activate the backend virtual environment first:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### 5.1 Realtime/TTS
-
-```powershell
-python -m uvicorn app_realtime:app --host 127.0.0.1 --port 50505 --log-level info
-```
-
-Expected local URL:
-
-```text
-http://127.0.0.1:50505
-```
-
-### 5.2 Orchestrator
-
-```powershell
-python -m uvicorn orchestrator.server:app --host 127.0.0.1 --port 50506 --log-level info
-```
-
-Expected local URL:
-
-```text
-http://127.0.0.1:50506
-```
-
-### 5.3 STT
-
-```powershell
-python -m uvicorn speech_server:app --host 127.0.0.1 --port 50507 --log-level info
-```
-
-Expected local URL:
-
-```text
-http://127.0.0.1:50507
-```
-
-STT WebSocket path:
-
-```text
-ws://127.0.0.1:50507/stt/ws/{sessionId}
-```
-
----
-
-## 6. Confirmed Local Backend Validation
-
-The following were confirmed working locally:
-
-```text
-50505 Realtime/TTS backend: OK
-50506 Orchestrator backend: OK
-50507 STT backend: OK
-Agent1 through local Orchestrator: OK
-Desktop full local pipeline: OK
-```
-
-### 6.1 Realtime/TTS Health Test
-
-Run from:
-
-```text
-C:\Projects\chatt
-```
-
-Command:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:50505/
-```
-
-Expected:
-
-```text
-status : ok
-ws     : ws://127.0.0.1:50505/voice/ws
-```
-
-### 6.2 Orchestrator Docs Test
-
-Run from:
-
-```text
-C:\Projects\chatt
-```
-
-Command:
-
-```powershell
-Invoke-WebRequest http://127.0.0.1:50506/docs -UseBasicParsing
-```
-
-Expected:
-
-```text
-StatusCode : 200
-```
-
-### 6.3 STT Docs Test
-
-Run from:
-
-```text
-C:\Projects\chatt
-```
-
-Command:
-
-```powershell
-Invoke-WebRequest http://127.0.0.1:50507/docs -UseBasicParsing
-```
-
-Expected:
-
-```text
-StatusCode : 200
-```
-
-### 6.4 Agent1 Local Test Through Orchestrator
-
-Run from:
-
-```text
-C:\Projects\chatt
-```
-
-Command:
-
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://127.0.0.1:50506/v1/sessions/test-local-agent/transcripts" `
-  -ContentType "application/json" `
-  -Body '{"transcript":"Identify the business unit requiring immediate executive attention and generate an executive operational risk summary.","lang":"en-US"}'
-```
-
-Expected:
-
-```text
-status : ok
-```
-
-This confirms:
-
-```text
-local Orchestrator → Agent1 → OK
-```
-
----
-
-## 7. Desktop Local Endpoint Settings
-
-To use the local backend from Desktop Settings, use:
-
-```text
-STT WS base
-ws://127.0.0.1:50507/stt/ws
-
-Orchestrator HTTP
-http://127.0.0.1:50506
-
-Control WS base
-ws://127.0.0.1:50506/v1/control
-
 Realtime HTTP
 http://127.0.0.1:50505
 
 Realtime WS
 ws://127.0.0.1:50505/voice/ws
 ```
-
-Why `ws://` locally:
-
-```text
-Local uvicorn services are not running TLS.
-```
-
-Why deployed URLs use `wss://`:
-
-```text
-Azure Container Apps endpoints are HTTPS/TLS-backed.
-```
-
 ---
-
-## 8. Previous Deployed Endpoint Values
-
-These were the previously used deployed Container Apps endpoint values:
-
+4. Active Repository Areas
+Current active project root:
 ```text
-STT WS base
-wss://chatt-speech.ashyglacier-62457361.eastus2.azurecontainerapps.io/stt/ws
-
-Orchestrator HTTP
-https://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io
-
-Control WS base
-wss://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io/v1/control
-
-Realtime HTTP
-https://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io
-
-Realtime WS
-wss://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io/voice/ws
+C:\Projects\chatt-direct
 ```
-
+Active Desktop app:
+```text
+C:\Projects\chatt-direct\Desktop
+```
+Active backend:
+```text
+C:\Projects\chatt-direct\backend
+```
+Important active files:
+```text
+Desktop/package.json
+Desktop/renderer/index.html
+Desktop/renderer/renderer.js
+Desktop/renderer/stt-worklet-processor.js
+backend/app_realtime.py
+backend/audio_utils.py
+backend/instructions.json
+backend/.env.example
+backend/requirements.txt
+docker-compose.yml
+start_all.ps1
+stop_all.ps1
+CHATT_CANONICAL_PROJECT_STATE.md
+CHATT_DIRECT_CANONICAL_STATE.md
+```
+Important note:
+```text
+Desktop/renderer/stt-worklet-processor.js has a legacy filename but is still used by Direct Realtime audio capture.
+Do not delete or rename it without first confirming all AudioWorklet registrations and processor names.
+```
+Current Direct worklet usage:
+```text
+new URL("stt-worklet-processor.js", window.location.href)
+processor name: direct-realtime-pcm16-24k
+```
 ---
-
-## 9. Current Azure Resource Values for Local Backend
-
-The current working Azure values are represented in:
-
+5. Removed / Deprecated Architecture
+The following architecture is no longer active and must not be reintroduced without explicit design approval:
 ```text
-C:\Projects\chatt\backend\.env
-C:\Projects\chatt\backend\orchestrator\.env
+STT backend
+Orchestrator backend
+Agent1 runtime path
+Control WebSocket
+TTS engine path
+Manual answer backend
+Frontend/Vite app
+Azure Static Web Apps deployment flow
+Full Pipeline Test flow
+legacy renderer STT runtime path
+legacy renderer Orchestrator runtime path
+legacy renderer Control WS path
 ```
-
-Do not commit real secrets.
-
-A non-secret template exists at:
-
+Inactive ports:
 ```text
-C:\Projects\chatt\backend\.env.example
+50506
+50507
+50605
+5173
+5174
 ```
-
-### 9.1 Realtime Voice
-
+Removed runtime/deployment artifacts include:
+```text
+backend/speech_server.py
+backend/Dockerfile.speech
+backend/Dockerfile.manual
+backend/Dockerfile.orchestrator
+backend/speech_server.py.bak
+backend/manual_answers.json
+backend/instruction_profiles.json
+Azure Static Web Apps YAML workflow files
+```
+---
+6. Current Local Startup
+Backend startup:
+```powershell
+cd C:\Projects\chatt-direct\backend
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app_realtime:app --host 127.0.0.1 --port 50505 --log-level info
+```
+Desktop startup:
+```powershell
+cd C:\Projects\chatt-direct\Desktop
+npm start
+```
+Optional helper script:
+```powershell
+cd C:\Projects\chatt-direct
+.\start_all.ps1
+```
+Current helper scripts are reduced to Direct Realtime backend only:
+```text
+start_all.ps1 -> starts 50505 only
+stop_all.ps1  -> stops 50505 only
+```
+---
+7. Configuration Model
+Backend runtime configuration comes from:
+```text
+C:\Projects\chatt-direct\backend\.env
+```
+Committed non-secret template:
+```text
+C:\Projects\chatt-direct\backend\.env.example
+```
+Current relevant Direct Realtime settings:
 ```env
 AZURE_OPENAI_ENDPOINT=https://agentfield.cognitiveservices.azure.com
-AZURE_OPENAI_MODEL=gpt-realtime-mini
+AZURE_OPENAI_KEY=<your-azure-openai-key>
+AZURE_OPENAI_MODEL=gpt-realtime-1.5
 AZURE_OPENAI_API_VERSION=2025-05-01-preview
+AZURE_OPENAI_PROFILE=byom-azure-openai-realtime
+REALTIME_SAMPLE_RATE=24000
+AUDIO_CHANNELS=1
+INSTRUCTIONS_PATH=instructions.json
+MAX_INSTRUCTIONS_LEN=8192
+PORT=50505
+DEBUG=false
 ```
-
-### 9.2 Agent1
-
-```env
-AGENT1_PROJECT_ENDPOINT=https://agentfield.services.ai.azure.com/api/projects/proj-default
-AGENT1_AGENT_ID=asst_sS6A4EFTSyKUSbKpRh8v5rXu
-```
-
-Important:
-
+Do not commit real secrets.
+The Desktop settings currently use only:
 ```text
-The Orchestrator code reads AGENT1_PROJECT_ENDPOINT and AGENT1_AGENT_ID.
+Realtime HTTP
+Realtime WS
+Realtime rate
+Playback volume
+Output device
+Instruction controls
 ```
-
-It does not read these legacy aliases directly:
-
+There are no active Desktop settings for:
 ```text
-AZURE_AI_PROJECT_ENDPOINT
-AGENT1_ID
+STT WS base
+Orchestrator HTTP
+Control WS base
+TTS engine
+Manual backend
+Frontend/Vite
 ```
-
-### 9.3 TTS
-
-```env
-AZURE_OPENAI_TTS_ENDPOINT=https://agentfield.cognitiveservices.azure.com
-AZURE_OPENAI_TTS_DEPLOYMENT=gpt-4o-mini-tts
-AZURE_OPENAI_TTS_API_VERSION=2025-03-01-preview
-AZURE_OPENAI_TTS_VOICE=alloy
-AZURE_OPENAI_TTS_RESPONSE_FORMAT=pcm
-```
-
 ---
-
-## 10. Important `.env` Findings
-
-### 10.1 Duplicate `.env` Files
-
-There are at least two relevant env files:
-
+8. Critical Audio Rule
+Direct Realtime input must use loopback/system/browser audio capture.
+Do not introduce microphone capture.
+Forbidden active input path:
 ```text
-C:\Projects\chatt\backend\.env
-C:\Projects\chatt\backend\orchestrator\.env
+navigator.mediaDevices.getUserMedia
+microphone input
+new microphone permission flow
 ```
-
-The `backend\orchestrator\.env` can override or differ from `backend\.env`.
-
-During troubleshooting, the local Agent1 failure was caused by stale values in:
-
+Canonical input path:
 ```text
-C:\Projects\chatt\backend\orchestrator\.env
+electronAPI.enableLoopbackAudio()
+navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+stop/remove video tracks immediately
+use only returned system audio track
 ```
-
-Old failing endpoint:
-
-```env
-AGENT1_PROJECT_ENDPOINT=https://zoranspeechf.services.ai.azure.com/api/projects/proj-zoranspeechF
-```
-
-That hostname did not resolve locally.
-
-Working Agent1 endpoint:
-
-```env
-AGENT1_PROJECT_ENDPOINT=https://agentfield.services.ai.azure.com/api/projects/proj-default
-```
-
-### 10.2 STT Inline Comment Issue
-
-This form is unsafe:
-
-```env
-SPEECH_REGION=eastus2   # npr: eastus, westeurope...
-```
-
-Use this instead:
-
-```env
-SPEECH_REGION=eastus2
-```
-
-The local STT issue was resolved after correcting local STT env values.
-
 ---
-
-## 11. STT Configuration
-
-Working STT configuration should match the deployed Container App values.
-
-Use:
-
-```env
-AZURE_SPEECH_REGION=eastus2
-SPEECH_REGION=eastus2
-SPEECH_LANG=en-US
-SPEECH_SAMPLE_RATE=16000
-
-STT_SEGMENTATION_STRATEGY=Default
-STT_SEGMENTATION_SILENCE_TIMEOUT_MS=2000
-STT_END_SILENCE_TIMEOUT_MS=2500
-STT_INITIAL_SILENCE_TIMEOUT_MS=4000
-STT_SEGMENTATION_MAXIMUM_TIME_MS=45000
-STT_RECO_MODE=Conversation
-STT_STABLE_PARTIAL_THRESHOLD=3
-STT_CONTEXT_FLUSH_SILENCE_MS=2500
-STT_DEFAULT_LANGUAGE=en-US
-```
-
-Known STT errors and meanings:
-
-### 11.1 Authentication Error 401
-
-Example:
-
+9. Current Desktop Behaviors To Preserve
+Keep these working:
 ```text
-WebSocket upgrade failed: Authentication error (401)
+Start Direct Realtime
+Stop Direct Realtime
+Reset session guard while Direct Realtime is active
+Refresh Instructions
+Realtime rate selector
+Realtime playback volume slider
+Selected output/headphones routing
+Listening/Speaking indicators
+Instruction preset selector/editor
+Instruction refresh/update flow
+Realtime playback pipeline through selected sink
+Barge-in/interruption behavior
 ```
-
-Meaning:
-
+Reset behavior:
 ```text
-Azure Speech key or region is wrong.
+If Direct Realtime is running, Reset session must not stop runtime.
+It must log that Reset is skipped and tell the user to stop Direct Realtime first.
+After Stop, Reset session may create a new session ID.
 ```
-
-### 11.2 Could Not Validate Speech Context
-
-Example:
-
-```text
-Error code: 1007
-Could not validate speech context
-```
-
-Meaning:
-
-```text
-Azure Speech accepted the connection, but rejected the speech context/configuration.
-```
-
-Confirmed fix in this project:
-
-```text
-Align local STT env values with working Container App settings.
-Remove inline comments from runtime env values.
-```
-
 ---
-
-## 12. Answer Engines
-
-The project supports two answer engines:
-
+10. Completed Cleanup Baseline
+Completed cleanup includes:
 ```text
-Realtime voice
-TTS
+Removed legacy backend/orchestrator module
+Removed legacy frontend/Vite app
+Removed legacy manual backend/frontend runtime
+Removed legacy manual answers backend store
+Removed legacy instruction profiles backend endpoint and file
+Removed TTS backend path/config/branching
+Removed TTS voice engine selector/runtime switching
+Removed backend/app.py legacy TTS/agent backend
+Removed legacy Desktop renderer profile subsystem
+Removed legacy hidden Desktop controls
+Decoupled Direct Realtime config from legacy cfg
+Removed legacy endpoint settings writes
+Removed dead legacy Desktop UI wiring
+Removed legacy renderer runtime paths for STT, Orchestrator, Control WS, and Full Pipeline Test
+Removed backend/speech_server.py
+Removed backend/Dockerfile.speech
+Removed backend/Dockerfile.manual
+Removed backend/Dockerfile.orchestrator
+Removed backend/speech_server.py.bak
+Removed backend/manual_answers.json
+Removed backend/instruction_profiles.json
+Reduced docker-compose.yml to active Realtime backend only
+Reduced start_all.ps1 and stop_all.ps1 to port 50505 only
+Removed obsolete Azure Static Web Apps YAML workflow files
+Removed obsolete frontend/manual-frontend gitignore exceptions
 ```
-
-The Desktop UI already has engine selection.
-
-The project also supports speech rate values such as:
-
+Recent cleanup commits include:
 ```text
-1.0
-0.9
-0.8
+Remove unused legacy backend artifacts
+Guard legacy hidden control initialization
+Decouple direct realtime config from legacy cfg
+Remove legacy hidden desktop controls
+Remove legacy endpoint settings writes
+Remove dead legacy desktop UI wiring
+Prevent reset from stopping active direct realtime
+Remove legacy renderer runtime paths
+Remove obsolete YAML workflow files
+Remove legacy STT and orchestrator runtime artifacts
+Remove obsolete frontend gitignore exceptions
 ```
-
-This should be preserved.
-
 ---
-
-## 13. Existing Desktop Capabilities
-
-Known existing capabilities:
-
+11. Current Validation State
+Confirmed after cleanup:
 ```text
-Realtime/TTS engine selection
-Speech rate selection
-STT enabled/language controls
-Instruction prompt settings
-Instruction profiles/presets
-Output device selection
-Headphones-only behavior
-Audio buffer/pause behavior
-Status/log indicators
-Control WebSocket handling
-SEND_TO_REALTIME handling
+python -m py_compile backend/app_realtime.py: OK
+node --check Desktop/renderer/renderer.js: OK
+Desktop package JSON parse: OK
+Desktop app runtime test: OK
+Direct Realtime voice test: OK
+Start Direct Realtime: OK
+Stop Direct Realtime: OK
+Reset session while Direct Realtime is running: skipped without closing runtime
+Reset session after Stop: creates a new session
+Direct Realtime worked normally after final cleanup
 ```
-
-The Desktop app is ahead of the web app and should be treated as the primary client.
-
 ---
-
-## 14. Planned Enhancements
-
-The following enhancements are planned but not implemented yet.
-
-### 14.1 Auto Send vs Review Before Send
-
-Two modes:
-
+12. Current Known Good State
+Current known good local state:
 ```text
-Auto Send
-Review Before Send
+CHATT Direct is a Windows/Electron Direct Realtime voice app
+Backend is Realtime-only on app_realtime.py port 50505
+Desktop renderer no longer contains active STT/Orchestrator/Control/Full Pipeline runtime paths
+backend/speech_server.py and backend/Dockerfile.speech are removed
+Docker/start/stop runtime helpers are reduced to Direct Realtime 50505
+Desktop runtime and voice flow were tested and worked after cleanup
 ```
-
-Default:
-
-```text
-Auto Send
-```
-
-Reason:
-
-```text
-Auto Send must remain the lowest-latency mode.
-```
-
-Review mode adds control and may add delay.
-
-### 14.2 Pending Question Queue
-
-Review Before Send mode should show formulated questions before sending them to the voice model.
-
-Required actions:
-
-```text
-Send selected question
-Edit question
-Delete question
-Clear queue
-```
-
-Hold may be skipped initially for personal-use simplicity.
-
-### 14.3 Stop Audio Now
-
-Must immediately:
-
-```text
-stop local playback
-clear local playback queue
-clear local audio buffer
-send backend cancel/stop if supported
-```
-
-This must not be just mute or pause.
-
-### 14.4 Stop Before Sending to Voice Model
-
-In Review Before Send mode, the question should wait before being sent to Realtime/TTS.
-
-### 14.5 Voice Output Test
-
-Add a one-click output test using the same playback path as Realtime/TTS output.
-
-Purpose:
-
-```text
-verify audio plays only to selected headphones/output device
-verify volume is acceptable
-```
-
-### 14.6 STT Presets
-
-Add UI presets:
-
-```text
-Fast
-Balanced
-Careful
-Custom
-```
-
-Custom should initially expose only the useful controls:
-
-```text
-context flush silence
-segmentation silence
-end silence
-maximum segment time
-```
-
-Do not expose too many STT knobs at once.
-
-### 14.7 Latency Panel
-
-Measure and show:
-
-```text
-STT latency
-Agent1 latency
-Orchestrator latency
-Realtime first-audio latency
-Playback latency
-Total turn latency
-```
-
-### 14.8 Instruction Prompt Workflow
-
-Keep current prompt functionality but improve usability.
-
-Preferred model:
-
-```text
-Default prompt
-Preset selector
-Short extra instruction
-Editable template
-Reset to default
-```
-
-Do not force writing a full new instruction prompt for every small change.
-
 ---
-
-## 15. Latency Rule
-
-All new features must follow this rule:
-
+13. Remaining Cleanup Work
+Known remaining cleanup is documentation-only unless a new scan proves otherwise:
 ```text
-Do not slow down Auto Send mode.
+README_SETUP.txt may need Direct-only rewrite
+SETUP.md may need Direct-only rewrite
 ```
+Runtime cleanup is complete for the currently verified Direct Realtime baseline.
+Before further cleanup, run:
+```powershell
+cd C:\Projects\chatt-direct
 
-Design principle:
-
-```text
-Auto Send = fastest path
-Review Queue = optional control path
+git status --short
+git diff --name-status
+git grep -n "speech_server\|50507\|50506\|/stt/ws\|orchestrator\|manual_answers\|instruction_profiles\|TTS\|tts\|frontend\|manual-backend\|manual-frontend" -- .
 ```
-
+Interpret broad grep results carefully. Some terms may appear in dependency hashes or documentation; do not treat a broad grep result as proof of active runtime usage.
 ---
-
-## 16. Work Process Rules
-
+14. Commercial Direction
+Preferred commercial packaging model:
+```text
+Windows app sold as a packaged desktop application
+Customer brings their own provider/API key
+```
+Product value should focus on:
+```text
+stable Direct Realtime voice workflow
+low latency
+headphones-only safe routing
+clean setup
+BYOK privacy/control
+workflow-specific use cases
+```
+---
+15. Work Process Rules
 For all future project work:
-
 ```text
-Analyze first.
-Then plan.
-Then change code.
+Analyze first
+Plan second
+Change code third
+No broad cleanup without reference checks
+No commit before diff review and runtime validation
+Always specify exact folder/path for commands
+Use one or two tasks at a time
 ```
-
-No skipping steps.
-
-When giving tasks:
-
-```text
-maximum 1-2 tasks at a time
-always specify exact folder/path
-always specify exact command
-```
-
-Before moving to the next step:
-
-```text
-the previous step must be completed or explicitly skipped by the user
-```
-
-When modifying files:
-
-```text
-always provide the complete file content
-no partial file snippets unless explicitly approved
-if shortening is unavoidable, clearly state what was shortened
-```
-
 For Codex work:
-
 ```text
-Codex must receive narrow scoped prompts
-Inspect-only when appropriate
-After Codex response, run git status --short
-If Codex creates untracked files, inspect those files before commit
-Do not commit until local test passes
+Create backup branch before large refactors
+Run git status --short after Codex
+Inspect git diff --name-status and git diff --stat
+Do not commit unreviewed runtime-generated changes
+Restore accidental runtime changes before commit
 ```
-
----
-
-## 17. Git Notes
-
-Real `.env` files are not expected to be committed.
-
-Current committed env template:
-
-```text
-backend/.env.example
-```
-
-The working `.env` files may remain local-only:
-
-```text
-backend/.env
-backend/orchestrator/.env
-```
-
-Do not commit real keys or secrets.
-
----
-
-## 18. Current Known Good State
-
-As of this update, the known good local state is:
-
-```text
-Backend services manually started from backend/.venv
-Realtime/TTS local service works
-Orchestrator local service works
-STT local service works
-Agent1 through local Orchestrator returns status ok
-Desktop can be configured to use local backend endpoints
-STT issue fixed by aligning env values and removing inline runtime comments
-```
-
-This is the baseline for the next implementation phase.
