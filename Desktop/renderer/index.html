@@ -134,12 +134,9 @@
         </div>
 
         <div class="voiceActionsPanel">
-          <button id="btnConnect" type="button" class="hidden">Connect Realtime</button>
           <button id="btnStart" type="button" disabled>Start Direct Realtime</button>
           <button id="btnStop" type="button" disabled>Stop Direct Realtime</button>
           <button id="btnInstrRefresh" type="button">Refresh Instructions</button>
-          <button id="btnTestFullPipeline" type="button" class="hidden">Test Direct Pipeline</button>
-          <button id="btnReloadInstr" type="button" class="hidden">Reload instructions</button>
           <button id="btnResetSession" type="button" title="Generate a new sessionId and reset local state (Ready state, no auto-connect).">
             Reset session
           </button>
@@ -153,21 +150,6 @@
     <div id="viewSettings" class="view">
       <div class="box">
         <h3>Connection + Audio Settings</h3>
-
-        <div class="row hidden">
-          <label>STT WS base</label>
-          <input id="sttBase" type="text" />
-        </div>
-
-        <div class="row hidden">
-          <label>Orchestrator HTTP</label>
-          <input id="orchHttp" type="text" />
-        </div>
-
-        <div class="row hidden">
-          <label>Control WS base</label>
-          <input id="controlBase" type="text" />
-        </div>
 
         <div class="row">
           <label>Realtime HTTP</label>
@@ -194,24 +176,6 @@
             <option value="">(auto)</option>
           </select>
           <button id="btnRefreshDevices" type="button">Refresh devices</button>
-        </div>
-
-        <div class="row hidden">
-          <label>STT mode</label>
-
-          <div class="check" title="When OFF, we keep Control/Realtime connected but we do not capture audio / send STT.">
-            <input id="sttEnabled" type="checkbox" checked />
-            <span>STT Enabled</span>
-          </div>
-
-          <label style="min-width:120px;">Language</label>
-          <select id="sttLang" style="width:220px;">
-            <option value="en-US">en-US</option>
-            <option value="sr-RS">sr-RS</option>
-            <option value="es-ES">es-ES</option>
-            <option value="de-DE">de-DE</option>
-            <option value="hr-HR">hr-HR</option>
-          </select>
         </div>
 
         <div class="row">
