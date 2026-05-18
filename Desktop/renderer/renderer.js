@@ -2350,18 +2350,12 @@ if (btnInstrRefresh) {
     }, 1500);
   }
   function saveSettingsFromInputs() {
-    saveStrLS(LS_STT_BASE, $("sttBase").value.trim());
-    saveStrLS(LS_ORCH_HTTP, $("orchHttp").value.trim());
-    saveStrLS(LS_CONTROL_BASE, $("controlBase").value.trim());
     saveStrLS(LS_RT_HTTP, $("rtHttp").value.trim());
     saveStrLS(LS_RT_WS, $("rtWs").value.trim());
-saveStrLS(LS_REALTIME_RATE, normalizeRealtimeRate((realtimeRateEl?.value || "").toString()));
-markSettingsSaved("Saved");
+    saveStrLS(LS_REALTIME_RATE, normalizeRealtimeRate((realtimeRateEl?.value || "").toString()));
+    markSettingsSaved("Saved");
   }
   function resetSettingsToDefaults() {
-    saveStrLS(LS_STT_BASE, "");
-    saveStrLS(LS_ORCH_HTTP, "");
-    saveStrLS(LS_CONTROL_BASE, "");
     saveStrLS(LS_RT_HTTP, "");
     saveStrLS(LS_RT_WS, "");
     saveStrLS(LS_REALTIME_RATE, "");
@@ -2370,9 +2364,6 @@ markSettingsSaved("Saved");
     markSettingsSaved("Reset to defaults");
   }
   function applyLocalBackendPreset() {
-    $("sttBase").value = LOCAL_BACKEND_PRESET.STT_WS_BASE;
-    $("orchHttp").value = LOCAL_BACKEND_PRESET.ORCH_HTTP;
-    $("controlBase").value = LOCAL_BACKEND_PRESET.ORCH_CONTROL_WS_BASE;
     $("rtHttp").value = LOCAL_BACKEND_PRESET.REALTIME_HTTP;
     $("rtWs").value = LOCAL_BACKEND_PRESET.REALTIME_WS;
     push("Local backend endpoint preset applied. Click Save settings.");
