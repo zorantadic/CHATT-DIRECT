@@ -114,12 +114,6 @@
 </div>
 
           <div class="row">
-            <label class="hidden" style="min-width:140px;">Voice Engine</label>
-              <select id="voiceEngineVoice" class="hidden" style="width:220px;">
-                <option value="realtime">realtime</option>
-                <option value="tts">tts</option>
-              </select>
-
             <label style="min-width:120px;">Realtime rate</label>
             <select id="realtimeRateVoice" style="width:140px;">
               <option value="1">1.0</option>
@@ -127,7 +121,7 @@
               <option value="0.8">0.8</option>
             </select>
 
-                     <span class="small">Rate se primenjuje samo kada je Engine = realtime.</span>
+                     <span class="small">Rate applies to the next Realtime connection.</span>
         </div>
 
         <div class="row">
@@ -183,14 +177,6 @@
         <div class="row">
           <label>Realtime WS</label>
           <input id="rtWs" type="text" />
-        </div>
-
-        <div class="row hidden">
-          <label>Voice Engine</label>
-          <select id="voiceEngine">
-            <option value="realtime">realtime</option>
-            <option value="tts">tts</option>
-          </select>
         </div>
 
         <div class="row">

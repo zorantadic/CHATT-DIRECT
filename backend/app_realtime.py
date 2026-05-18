@@ -4,7 +4,7 @@ import asyncio
 import tempfile
 import base64
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List, Literal
+from typing import Dict, Any, Optional
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -25,39 +25,6 @@ AZURE_OPENAI_MODEL = os.getenv("AZURE_OPENAI_MODEL", "gpt-realtime-mini")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-05-01-preview")
 AZURE_OPENAI_PROFILE = os.getenv("AZURE_OPENAI_PROFILE", "byom-azure-openai-realtime")
 
-# ----------------------------
-# Azure OpenAI TTS config (engine=tts)
-# ----------------------------
-# Manual project used:
-#   AZURE_OPENAI_TTS_DEPLOYMENT_NAME
-#   AZURE_OPENAI_TTS_RESPONSE_FORMAT=pcm
-#
-# This backend supports BOTH naming conventions and aligns payload with manual:
-# - send `instructions` separately
-# - use `response_format` (not `format`) to request PCM
-AZURE_OPENAI_TTS_ENDPOINT = (os.getenv("AZURE_OPENAI_TTS_ENDPOINT") or AZURE_OPENAI_ENDPOINT).rstrip("/")
-AZURE_OPENAI_TTS_KEY = (os.getenv("AZURE_OPENAI_TTS_KEY") or AZURE_OPENAI_KEY)
-
-AZURE_OPENAI_TTS_DEPLOYMENT = (
-    os.getenv("AZURE_OPENAI_TTS_DEPLOYMENT", "").strip()
-    or os.getenv("AZURE_OPENAI_TTS_DEPLOYMENT_NAME", "").strip()
-)
-
-AZURE_OPENAI_TTS_API_VERSION = os.getenv("AZURE_OPENAI_TTS_API_VERSION", AZURE_OPENAI_API_VERSION)
-AZURE_OPENAI_TTS_MODEL = os.getenv("AZURE_OPENAI_TTS_MODEL", "gpt-4o-mini-tts-2025-12-15").strip()
-AZURE_OPENAI_TTS_VOICE = os.getenv("AZURE_OPENAI_TTS_VOICE", "alloy").strip()
-
-AZURE_OPENAI_TTS_RESPONSE_FORMAT = (
-    os.getenv("AZURE_OPENAI_TTS_RESPONSE_FORMAT", "").strip()
-    or "pcm"
-).lower()
-
-# normalize response_format
-if AZURE_OPENAI_TTS_RESPONSE_FORMAT == "pcm16":
-    AZURE_OPENAI_TTS_RESPONSE_FORMAT = "pcm"
-if AZURE_OPENAI_TTS_RESPONSE_FORMAT not in {"pcm", "mp3", "wav", "opus", "aac", "flac"}:
-    AZURE_OPENAI_TTS_RESPONSE_FORMAT = "pcm"
-
 PORT = int(os.getenv("PORT", "50505"))
 
 # Flat-file stores
@@ -67,14 +34,10 @@ MAX_INSTRUCTIONS_LEN = int(os.getenv("MAX_INSTRUCTIONS_LEN", "8192"))
 
 # Audio format expected by the desktop app events:
 # - Realtime from Azure Realtime is pcm16 @ 24000 Hz
-# - TTS: request PCM; we emit pcm16 frames to renderer
 REALTIME_SAMPLE_RATE = int(os.getenv("REALTIME_SAMPLE_RATE", "24000"))
-TTS_SAMPLE_RATE = int(os.getenv("TTS_SAMPLE_RATE", "24000"))
 CHANNELS = int(os.getenv("AUDIO_CHANNELS", "1"))
 
-# Allowed engines/rates coming from the Desktop query params
-VoiceEngine = Literal["realtime", "tts"]
-ALLOWED_ENGINES: set[str] = {"realtime", "tts"}
+# Allowed rates coming from the Desktop query params
 ALLOWED_RATES: set[str] = {"1", "0.9", "0.8"}
 
 app = FastAPI()
@@ -123,7 +86,6 @@ _instructions_lock = asyncio.Lock()
 
 _instructions_cache: Dict[str, Dict[str, str]] = {
     "realtime": {"default": "", "current": "", "updatedAt": ""},
-    "tts": {"default": "", "current": "", "updatedAt": ""},
 }
 _instructions_file_updated_at: str = ""
 
@@ -141,8 +103,8 @@ def _validate_instructions_text(s: Any) -> str:
 
 def _coerce_target(t: Optional[str]) -> str:
     t2 = (t or "realtime").strip().lower()
-    if t2 not in _instructions_cache:
-        raise ValueError(f"invalid target (allowed: {', '.join(_instructions_cache.keys())})")
+    if t2 != "realtime":
+        raise ValueError("invalid target (allowed: realtime)")
     return t2
 
 
@@ -164,7 +126,6 @@ def _ensure_instructions_file() -> None:
         now = _now_iso()
         data = {
             "realtime": {"default": default_fallback, "current": default_fallback, "updatedAt": now},
-            "tts": {"default": default_fallback, "current": default_fallback, "updatedAt": now},
             "updatedAt": now,
         }
         _atomic_write_json(INSTRUCTIONS_PATH, data)
@@ -173,18 +134,17 @@ def _ensure_instructions_file() -> None:
     try:
         data = _read_json_file(INSTRUCTIONS_PATH)
 
-        # v2 schema
-        if isinstance(data, dict) and ("realtime" in data or "tts" in data):
+        # v2 schema; ignore legacy non-realtime blocks.
+        if isinstance(data, dict) and "realtime" in data:
             now = _now_iso()
-            out: Dict[str, Any] = {}
-            for target in ["realtime", "tts"]:
-                block = data.get(target, {}) if isinstance(data.get(target, {}), dict) else {}
-                d = str(block.get("default", default_fallback)).strip() or default_fallback
-                c = str(block.get("current", d)).strip() or d
-                u = str(block.get("updatedAt", now)).strip() or now
-                out[target] = {"default": d, "current": c, "updatedAt": u}
-
-            out["updatedAt"] = str(data.get("updatedAt", now)).strip() or now
+            block = data.get("realtime", {}) if isinstance(data.get("realtime", {}), dict) else {}
+            d = str(block.get("default", default_fallback)).strip() or default_fallback
+            c = str(block.get("current", d)).strip() or d
+            u = str(block.get("updatedAt", now)).strip() or now
+            out: Dict[str, Any] = {
+                "realtime": {"default": d, "current": c, "updatedAt": u},
+                "updatedAt": str(data.get("updatedAt", now)).strip() or now,
+            }
             _atomic_write_json(INSTRUCTIONS_PATH, out)
             return
 
@@ -196,7 +156,6 @@ def _ensure_instructions_file() -> None:
         now = _now_iso()
         out2 = {
             "realtime": {"default": d1, "current": c1, "updatedAt": u1},
-            "tts": {"default": d1, "current": d1, "updatedAt": now},
             "updatedAt": now,
         }
         _atomic_write_json(INSTRUCTIONS_PATH, out2)
@@ -205,7 +164,6 @@ def _ensure_instructions_file() -> None:
         now = _now_iso()
         data = {
             "realtime": {"default": default_fallback, "current": default_fallback, "updatedAt": now},
-            "tts": {"default": default_fallback, "current": default_fallback, "updatedAt": now},
             "updatedAt": now,
         }
         _atomic_write_json(INSTRUCTIONS_PATH, data)
@@ -218,11 +176,10 @@ async def _load_instructions_to_cache() -> None:
         data = _read_json_file(INSTRUCTIONS_PATH)
         now = _now_iso()
 
-        for target in ["realtime", "tts"]:
-            block = data.get(target, {}) if isinstance(data.get(target, {}), dict) else {}
-            _instructions_cache[target]["default"] = str(block.get("default", "")).strip()
-            _instructions_cache[target]["current"] = str(block.get("current", "")).strip()
-            _instructions_cache[target]["updatedAt"] = str(block.get("updatedAt", now)).strip() or now
+        block = data.get("realtime", {}) if isinstance(data.get("realtime", {}), dict) else {}
+        _instructions_cache["realtime"]["default"] = str(block.get("default", "")).strip()
+        _instructions_cache["realtime"]["current"] = str(block.get("current", "")).strip()
+        _instructions_cache["realtime"]["updatedAt"] = str(block.get("updatedAt", now)).strip() or now
 
         _instructions_file_updated_at = str(data.get("updatedAt", now)).strip() or now
 
@@ -245,10 +202,6 @@ async def _startup():
     await _load_instructions_to_cache()
     if DEBUG:
         print("[startup] Realtime endpoint:", AZURE_OPENAI_ENDPOINT)
-        print("[startup] TTS endpoint:", AZURE_OPENAI_TTS_ENDPOINT)
-        print("[startup] TTS deployment:", AZURE_OPENAI_TTS_DEPLOYMENT or "(empty)")
-        print("[startup] TTS response_format:", AZURE_OPENAI_TTS_RESPONSE_FORMAT)
-        print("[startup] TTS sample rate:", TTS_SAMPLE_RATE)
 
 
 # ----------------------------
@@ -277,7 +230,6 @@ async def put_instructions(body: Dict[str, Any], target: str = Query("realtime")
         now = _now_iso()
         data = {
             "realtime": _instructions_cache["realtime"].copy(),
-            "tts": _instructions_cache["tts"].copy(),
             "updatedAt": now,
         }
 
@@ -305,7 +257,6 @@ async def reset_instructions(target: str = Query("realtime")):
         now = _now_iso()
         data = {
             "realtime": _instructions_cache["realtime"].copy(),
-            "tts": _instructions_cache["tts"].copy(),
             "updatedAt": now,
         }
 
@@ -329,12 +280,7 @@ async def root():
             "status": "ok",
             "ws": f"ws://127.0.0.1:{PORT}/voice/ws",
             "instructions": f"http://127.0.0.1:{PORT}/v1/instructions?target=realtime",
-            "instructions_targets": ["realtime", "tts"],
-            "tts": {
-                "deployment": AZURE_OPENAI_TTS_DEPLOYMENT,
-                "response_format": AZURE_OPENAI_TTS_RESPONSE_FORMAT,
-                "sample_rate": TTS_SAMPLE_RATE,
-            },
+            "instructions_targets": ["realtime"],
         }
     )
 
@@ -368,13 +314,6 @@ def _realtime_ws_url() -> str:
     )
 
 
-def _normalize_engine(s: Optional[str]) -> str:
-    e = (s or "realtime").strip().lower()
-    if e not in ALLOWED_ENGINES:
-        return "realtime"
-    return e
-
-
 def _normalize_rate(s: Optional[str]) -> str:
     r = (s or "1").strip()
     if r == "1.0":
@@ -393,176 +332,24 @@ async def _send_error(ws: WebSocket, message: str, **extra: Any) -> None:
     except Exception:
         pass
 
-
-def _is_all_zeros(b: bytes) -> bool:
-    return len(b) > 0 and all(x == 0 for x in b[: min(len(b), 4096)])
-
-
 # ----------------------------
-# TTS (engine=tts) — HTTP streaming to Desktop audio events
-# ----------------------------
-async def _stream_tts_pcm(ws: WebSocket, text: str, instructions: str) -> None:
-    """
-    Manual-aligned TTS:
-    - send `instructions` separately
-    - use `response_format` to request PCM
-    - emit desktop audio events as pcm16
-    """
-    if not AZURE_OPENAI_TTS_ENDPOINT or not AZURE_OPENAI_TTS_KEY:
-        await _send_error(ws, "Missing AZURE_OPENAI_TTS_ENDPOINT or AZURE_OPENAI_TTS_KEY")
-        return
-
-    if not AZURE_OPENAI_TTS_DEPLOYMENT:
-        await _send_error(
-            ws,
-            "TTS not configured: AZURE_OPENAI_TTS_DEPLOYMENT/AZURE_OPENAI_TTS_DEPLOYMENT_NAME is empty",
-        )
-        return
-
-    import httpx
-
-    url = (
-        f"{AZURE_OPENAI_TTS_ENDPOINT}/openai/deployments/{AZURE_OPENAI_TTS_DEPLOYMENT}/audio/speech"
-        f"?api-version={AZURE_OPENAI_TTS_API_VERSION}"
-    )
-
-    body = {
-        "model": AZURE_OPENAI_TTS_MODEL,
-        "voice": AZURE_OPENAI_TTS_VOICE,
-        "input": text.strip(),
-        "instructions": instructions,
-        "response_format": AZURE_OPENAI_TTS_RESPONSE_FORMAT,  # key difference vs broken "format"
-    }
-
-    headers = {
-        "api-key": AZURE_OPENAI_TTS_KEY,
-        "Content-Type": "application/json",
-        "Accept": "audio/*",
-    }
-
-    if DEBUG:
-        print("[tts] POST", url)
-        print("[tts] model=", AZURE_OPENAI_TTS_MODEL, "voice=", AZURE_OPENAI_TTS_VOICE, "response_format=", AZURE_OPENAI_TTS_RESPONSE_FORMAT)
-        print("[tts] input_len=", len(body["input"]))
-
-    saw_any_bytes = False
-
-    try:
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", url, headers=headers, json=body) as resp:
-                if resp.status_code >= 400:
-                    details = None
-                    try:
-                        raw = await resp.aread()
-                        details = raw.decode("utf-8", errors="ignore")
-                    except Exception:
-                        details = f"HTTP {resp.status_code}"
-                    await _send_error(ws, "TTS request failed", status_code=resp.status_code, details=details)
-                    return
-
-                if DEBUG:
-                    ct = resp.headers.get("content-type", "")
-                    print("[tts] response content-type:", ct)
-
-                async for chunk in resp.aiter_bytes():
-                    if not chunk:
-                        continue
-
-                    saw_any_bytes = True
-
-                    if DEBUG and _is_all_zeros(chunk):
-                        print("[tts] WARNING: chunk appears to be zeros (possible silence). len=", len(chunk))
-
-                    b64 = base64.b64encode(chunk).decode("ascii")
-                    await ws.send_text(
-                        json.dumps(
-                            {
-                                "type": "audio",
-                                "format": "pcm16",
-                                "sample_rate": TTS_SAMPLE_RATE,
-                                "channels": CHANNELS,
-                                "data": b64,
-                            }
-                        )
-                    )
-
-        if not saw_any_bytes:
-            await _send_error(ws, "TTS returned no audio bytes (empty stream)")
-            return
-
-        await ws.send_text(json.dumps({"type": "agent_done"}))
-
-    except Exception as e:
-        await _send_error(ws, "TTS streaming error", details=str(e))
-
-
-# ----------------------------
-# Voice WebSocket (engine switch)
+# Voice WebSocket
 # ----------------------------
 @app.websocket("/voice/ws")
 async def voice_ws(ws: WebSocket):
     await ws.accept()
 
-    engine = _normalize_engine(ws.query_params.get("engine"))
     rate = _normalize_rate(ws.query_params.get("rate"))
 
     if DEBUG:
-        print(f"[voice/ws] engine={engine} rate={rate}")
+        print(f"[voice/ws] rate={rate}")
 
     async with _instructions_lock:
         realtime_instr = _instructions_cache["realtime"]["current"]
-        tts_instr = _instructions_cache["tts"]["current"]
     if DEBUG:
      print("[DBG] file realtime default head:", _instructions_cache["realtime"]["default"][:120])
      print("[DBG] file realtime current  head:", _instructions_cache["realtime"]["current"][:120])
 
-    # ----------------------------
-    # engine=tts
-    # ----------------------------
-    if engine == "tts":
-        try:
-            while True:
-                try:
-                    incoming = await ws.receive()
-                except (WebSocketDisconnect, RuntimeError):
-                    break
-
-                txt = incoming.get("text")
-                if not txt:
-                    if DEBUG and incoming.get("bytes") is not None:
-                        b = incoming.get("bytes") or b""
-                        print("[tts] received binary frame len=", len(b))
-                    continue
-
-                try:
-                    data = json.loads(txt)
-                except Exception:
-                    if DEBUG:
-                        print("[tts] non-json text frame ignored")
-                    continue
-
-                if data.get("type") != "SEND_TEXT":
-                    continue
-
-                payload_text = (data.get("text") or "").strip()
-                if not payload_text:
-                    continue
-
-                if DEBUG:
-                    print("[tts] SEND_TEXT received len=", len(payload_text))
-
-                await _stream_tts_pcm(ws, payload_text, instructions=tts_instr)
-
-        finally:
-            try:
-                await ws.close()
-            except Exception:
-                pass
-        return
-
-    # ----------------------------
-    # engine=realtime
-    # ----------------------------
     if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_KEY:
         await _send_error(ws, "Missing AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_KEY")
         await ws.close()

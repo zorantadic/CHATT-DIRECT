@@ -65,9 +65,8 @@ function writeJsonAtomic(filePath, obj) {
 }
 
 const instructionsPath = path.join(userDataDir, "instructions.local.json");
-const profilesPath = path.join(userDataDir, "instruction_profiles.local.json");
 
-// ---- Instructions/Profiles local-store helpers ----
+// ---- Instructions local-store helpers ----
 function nowIso() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
@@ -101,59 +100,28 @@ function resolveBundledJsonPath(basename) {
   return null;
 }
 
-function ensureProfilesFile() {
-  // If local file exists and is readable JSON, keep it.
-  const existing = readJsonSafe(profilesPath);
-  if (existing && typeof existing === "object") return;
-
-  // Seed from bundled instruction_profiles.json if present
-  const bundled = resolveBundledJsonPath("instruction_profiles.json");
-  if (bundled) {
-    const seeded = readJsonSafe(bundled);
-    if (seeded && typeof seeded === "object") {
-      writeJsonAtomic(profilesPath, seeded);
-      return;
-    }
-  }
-
-  // Minimal fallback
-  writeJsonAtomic(profilesPath, { version: "1.0", styles: [], domains: [] });
-}
-
 function normalizeInstructionsStore(store) {
   const now = nowIso();
-  const out = store && typeof store === "object" ? store : {};
-  if (!out.updatedAt) out.updatedAt = now;
+  const raw = store && typeof store === "object" ? store : {};
+  const block = raw.realtime && typeof raw.realtime === "object" ? raw.realtime : raw;
+  const fallback = defaultInstructionsText();
+  const def = String(block.default || fallback).trim() || fallback;
+  const cur = String(block.current || def).trim() || def;
+  const updatedAt = String(block.updatedAt || raw.updatedAt || now).trim() || now;
 
-  const ensureTarget = (t) => {
-    if (!out[t] || typeof out[t] !== "object") {
-      out[t] = {
-        default: defaultInstructionsText(),
-        current: defaultInstructionsText(),
-        updatedAt: now,
-      };
-      return;
-    }
-    out[t].default =
-      String(out[t].default || defaultInstructionsText()).trim() ||
-      defaultInstructionsText();
-    out[t].current =
-      String(out[t].current || out[t].default || defaultInstructionsText()).trim() ||
-      out[t].default;
-    out[t].updatedAt = String(out[t].updatedAt || now).trim() || now;
+  return {
+    realtime: {
+      default: def,
+      current: cur,
+      updatedAt,
+    },
+    updatedAt: String(raw.updatedAt || updatedAt || now).trim() || now,
   };
-
-  // Always ensure core targets; others will be created on demand.
-  ensureTarget("realtime");
-  ensureTarget("tts");
-
-  return out;
 }
 
 function ensureInstructionsFile() {
   const existing = readJsonSafe(instructionsPath);
   if (existing && typeof existing === "object") {
-    // Normalize schema to ensure it has at least realtime+tts.
     const normalized = normalizeInstructionsStore(existing);
     writeJsonAtomic(instructionsPath, normalized);
     return;
@@ -176,10 +144,10 @@ function ensureInstructionsFile() {
 }
 
 function ensureTargetInStore(store, target) {
-  const t = String(target || "realtime").trim().toLowerCase() || "realtime";
-  if (!store[t]) {
+  const t = "realtime";
+  if (!store.realtime) {
     const now = nowIso();
-    store[t] = {
+    store.realtime = {
       default: defaultInstructionsText(),
       current: defaultInstructionsText(),
       updatedAt: now,
@@ -196,26 +164,12 @@ ipcMain.handle("instructions:write", async (_evt, payload) =>
 );
 ipcMain.handle("instructions:path", async () => instructionsPath);
 
-ipcMain.handle("instructionProfiles:read", async () =>
-  readJsonSafe(profilesPath)
-);
-ipcMain.handle("instructionProfiles:write", async (_evt, payload) =>
-  writeJsonAtomic(profilesPath, payload)
-);
-ipcMain.handle("instructionProfiles:path", async () => profilesPath);
-
 // ---- Higher-level Instructions API (target-based) ----
 // This keeps web-like semantics but persists to local JSON files.
 // Renderer should use these to avoid read/modify/write races.
 ipcMain.handle("instructions:paths", async () => ({
   instructionsPath,
-  profilesPath,
 }));
-
-ipcMain.handle("instructions:profilesGet", async () => {
-  ensureProfilesFile();
-  return readJsonSafe(profilesPath) || { version: "1.0", styles: [], domains: [] };
-});
 
 ipcMain.handle("instructions:get", async (_evt, args) => {
   ensureInstructionsFile();

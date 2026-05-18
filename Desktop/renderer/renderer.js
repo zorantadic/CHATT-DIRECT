@@ -36,14 +36,10 @@ Full pipeline test successful.`;
   const LS_AUTH_TOKEN = "chatt.auth.bearerToken";
   const SUPPORTED_LANGS = ["en-US", "sr-RS", "es-ES", "de-DE", "hr-HR"];
   const DEFAULT_LANG = "en-US";
-// Voice output settings (Paket 1)
-const LS_VOICE_ENGINE = "chatt.voice.engine";       // "realtime" | "tts"
 const LS_REALTIME_RATE = "chatt.realtime.rate";
 const LS_PLAYBACK_VOLUME = "chatt.realtime.playbackVolume";
 const LS_INSTR_TARGET = "chatt.instructions.target"; // Direct Instructions target; always "realtime"
 const LS_INSTRUCTION_PRESET = "chatt.instructions.preset";
-const ALLOWED_VOICE_ENGINES = ["realtime", "tts"];
-const DEFAULT_VOICE_ENGINE = "realtime";
 const ALLOWED_REALTIME_RATES = ["1", "0.9", "0.8"];
 const DEFAULT_REALTIME_RATE = "1";
   // HARD REQUIREMENT: Realtime audio must go to headphones only.
@@ -221,8 +217,6 @@ Do not introduce new topics.`;
   const speakStatusEl = $("speakStatus");
   const sttEnabledEl = $("sttEnabled");
   const sttLangEl = $("sttLang");
-  const voiceEngineEl = $("voiceEngine");
-  const voiceEngineVoiceEl = $("voiceEngineVoice");
   const realtimeRateEl = $("realtimeRate");
   const realtimeRateVoiceEl = $("realtimeRateVoice");
   const playbackVolumeEl = $("playbackVolume");
@@ -288,13 +282,9 @@ Do not introduce new topics.`;
     if (sttLangEl) sttLangEl.value = lang;
   }
 function loadVoiceSettingsIntoInputs() {
-  const engine = normalizeVoiceEngine(loadStrLS(LS_VOICE_ENGINE, DEFAULT_VOICE_ENGINE));
   const rate = normalizeRealtimeRate(loadStrLS(LS_REALTIME_RATE, DEFAULT_REALTIME_RATE));
-  if (voiceEngineEl) voiceEngineEl.value = engine;
-  if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = engine;
   if (realtimeRateEl) realtimeRateEl.value = rate;
   if (realtimeRateVoiceEl) realtimeRateVoiceEl.value = rate;
-  applyVoiceEngineUiState(engine);
 }
 function normalizePlaybackVolume(value) {
   const n = Number(value);
@@ -349,55 +339,26 @@ function loadInstructionsTargetIntoInputs() {
     return `${b}/${sessionId}?language=${l}&lang=${l}&locale=${l}&mode=fixed`;
   }
 
-// ------------------------------
-// Voice output settings (engine + rate)
-// ------------------------------
-function normalizeVoiceEngine(engine) {
-  const e = (engine || "").toString().trim().toLowerCase();
-  return ALLOWED_VOICE_ENGINES.includes(e) ? e : DEFAULT_VOICE_ENGINE;
-}
 function normalizeRealtimeRate(rate) {
   const r = (rate || "").toString().trim();
   return ALLOWED_REALTIME_RATES.includes(r) ? r : DEFAULT_REALTIME_RATE;
-}
-function getVoiceEngine() {
-  // Prefer Voice tab selector; fallback to Settings selector; then persisted; then default.
-  const uiVoice = (voiceEngineVoiceEl?.value || "").toString().trim();
-  const uiSettings = (voiceEngineEl?.value || "").toString().trim();
-  return normalizeVoiceEngine(uiVoice || uiSettings || loadStrLS(LS_VOICE_ENGINE, DEFAULT_VOICE_ENGINE));
 }
 function getRealtimeRate() {
   const uiVoice = (realtimeRateVoiceEl?.value || "").toString().trim();
   const uiSettings = (realtimeRateEl?.value || "").toString().trim();
   return normalizeRealtimeRate(uiVoice || uiSettings || loadStrLS(LS_REALTIME_RATE, DEFAULT_REALTIME_RATE));
 }
-function applyVoiceEngineUiState(engine) {
-  const e = normalizeVoiceEngine(engine);
-  const enabled = e === "realtime";
-  if (realtimeRateEl) {
-    realtimeRateEl.disabled = !enabled;
-    realtimeRateEl.title = enabled ? "" : "Rate applies only when Voice Engine = realtime";
-  }
-  if (realtimeRateVoiceEl) {
-    realtimeRateVoiceEl.disabled = !enabled;
-    realtimeRateVoiceEl.title = enabled ? "" : "Rate applies only when Voice Engine = realtime";
-  }
-}
-function buildVoiceWsUrl(baseWsUrl, engine, rate) {
+function buildVoiceWsUrl(baseWsUrl, rate) {
   const base = (baseWsUrl || "").toString().trim().replace(/\/+$/, "");
-  const e = normalizeVoiceEngine(engine);
   const r = normalizeRealtimeRate(rate);
   try {
     const u = new URL(base);
-    u.searchParams.set("engine", e);
-    if (e === "realtime") u.searchParams.set("rate", r);
-    else u.searchParams.delete("rate");
+    u.searchParams.set("engine", "realtime");
+    u.searchParams.set("rate", r);
     return u.toString();
   } catch {
     const sep = base.includes("?") ? "&" : "?";
-    let out = `${base}${sep}engine=${encodeURIComponent(e)}`;
-    if (e === "realtime") out += `&rate=${encodeURIComponent(r)}`;
-    return out;
+    return `${base}${sep}engine=realtime&rate=${encodeURIComponent(r)}`;
   }
 }
 
@@ -407,7 +368,6 @@ function buildVoiceWsUrl(baseWsUrl, engine, rate) {
 const cfg = () => {
   const base = $("sttBase").value;
   const lang = getSttLanguage();
-  const engine = getVoiceEngine();
   const rate = getRealtimeRate();
   const rtWsBase = $("rtWs").value.replace(/\/+$/, "");
   return {
@@ -416,9 +376,8 @@ const cfg = () => {
     ORCH_CONTROL_WS: `${$("controlBase").value.replace(/\/+$/, "")}/${sid}`,
     REALTIME_HTTP: $("rtHttp").value.replace(/\/+$/, ""),
     REALTIME_WS: rtWsBase,
-    VOICE_ENGINE: engine,
     REALTIME_RATE: rate,
-    VOICE_WS: buildVoiceWsUrl(rtWsBase, engine, rate),
+    VOICE_WS: buildVoiceWsUrl(rtWsBase, rate),
   };
 };
   // ------------------------------
@@ -427,7 +386,6 @@ const cfg = () => {
   let desiredConnected = false;
   let controlWs = null;
   let rtWs = null;
-  let rtWsEngine = "";
   let controlReconnectAttempt = 0;
   let rtReconnectAttempt = 0;
   let controlReconnectTimer = null;
@@ -477,10 +435,9 @@ const cfg = () => {
     else setPill("controlStatus", "bad", "CONTROL: OFF");
   }
   function setRealtimeStatus(state) {
-    const label = (getVoiceEngine() === "tts") ? "TTS" : "REALTIME";
-    if (state === "ON") setPill("rtStatus", "ok", `${label}: ON`);
-    else if (state === "RECONNECTING") setPill("rtStatus", "warn", `${label}: RECONNECTING`);
-    else setPill("rtStatus", "bad", `${label}: OFF`);
+    if (state === "ON") setPill("rtStatus", "ok", "REALTIME: ON");
+    else if (state === "RECONNECTING") setPill("rtStatus", "warn", "REALTIME: RECONNECTING");
+    else setPill("rtStatus", "bad", "REALTIME: OFF");
   }
   function scheduleControlReconnect(reason) {
     if (!desiredConnected) return;
@@ -1606,7 +1563,7 @@ if (btnInstrRefresh) {
     if (rtWs && (rtWs.readyState === WebSocket.OPEN || rtWs.readyState === WebSocket.CONNECTING)) {
       return;
     }
-    const { VOICE_WS, VOICE_ENGINE, REALTIME_RATE } = cfg();
+    const { VOICE_WS, REALTIME_RATE } = cfg();
     const playbackReady = await ensurePlayback();
     if (!playbackReady) {
       setRealtimeStatus("OFF");
@@ -1614,11 +1571,10 @@ if (btnInstrRefresh) {
       return;
     }
     rtWs = new WebSocket(VOICE_WS);
-    rtWsEngine = VOICE_ENGINE;
     setRealtimeStatus("RECONNECTING");
     rtWs.onopen = () => {
       setRealtimeStatus("ON");
-      push(`Voice WS connected (engine=${VOICE_ENGINE}${VOICE_ENGINE === "realtime" ? " rate=" + REALTIME_RATE : ""})`);
+      push(`Voice WS connected (rate=${REALTIME_RATE})`);
       startRealtimePing();
       flushDirectFramePending();
       rtReconnectAttempt = 0;
@@ -1636,7 +1592,6 @@ if (btnInstrRefresh) {
       try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
       rtPingTimer = null;
       rtWs = null;
-      rtWsEngine = "";
       setAssistantSpeaking(false);
       setListeningIndicator(false);
       refreshButtons();
@@ -2040,26 +1995,6 @@ if (btnInstrRefresh) {
   function setDirectStatusOn(on, text) {
     setPill("sttStatus", on ? "ok" : "bad", text || (on ? "DIRECT: ON" : "DIRECT: OFF"));
   }
-  function forceRealtimeEngineForDirect() {
-    if (getVoiceEngine() === "realtime") return false;
-    try { if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = "realtime"; } catch {}
-    try { if (voiceEngineEl) voiceEngineEl.value = "realtime"; } catch {}
-    saveStrLS(LS_VOICE_ENGINE, "realtime");
-    applyVoiceEngineUiState("realtime");
-    updateVoiceInstructionsUI();
-    push("Direct Realtime forced Voice Engine to realtime.");
-    return true;
-  }
-  async function prepareRealtimeSocketForDirect() {
-    forceRealtimeEngineForDirect();
-    if (rtWs && rtWsEngine && rtWsEngine !== "realtime") {
-      rtReconnectSuppressOnce = true;
-      try { rtWs.close(1000, "direct-realtime-engine-switch"); } catch {}
-      rtWs = null;
-      rtWsEngine = "";
-      await sleep(100);
-    }
-  }
   function waitForRealtimeOpen(timeoutMs) {
     return new Promise((resolve, reject) => {
       if (rtWs && rtWs.readyState === WebSocket.OPEN) {
@@ -2183,7 +2118,6 @@ if (btnInstrRefresh) {
       }
       disconnectControlForDirect();
 
-      await prepareRealtimeSocketForDirect();
       await refreshOutputDevicesUI();
       const playbackReady = await ensurePlayback();
       if (!playbackReady) throw new Error("Headphones output is required for Direct Realtime.");
@@ -2267,7 +2201,6 @@ if (btnInstrRefresh) {
       rtPingTimer = null;
       const ws = rtWs;
       rtWs = null;
-      rtWsEngine = "";
       if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
         try { ws.close(1000, "direct-realtime-stop"); } catch {}
       }
@@ -2392,7 +2325,6 @@ if (btnInstrRefresh) {
     try { rtWs?.close(1000, "reset"); } catch {}
     controlWs = null;
     rtWs = null;
-    rtWsEngine = "";
     activeTurnId = null;
     controlReconnectAttempt = 0;
     rtReconnectAttempt = 0;
@@ -3078,9 +3010,7 @@ updateVoiceInstructionsUI();
     saveStrLS(LS_CONTROL_BASE, $("controlBase").value.trim());
     saveStrLS(LS_RT_HTTP, $("rtHttp").value.trim());
     saveStrLS(LS_RT_WS, $("rtWs").value.trim());
-saveStrLS(LS_VOICE_ENGINE, normalizeVoiceEngine((voiceEngineEl?.value || "").toString()));
 saveStrLS(LS_REALTIME_RATE, normalizeRealtimeRate((realtimeRateEl?.value || "").toString()));
-applyVoiceEngineUiState(getVoiceEngine());
 markSettingsSaved("Saved");
   }
   function resetSettingsToDefaults() {
@@ -3089,7 +3019,6 @@ markSettingsSaved("Saved");
     saveStrLS(LS_CONTROL_BASE, "");
     saveStrLS(LS_RT_HTTP, "");
     saveStrLS(LS_RT_WS, "");
-    saveStrLS(LS_VOICE_ENGINE, "");
     saveStrLS(LS_REALTIME_RATE, "");
     loadEndpointSettingsIntoInputs();
     loadVoiceSettingsIntoInputs();
@@ -3133,7 +3062,7 @@ markSettingsSaved("Saved");
       push(`STT language set to: ${lang} (will apply on next STT start)`);
     });
   }
-// Voice engine + rate (Paket 1)
+// Realtime rate
 async function reconnectVoiceWs(reason) {
   if (!desiredConnected) return;
   try {
@@ -3146,50 +3075,10 @@ async function reconnectVoiceWs(reason) {
     await connectRealtime();
     refreshButtons();
   } catch (e) {
-    push(`WARN: voice WS reconnect failed: ${e?.message || e}`);
+    push(`WARN: Realtime WS reconnect failed: ${e?.message || e}`);
   }
 }
 
-if (voiceEngineEl) {
-  voiceEngineEl.addEventListener("change", async () => {
-    if ((directRealtimeActive || directRealtimeStarting) && normalizeVoiceEngine(voiceEngineEl.value) !== "realtime") {
-      try { voiceEngineEl.value = "realtime"; } catch {}
-      try { if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = "realtime"; } catch {}
-      saveStrLS(LS_VOICE_ENGINE, "realtime");
-      push("Direct Realtime requires Voice Engine = realtime.");
-      return;
-    }
-    // Keep Voice tab selector in sync
-    try { if (voiceEngineVoiceEl) voiceEngineVoiceEl.value = voiceEngineEl.value; } catch {}
-    const engine = getVoiceEngine();
-    saveStrLS(LS_VOICE_ENGINE, engine);
-    applyVoiceEngineUiState(engine);
-    push(`Voice Engine set to: ${engine}${engine === "realtime" ? " (rate applies)" : ""}`);
-    await reconnectVoiceWs("engine-change");
-    updateVoiceInstructionsUI();
-  });
-}
-if (voiceEngineVoiceEl) {
-  voiceEngineVoiceEl.addEventListener("change", async () => {
-    if ((directRealtimeActive || directRealtimeStarting) && normalizeVoiceEngine(voiceEngineVoiceEl.value) !== "realtime") {
-      try { voiceEngineVoiceEl.value = "realtime"; } catch {}
-      try { if (voiceEngineEl) voiceEngineEl.value = "realtime"; } catch {}
-      saveStrLS(LS_VOICE_ENGINE, "realtime");
-      push("Direct Realtime requires Voice Engine = realtime.");
-      return;
-    }
-    // Sync Settings selector
-    try { if (voiceEngineEl) voiceEngineEl.value = voiceEngineVoiceEl.value; } catch {}
-    const engine = getVoiceEngine();
-    saveStrLS(LS_VOICE_ENGINE, engine);
-    applyVoiceEngineUiState(engine);
-    push(`Voice Engine set to: ${engine}${engine === "realtime" ? " (rate applies)" : ""}`);
-    await reconnectVoiceWs("engine-change");
-    updateVoiceInstructionsUI();
-    // Update status label immediately (even if disconnected)
-    setRealtimeStatus(desiredConnected ? "RECONNECTING" : "OFF");
-  });
-}
 if (realtimeRateEl) {
   realtimeRateEl.addEventListener("change", async () => {
     // Keep Voice tab selector in sync
@@ -3201,7 +3090,7 @@ if (realtimeRateEl) {
       return;
     }
     push(`Realtime rate set to: ${rate} (will apply immediately if connected)`);
-    if (getVoiceEngine() === "realtime") await reconnectVoiceWs("rate-change");
+    await reconnectVoiceWs("rate-change");
   });
 }
 if (realtimeRateVoiceEl) {
@@ -3215,7 +3104,7 @@ if (realtimeRateVoiceEl) {
       return;
     }
     push(`Realtime rate set to: ${rate} (will apply immediately if connected)`);
-    if (getVoiceEngine() === "realtime") await reconnectVoiceWs("rate-change");
+    await reconnectVoiceWs("rate-change");
   });
 }
 if (playbackVolumeEl) {
@@ -3275,7 +3164,6 @@ if (playbackVolumeEl) {
     await applyRealtimeSink();
   });
   $("btnConnect").addEventListener("click", async () => {
-    await prepareRealtimeSocketForDirect();
     desiredConnected = true;
     clearReconnectTimers();
     await refreshOutputDevicesUI();
@@ -3337,7 +3225,6 @@ if (playbackVolumeEl) {
     try { fullPipelineTestWs?.close(1000, "window unload"); } catch {}
     controlWs = null;
     rtWs = null;
-    rtWsEngine = "";
     sttWs = null;
     fullPipelineTestWs = null;
     try {
