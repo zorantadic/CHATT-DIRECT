@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta
-  http-equiv="Content-Security-Policy"
-  content="default-src 'self' https: wss:;
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' https: wss:;
            script-src 'self';
            style-src 'self' 'unsafe-inline';
            media-src 'self' blob:;
@@ -13,9 +13,10 @@
              ws://localhost:50505 ws://localhost:50506 ws://localhost:50507
              http://127.0.0.1:50505 http://127.0.0.1:50506 http://127.0.0.1:50507
              http://localhost:50505 http://localhost:50506 http://localhost:50507;"
-/>
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CHATT Direct – Realtime Voice</title>
+
     <style>
       body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; }
       h2 { margin: 0 0 8px 0; }
@@ -39,38 +40,55 @@
       .check { display:flex; align-items:center; gap:10px; }
       .check input { width:auto; }
 
-      /* Simple navigation */
       .nav { display:flex; gap:10px; margin: 14px 0 18px 0; }
       .nav button { padding: 8px 12px; }
       .nav button.active { border: 2px solid #333; }
       .view { display:none; }
       .view.active { display:block; }
 
+      .voiceLayout {
+        display: grid;
+        grid-template-columns: minmax(520px, 760px) 220px;
+        gap: 16px;
+        align-items: start;
+      }
 
-      /* Voice layout: left controls + right instructions panel */
-      .voiceLayout { display: grid; grid-template-columns: minmax(520px, 1fr) 560px; gap: 16px; align-items: start; }
-      @media (max-width: 1200px) { .voiceLayout { grid-template-columns: 1fr; } }
-      .instrPanelHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-      .instrMeta { font-size: 12px; color:#555; }
-      pre.instrPre { border: 1px solid #ddd; padding: 10px; border-radius: 10px; height: 280px; overflow:auto; white-space: pre-wrap; background:#fafafa; margin: 8px 0 0 0; }
-      .btnSmall { padding: 6px 10px; font-size: 12px; }
+      @media (max-width: 1000px) {
+        .voiceLayout {
+          grid-template-columns: 1fr;
+        }
+      }
 
-      /* Instructions page cards */
+      .voiceActionsPanel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+      }
+
+      .voiceActionsPanel button {
+        width: 100%;
+        text-align: center;
+      }
+
       .card { border:1px solid #ddd; padding:10px; border-radius:10px; margin: 10px 0; }
       .card strong { display:block; }
       .card textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    
+
       .logbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin: 8px 0 10px 0; }
       .logbar label { min-width: auto; }
       .logbar input[type="text"] { width: 420px; max-width: 100%; padding: 6px 10px; }
       .logbar .spacer { flex: 1 1 auto; }
       .logbar button { padding: 8px 12px; }
       .logbar .check { display:flex; align-items:center; gap:8px; }
-
     </style>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https: wss: http: ws: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*;">
 
-</head>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https: wss: http: ws: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*;"
+    />
+  </head>
+
   <body>
     <h2>CHATT Direct – Realtime Voice</h2>
 
@@ -81,37 +99,39 @@
     </div>
 
     <!-- ===========================
-         VOICE VIEW (default)
+         VOICE VIEW
          =========================== -->
     <div id="viewVoice" class="view active">
       <div class="voiceLayout">
         <div class="box">
-        <div class="row">
-          <div><b>SessionId:</b> <span id="sid" class="mono"></span></div>
-          <span id="sttStatus" class="pill bad">DIRECT: OFF</span>
-          <span id="controlStatus" class="pill bad hidden">CONTROL: OFF</span>
-          <span id="rtStatus" class="pill bad">REALTIME: OFF</span>
+          <div class="row">
+            <div><b>SessionId:</b> <span id="sid" class="mono"></span></div>
+            <span id="sttStatus" class="pill bad">DIRECT: OFF</span>
+            <span id="controlStatus" class="pill bad hidden">CONTROL: OFF</span>
+            <span id="rtStatus" class="pill bad">REALTIME: OFF</span>
+          </div>
+
+          <div class="row">
+            <label style="min-width:140px;">Voice Engine</label>
+            <select id="voiceEngineVoice" style="width:220px;">
+              <option value="realtime">realtime</option>
+              <option value="tts">tts</option>
+            </select>
+
+            <label style="min-width:120px;">Realtime rate</label>
+            <select id="realtimeRateVoice" style="width:140px;">
+              <option value="1">1.0</option>
+              <option value="0.9">0.9</option>
+              <option value="0.8">0.8</option>
+            </select>
+
+            <span class="small">Rate se primenjuje samo kada je Engine = realtime.</span>
+          </div>
+
+          <audio id="rtOut" class="hidden" autoplay></audio>
         </div>
 
-        <!-- NEW: Voice Engine + Realtime Rate (also available on Voice tab) -->
-        <div class="row">
-          <label style="min-width:140px;">Voice Engine</label>
-          <select id="voiceEngineVoice" style="width:220px;">
-            <option value="realtime">realtime</option>
-            <option value="tts">tts</option>
-          </select>
-
-          <label style="min-width:120px;">Realtime rate</label>
-          <select id="realtimeRateVoice" style="width:140px;">
-            <option value="1">1.0</option>
-            <option value="0.9">0.9</option>
-            <option value="0.8">0.8</option>
-          </select>
-
-          <span class="small">Rate se primenjuje samo kada je Engine = realtime.</span>
-        </div>
-
-        <div class="row">
+        <div class="voiceActionsPanel">
           <button id="btnConnect" type="button" class="hidden">Connect Realtime</button>
           <button id="btnStart" type="button" disabled>Start Direct Realtime</button>
           <button id="btnStop" type="button" disabled>Stop Direct Realtime</button>
@@ -122,14 +142,10 @@
             Reset session
           </button>
         </div>
-
-        <!-- Realtime audio element (plays to selected output via setSinkId) -->
-        <audio id="rtOut" class="hidden" autoplay></audio>
-      </div>
       </div>
     </div>
 
-<!-- ===========================
+    <!-- ===========================
          SETTINGS VIEW
          =========================== -->
     <div id="viewSettings" class="view">
@@ -140,38 +156,43 @@
           <label>STT WS base</label>
           <input id="sttBase" type="text" />
         </div>
+
         <div class="row hidden">
           <label>Orchestrator HTTP</label>
           <input id="orchHttp" type="text" />
         </div>
+
         <div class="row hidden">
           <label>Control WS base</label>
           <input id="controlBase" type="text" />
         </div>
+
         <div class="row">
           <label>Realtime HTTP</label>
           <input id="rtHttp" type="text" />
         </div>
+
         <div class="row">
           <label>Realtime WS</label>
           <input id="rtWs" type="text" />
-        <div class="row hidden">
-  <label>Voice Engine</label>
-  <select id="voiceEngine">
-    <option value="realtime">realtime</option>
-    <option value="tts">tts</option>
-  </select>
-</div>
-<div class="row">
-  <label>Realtime rate</label>
-  <select id="realtimeRate">
-    <option value="1">1.0</option>
-    <option value="0.9">0.9</option>
-    <option value="0.8">0.8</option>
-  </select>
-</div>
+        </div>
 
-</div>
+        <div class="row hidden">
+          <label>Voice Engine</label>
+          <select id="voiceEngine">
+            <option value="realtime">realtime</option>
+            <option value="tts">tts</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Realtime rate</label>
+          <select id="realtimeRate">
+            <option value="1">1.0</option>
+            <option value="0.9">0.9</option>
+            <option value="0.8">0.8</option>
+          </select>
+        </div>
 
         <div class="row">
           <label>Realtime output</label>
@@ -209,15 +230,19 @@
 
       <div class="box" style="margin-top:14px;">
         <h3>Login / Auth (optional)</h3>
+
         <div class="row">
           <label>Bearer token</label>
           <input id="authToken" type="password" placeholder="Optional. Stored locally. Used for API calls as Authorization: Bearer &lt;token&gt;." />
         </div>
+
         <div class="row">
           <button id="btnSaveToken" type="button">Save token</button>
           <button id="btnClearToken" type="button">Clear token</button>
           <span id="authStatus" class="small"></span>
         </div>
+      </div>
+
       <div class="box" style="margin-top:14px;">
         <h3>Diagnostics</h3>
 
@@ -235,8 +260,6 @@
           Pravilo za Windows: <b>NE postavljati Electron u Volume Mixer na Headphones</b>.
           Electron ostaje <b>Default</b>, a mi Realtime rutujemo na slušalice iz aplikacije (Settings → Realtime output).
         </div>
-      </div>
-
       </div>
     </div>
 
@@ -297,6 +320,7 @@
       <button id="btnLogClear" type="button">Clear</button>
       <button id="btnLogDownload" type="button">Download</button>
     </div>
+
     <pre id="log"></pre>
 
     <script src="./renderer.js"></script>
