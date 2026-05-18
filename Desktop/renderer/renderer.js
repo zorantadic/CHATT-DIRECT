@@ -1,41 +1,22 @@
 /* global electronAPI */
 (function () {
   const DEFAULTS = {
-    STT_WS_BASE: "wss://chatt-speech.ashyglacier-62457361.eastus2.azurecontainerapps.io/stt/ws",
-    ORCH_HTTP: "https://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io",
-    ORCH_CONTROL_WS_BASE: "wss://chatt-orchestrator.ashyglacier-62457361.eastus2.azurecontainerapps.io/v1/control",
     REALTIME_HTTP: "https://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io",
     REALTIME_WS: "wss://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io/voice/ws",
   };
   const LOCAL_BACKEND_PRESET = {
-    STT_WS_BASE: "ws://127.0.0.1:50507/stt/ws",
-    ORCH_HTTP: "http://127.0.0.1:50506",
-    ORCH_CONTROL_WS_BASE: "ws://127.0.0.1:50506/v1/control",
     REALTIME_HTTP: "http://127.0.0.1:50505",
     REALTIME_WS: "ws://127.0.0.1:50505/voice/ws",
   };
-  const FULL_PIPELINE_TEST_AUDIO_URL = "../assets/test-audio/full-pipeline-test.wav";
-  const FULL_PIPELINE_TEST_INSTRUCTIONS =
-`This is a CHATT full pipeline system test.
-Respond with exactly this sentence and nothing else:
-Full pipeline test successful.`;
   // Persisted settings
   const LS_RT_DEVICE_ID = "chatt.rtOutputDeviceId";
   const LS_RT_DEVICE_LABEL = "chatt.rtOutputDeviceLabel";
   const LS_RT_DEVICE_PREFERRED_LABEL = "chatt.rtPreferredDeviceLabel";
-  // STT production settings
-  const LS_STT_ENABLED = "chatt.sttEnabled";
-  const LS_STT_LANGUAGE = "chatt.sttLanguage";
   // Endpoints (settings page)
-  const LS_STT_BASE = "chatt.settings.sttBase";
-  const LS_ORCH_HTTP = "chatt.settings.orchHttp";
-  const LS_CONTROL_BASE = "chatt.settings.controlBase";
   const LS_RT_HTTP = "chatt.settings.rtHttp";
   const LS_RT_WS = "chatt.settings.rtWs";
   // Auth (optional)
   const LS_AUTH_TOKEN = "chatt.auth.bearerToken";
-  const SUPPORTED_LANGS = ["en-US", "sr-RS", "es-ES", "de-DE", "hr-HR"];
-  const DEFAULT_LANG = "en-US";
 const LS_REALTIME_RATE = "chatt.realtime.rate";
 const LS_PLAYBACK_VOLUME = "chatt.realtime.playbackVolume";
 const LS_INSTR_TARGET = "chatt.instructions.target"; // Direct Instructions target; always "realtime"
@@ -167,18 +148,6 @@ Do not introduce new topics.`;
   // ------------------------------
   // Settings helpers
   // ------------------------------
-  function loadBoolLS(key, fallback) {
-    try {
-      const v = localStorage.getItem(key);
-      if (v === null || v === undefined) return fallback;
-      return v === "true";
-    } catch {
-      return fallback;
-    }
-  }
-  function saveBoolLS(key, val) {
-    try { localStorage.setItem(key, val ? "true" : "false"); } catch {}
-  }
   function loadStrLS(key, fallback) {
     try {
       const v = (localStorage.getItem(key) || "").trim();
@@ -192,11 +161,6 @@ Do not introduce new topics.`;
       if (val) localStorage.setItem(key, val);
       else localStorage.removeItem(key);
     } catch {}
-  }
-  function normalizeLang(lang) {
-    if (!lang) return DEFAULT_LANG;
-    if (SUPPORTED_LANGS.includes(lang)) return lang;
-    return DEFAULT_LANG;
   }
   function getAuthToken() {
     try { return (localStorage.getItem(LS_AUTH_TOKEN) || "").trim(); } catch { return ""; }
@@ -262,12 +226,6 @@ Do not introduce new topics.`;
   // Initialize settings into inputs
   // ------------------------------
   function loadEndpointSettingsIntoInputs() {
-    const sttBaseEl = $("sttBase");
-    const orchHttpEl = $("orchHttp");
-    const controlBaseEl = $("controlBase");
-    if (sttBaseEl) sttBaseEl.value = loadStrLS(LS_STT_BASE, DEFAULTS.STT_WS_BASE);
-    if (orchHttpEl) orchHttpEl.value = loadStrLS(LS_ORCH_HTTP, DEFAULTS.ORCH_HTTP);
-    if (controlBaseEl) controlBaseEl.value = loadStrLS(LS_CONTROL_BASE, DEFAULTS.ORCH_CONTROL_WS_BASE);
     $("rtHttp").value = loadStrLS(LS_RT_HTTP, DEFAULTS.REALTIME_HTTP);
     $("rtWs").value = loadStrLS(LS_RT_WS, DEFAULTS.REALTIME_WS);
   }
@@ -312,22 +270,6 @@ function loadInstructionsTargetIntoInputs() {
   loadVoiceSettingsIntoInputs();
   applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
   loadInstructionsTargetIntoInputs();
-  // ------------------------------
-  // STT settings
-  // ------------------------------
-  function getSttEnabled() {
-    return loadBoolLS(LS_STT_ENABLED, true);
-  }
-  function getSttLanguage() {
-    return normalizeLang(loadStrLS(LS_STT_LANGUAGE, DEFAULT_LANG));
-  }
-  function buildSttWsUrl(base, sessionId, lang) {
-    const b = (base || "").replace(/\/+$/, "");
-    const l = encodeURIComponent(lang || DEFAULT_LANG);
-    // NOTE: server currently uses `language=`. We also include `lang` and `locale` for broader compatibility.
-    return `${b}/${sessionId}?language=${l}&lang=${l}&locale=${l}&mode=fixed`;
-  }
-
 function normalizeRealtimeRate(rate) {
   const r = (rate || "").toString().trim();
   return ALLOWED_REALTIME_RATES.includes(r) ? r : DEFAULT_REALTIME_RATE;
@@ -351,25 +293,6 @@ function buildVoiceWsUrl(baseWsUrl, rate) {
   }
 }
 
-  // ------------------------------
-  // Config builder (uses current sid)
-  // ------------------------------
-const cfg = () => {
-  const base = $("sttBase").value;
-  const lang = getSttLanguage();
-  const rate = getRealtimeRate();
-  const rtWsBase = $("rtWs").value.replace(/\/+$/, "");
-  return {
-    STT_WS: buildSttWsUrl(base, sid, lang),
-    ORCH_HTTP: $("orchHttp").value.replace(/\/+$/, ""),
-    ORCH_CONTROL_WS: `${$("controlBase").value.replace(/\/+$/, "")}/${sid}`,
-    REALTIME_HTTP: $("rtHttp").value.replace(/\/+$/, ""),
-    REALTIME_WS: rtWsBase,
-    REALTIME_RATE: rate,
-    VOICE_WS: buildVoiceWsUrl(rtWsBase, rate),
-  };
-};
-
 function directRealtimeCfg() {
   const rate = getRealtimeRate();
   const rtWsBase = $("rtWs").value.replace(/\/+$/, "");
@@ -381,32 +304,18 @@ function directRealtimeCfg() {
   };
 }
   // ------------------------------
-  // Desired connection state + reconnect (Control/Realtime)
+  // Desired connection state + reconnect (Realtime)
   // ------------------------------
   let desiredConnected = false;
-  let controlWs = null;
   let rtWs = null;
-  let controlReconnectAttempt = 0;
   let rtReconnectAttempt = 0;
-  let controlReconnectTimer = null;
   let rtReconnectTimer = null;
   let rtReconnectSuppressOnce = false; // used for deliberate voice WS reconfigure
   // Keepalive ping timers
-  let controlPingTimer = null;
   let rtPingTimer = null;
   function clearPingTimers() {
-    try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
     try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
-    controlPingTimer = null;
     rtPingTimer = null;
-  }
-  function startControlPing() {
-    try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
-    controlPingTimer = window.setInterval(() => {
-      if (controlWs && controlWs.readyState === WebSocket.OPEN) {
-        try { controlWs.send(JSON.stringify({ type: "ping" })); } catch {}
-      }
-    }, WS_PING_INTERVAL_MS);
   }
   function startRealtimePing() {
     try { if (rtPingTimer) window.clearInterval(rtPingTimer); } catch {}
@@ -417,9 +326,7 @@ function directRealtimeCfg() {
     }, WS_PING_INTERVAL_MS);
   }
   function clearReconnectTimers() {
-    try { if (controlReconnectTimer) window.clearTimeout(controlReconnectTimer); } catch {}
     try { if (rtReconnectTimer) window.clearTimeout(rtReconnectTimer); } catch {}
-    controlReconnectTimer = null;
     rtReconnectTimer = null;
   }
   const WS_PING_INTERVAL_MS = 30000; // 30s keepalive ping
@@ -429,26 +336,10 @@ function directRealtimeCfg() {
     const jitter = Math.floor(Math.random() * 250);
     return Math.min(WS_MAX_BACKOFF_MS, base + jitter);
   }
-  function setControlStatus(state) {
-    if (state === "ON") setPill("controlStatus", "ok", "CONTROL: ON");
-    else if (state === "RECONNECTING") setPill("controlStatus", "warn", "CONTROL: RECONNECTING");
-    else setPill("controlStatus", "bad", "CONTROL: OFF");
-  }
   function setRealtimeStatus(state) {
     if (state === "ON") setPill("rtStatus", "ok", "REALTIME: ON");
     else if (state === "RECONNECTING") setPill("rtStatus", "warn", "REALTIME: RECONNECTING");
     else setPill("rtStatus", "bad", "REALTIME: OFF");
-  }
-  function scheduleControlReconnect(reason) {
-    if (!desiredConnected) return;
-    if (controlReconnectTimer) return;
-    setControlStatus("RECONNECTING");
-    const delay = backoffMs(controlReconnectAttempt++);
-    push(`Control WS reconnect scheduled in ${delay}ms (${reason || "closed"})`);
-    controlReconnectTimer = window.setTimeout(() => {
-      controlReconnectTimer = null;
-      connectControl();
-    }, delay);
   }
   function scheduleRealtimeReconnect(reason) {
     if (!desiredConnected) return;
@@ -746,7 +637,7 @@ async function writeLocalInstructionStore(store) {
 }
 
 function getBackendLabelForTarget(_target) {
-  const c = cfg();
+  const c = directRealtimeCfg();
   return c.REALTIME_HTTP || "(realtime not set)";
 }
 
@@ -780,7 +671,7 @@ function applyTargetDocToEditor(target, statusText, { silent } = {}) {
 }
 
 async function fetchInstructionsFromBackend(_target) {
-  const c = cfg();
+  const c = directRealtimeCfg();
 
   const res = await fetch(`${c.REALTIME_HTTP}/v1/instructions`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -796,7 +687,7 @@ async function fetchInstructionsFromBackend(_target) {
 
 async function syncInstructionsToBackend(target, current, { silent } = {}) {
   const t = normalizeInstrTarget(target);
-  const c = cfg();
+  const c = directRealtimeCfg();
   const url = `${c.REALTIME_HTTP}/v1/instructions`;
 
   try {
@@ -1090,35 +981,6 @@ if (btnInstrRefresh) {
   });
 }
 
-  // ------------------------------
-  // Orchestrator REST
-  // ------------------------------
-  async function postTranscript(text) {
-    const { ORCH_HTTP } = cfg();
-    try {
-      const r = await fetch(`${ORCH_HTTP}/v1/sessions/${sid}/transcripts`, {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ transcript: text }),
-      });
-      push(`Orchestrator transcripts POST status=${r.status}`);
-    } catch (e) {
-      push(`ERROR: Orchestrator transcripts POST failed: ${e?.message || e}`);
-    }
-  }
-  async function postTurnDone(turnId) {
-    const { ORCH_HTTP } = cfg();
-    try {
-      const r = await fetch(`${ORCH_HTTP}/v1/sessions/${sid}/turns/${turnId}/done`, {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({}),
-      });
-      push(`turn_done POST status=${r.status} (turnId=${turnId})`);
-    } catch (e) {
-      push(`ERROR: Orchestrator turn_done POST failed: ${e?.message || e}`);
-    }
-  }
   // ------------------------------
   // Realtime output device selection (persisted) + Auto re-bind
   // ------------------------------
@@ -1471,80 +1333,6 @@ if (btnInstrRefresh) {
     playhead += buffer.duration;
   }
   // ------------------------------
-  // Control WS
-  // ------------------------------
-  let activeTurnId = null;
-  function connectControl() {
-    if (controlWs && (controlWs.readyState === WebSocket.OPEN || controlWs.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
-    const { ORCH_CONTROL_WS } = cfg();
-    controlWs = new WebSocket(ORCH_CONTROL_WS);
-    setControlStatus("RECONNECTING");
-    controlWs.onopen = () => {
-      setControlStatus("ON");
-      push(`Control WS connected (sessionId=${sid})`);
-      startControlPing();
-      controlReconnectAttempt = 0;
-      if (controlReconnectTimer) {
-        try { window.clearTimeout(controlReconnectTimer); } catch {}
-        controlReconnectTimer = null;
-      }
-      refreshButtons();
-    };
-    controlWs.onclose = (evt) => {
-      const code = evt?.code;
-      const reason = evt?.reason;
-      const clean = evt?.wasClean;
-      push(`Control WS closed (code=${code}, clean=${clean}, reason=${reason || ""})`);
-      try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
-      controlPingTimer = null;
-      controlWs = null;
-      refreshButtons();
-      if (fullPipelineTestActive) {
-        failFullPipelineTest("Control WS closed");
-      }
-      if (desiredConnected) scheduleControlReconnect("closed");
-      else setControlStatus("OFF");
-    };
-    controlWs.onerror = () => {
-      push("Control WS error");
-      if (fullPipelineTestActive) {
-        failFullPipelineTest("Control WS error");
-      }
-    };
-    controlWs.onmessage = (e) => {
-      if (typeof e.data !== "string") return;
-      let cmd;
-      try { cmd = JSON.parse(e.data); } catch { return; }
-      if (cmd.command === "SEND_TO_REALTIME") {
-        const { turnId, text } = cmd.payload || {};
-        if (!turnId || !text) return;
-        push(`COMMAND SEND_TO_REALTIME (turnId=${turnId})`);
-        activeTurnId = turnId;
-        const effInstr = fullPipelineTestActive
-          ? FULL_PIPELINE_TEST_INSTRUCTIONS
-          : getEffectiveInstructionsForEngine().toString();
-        const cleanText = (text ?? "").toString();
-        if (fullPipelineTestActive) {
-          push("Full pipeline test instructions override applied.");
-        }
-        if (rtWs && rtWs.readyState === WebSocket.OPEN) {
-          rtWs.send(JSON.stringify({
-            type: "SEND_TEXT",
-            text: cleanText,
-            instructions: effInstr
-          }));
-        } else {
-          push("ERROR: Realtime WS not open; cannot SEND_TEXT");
-          if (fullPipelineTestActive) {
-            failFullPipelineTest("Realtime WS not open when SEND_TO_REALTIME arrived");
-          }
-        }
-      }
-    };
-  }
-  // ------------------------------
   // Realtime WS
   // ------------------------------
   async function connectRealtime() {
@@ -1587,9 +1375,6 @@ if (btnInstrRefresh) {
         stopDirectRealtime({ closeRealtime: false, silent: true }).catch(() => {});
         push("Direct Realtime stopped because Voice WS closed.");
       }
-      if (fullPipelineTestActive) {
-        failFullPipelineTest("Realtime WS closed");
-      }
       if (rtReconnectSuppressOnce) {
         rtReconnectSuppressOnce = false;
         setRealtimeStatus("OFF");
@@ -1600,9 +1385,6 @@ if (btnInstrRefresh) {
     };
     rtWs.onerror = () => {
       push("Realtime WS error");
-      if (fullPipelineTestActive) {
-        failFullPipelineTest("Realtime WS error");
-      }
     };
     rtWs.onmessage = async (e) => {
       if (typeof e.data !== "string") return;
@@ -1646,34 +1428,13 @@ if (btnInstrRefresh) {
           push("Direct Realtime response done");
           return;
         }
-        if (!activeTurnId) {
-          push("agent_done received but no activeTurnId");
-          return;
-        }
-        const turnId = activeTurnId;
-        activeTurnId = null;
-        push(`agent_done (turnId=${turnId})`);
-        await postTurnDone(turnId);
-        if (fullPipelineTestActive) {
-          finishFullPipelineTest(true);
-        }
+        push("Realtime response done");
       }
     };
   }
   // ------------------------------
-  // STT (loopback)
+  // Direct Realtime loopback
   // ------------------------------
-  let sttWs = null;
-  let sttCtx = null;
-  let sttStream = null;
-  let analyser = null;
-  let analyserTimer = null;
-  let sttPending = [];
-  let sttBuffer = [];
-  let flushTimer = null;
-  let fullPipelineTestActive = false;
-  let fullPipelineTestWs = null;
-  let fullPipelineTestTimer = null;
   let directRealtimeActive = false;
   let directRealtimeStarting = false;
   let directStream = null;
@@ -1683,287 +1444,8 @@ if (btnInstrRefresh) {
   let directAudioChunks = [];
   let directAudioBytes = 0;
   let directFramePending = [];
-  const FLUSH_MS = 1200;
-  const FULL_PIPELINE_TEST_TIMEOUT_MS = 30000;
   const DIRECT_PCM_CHUNK_BYTES = 960; // 20ms @ 24kHz mono PCM16
   const DIRECT_FRAME_PENDING_LIMIT = 80;
-  function clearFlushTimer() {
-    if (flushTimer) {
-      window.clearTimeout(flushTimer);
-      flushTimer = null;
-    }
-  }
-  function stopAnalyser() {
-    if (analyserTimer) {
-      window.clearInterval(analyserTimer);
-      analyserTimer = null;
-    }
-    analyser = null;
-  }
-  function startAnalyser() {
-    if (!analyser || !sttCtx) return;
-    const buf = new Float32Array(analyser.fftSize);
-    if (analyserTimer) window.clearInterval(analyserTimer);
-    analyserTimer = window.setInterval(() => {
-      analyser.getFloatTimeDomainData(buf);
-      let sum = 0;
-      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-      const rms = Math.sqrt(sum / buf.length);
-      push(`AUDIO_LEVEL_RMS: ${rms.toFixed(5)}`);
-    }, 1500);
-  }
-  async function flushSttBuffer() {
-    if (!sttBuffer.length) return;
-    const full = sttBuffer.join(" ").trim();
-    sttBuffer = [];
-    if (!full) return;
-    push(`STT_BUFFER_FLUSH: ${full}`);
-    await postTranscript(full);
-  }
-  function handleSttMessage(msg) {
-    if (msg.type === "STT_FINAL") {
-      const chunk = (msg.transcript || "").trim();
-      if (!chunk) return;
-      push(`STT_FINAL: ${chunk}`);
-      sttBuffer.push(chunk);
-      const endsSentence = /[?.!]\s*$/.test(chunk);
-      clearFlushTimer();
-      const timeout = endsSentence ? 450 : FLUSH_MS;
-      flushTimer = window.setTimeout(() => {
-        flushSttBuffer().catch(() => {});
-        flushTimer = null;
-      }, timeout);
-    } else if (msg.type === "STT_ERROR") {
-      push(`STT_ERROR: ${msg.error || "unknown"}`);
-      if (fullPipelineTestActive) {
-        failFullPipelineTest(msg.error || "STT error");
-      }
-    } else if (msg.type === "STT_MODE") {
-      // Normalize server mode line for quick diagnostics (matches your log pattern).
-      const requested = (getSttLanguage() || "").toString();
-      const serverLang = (msg.language || msg.lang || msg.locale || "").toString();
-      const supported = Array.isArray(msg.supported) ? msg.supported.join(",") : (msg.supported || "");
-      push(`STT_MODE: mode=${msg.mode} requested=${requested} server=${serverLang || requested} supported=${supported}`);
-    } else {
-      push(`STT WS msg: ${JSON.stringify(msg)}`);
-    }
-  }
-  function handleSttMessageData(data) {
-    if (typeof data !== "string") return;
-    let msg;
-    try { msg = JSON.parse(data); } catch { return; }
-    handleSttMessage(msg);
-  }
-  function readAscii(view, offset, length) {
-    let out = "";
-    for (let i = 0; i < length; i++) out += String.fromCharCode(view.getUint8(offset + i));
-    return out;
-  }
-  function decodePcm16Wav(arrayBuffer) {
-    if (!(arrayBuffer instanceof ArrayBuffer) || arrayBuffer.byteLength < 44) {
-      throw new Error("WAV file is too small");
-    }
-    const view = new DataView(arrayBuffer);
-    if (readAscii(view, 0, 4) !== "RIFF" || readAscii(view, 8, 4) !== "WAVE") {
-      throw new Error("WAV file must be RIFF/WAVE");
-    }
-    let fmt = null;
-    let dataOffset = -1;
-    let dataSize = 0;
-    let offset = 12;
-    while (offset + 8 <= view.byteLength) {
-      const chunkId = readAscii(view, offset, 4);
-      const chunkSize = view.getUint32(offset + 4, true);
-      const chunkStart = offset + 8;
-      const chunkEnd = chunkStart + chunkSize;
-      if (chunkEnd > view.byteLength) {
-        throw new Error(`WAV chunk ${chunkId} exceeds file length`);
-      }
-      if (chunkId === "fmt ") {
-        if (chunkSize < 16) throw new Error("WAV fmt chunk is too small");
-        fmt = {
-          audioFormat: view.getUint16(chunkStart, true),
-          channels: view.getUint16(chunkStart + 2, true),
-          sampleRate: view.getUint32(chunkStart + 4, true),
-          bitsPerSample: view.getUint16(chunkStart + 14, true),
-        };
-      } else if (chunkId === "data") {
-        dataOffset = chunkStart;
-        dataSize = chunkSize;
-      }
-      offset = chunkEnd + (chunkSize % 2);
-    }
-    if (!fmt) throw new Error("WAV fmt chunk not found");
-    if (fmt.audioFormat !== 1) throw new Error(`WAV must be PCM format 1; found ${fmt.audioFormat}`);
-    if (fmt.channels !== 1) throw new Error(`WAV must be mono; found ${fmt.channels} channels`);
-    if (fmt.sampleRate !== 16000) throw new Error(`WAV must be 16000 Hz; found ${fmt.sampleRate} Hz`);
-    if (fmt.bitsPerSample !== 16) throw new Error(`WAV must be signed 16-bit; found ${fmt.bitsPerSample}-bit`);
-    if (dataOffset < 0 || dataSize <= 0) throw new Error("WAV data chunk not found");
-    if (dataSize % 2 !== 0) throw new Error("WAV PCM16 data length must be even");
-    return {
-      pcm: new Uint8Array(arrayBuffer, dataOffset, dataSize),
-      durationSec: dataSize / 2 / fmt.sampleRate,
-    };
-  }
-  function sleep(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-  function readArrayBufferWithXhr(url) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("GET", url, true);
-      xhr.responseType = "arraybuffer";
-      xhr.onload = () => {
-        if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
-          resolve(xhr.response);
-          return;
-        }
-        reject(new Error(`test audio load failed (${xhr.status})`));
-      };
-      xhr.onerror = () => reject(new Error("test audio load failed"));
-      xhr.send();
-    });
-  }
-  async function loadFullPipelineTestAudio() {
-    const url = new URL(FULL_PIPELINE_TEST_AUDIO_URL, window.location.href).toString();
-    let arrayBuffer;
-    try {
-      const res = await fetch(url);
-      if (!res.ok && res.status !== 0) throw new Error(`test audio load failed (${res.status})`);
-      arrayBuffer = await res.arrayBuffer();
-    } catch {
-      arrayBuffer = await readArrayBufferWithXhr(url);
-    }
-    const decoded = decodePcm16Wav(arrayBuffer);
-    push(`Full pipeline test audio loaded (${decoded.pcm.byteLength} bytes, ${decoded.durationSec.toFixed(2)}s)`);
-    return decoded.pcm;
-  }
-  function openFullPipelineTestSttWs() {
-    return new Promise((resolve, reject) => {
-      const { STT_WS } = cfg();
-      let opened = false;
-      push(`Full pipeline test connecting STT WS: ${STT_WS}`);
-      const ws = new WebSocket(STT_WS);
-      fullPipelineTestWs = ws;
-      ws.binaryType = "arraybuffer";
-      ws.onopen = () => {
-        opened = true;
-        push("Full pipeline test STT WS connected");
-        refreshButtons();
-        resolve(ws);
-      };
-      ws.onmessage = (evt) => handleSttMessageData(evt.data);
-      ws.onerror = () => {
-        if (!opened) {
-          reject(new Error("STT WS error"));
-          return;
-        }
-        if (fullPipelineTestActive) {
-          failFullPipelineTest("STT WS error");
-        }
-      };
-      ws.onclose = (evt) => {
-        const code = evt?.code;
-        const reason = evt?.reason;
-        const clean = evt?.wasClean;
-        push(`Full pipeline test STT WS closed (code=${code}, clean=${clean}, reason=${reason || ""})`);
-        if (fullPipelineTestWs === ws) fullPipelineTestWs = null;
-        refreshButtons();
-        if (!opened) {
-          reject(new Error(`STT WS closed before open (code=${code})`));
-          return;
-        }
-        if (fullPipelineTestActive && code !== 1000 && code !== 1005) {
-          failFullPipelineTest(`STT WS closed unexpectedly (code=${code})`);
-        }
-      };
-    });
-  }
-  async function streamFullPipelineTestAudio(ws, pcmBytes) {
-    const chunkBytes = 640;
-    for (let offset = 0; offset < pcmBytes.byteLength; offset += chunkBytes) {
-      if (!fullPipelineTestActive) return;
-      if (ws.readyState !== WebSocket.OPEN) throw new Error("STT WS closed while streaming test audio");
-      ws.send(pcmBytes.slice(offset, Math.min(offset + chunkBytes, pcmBytes.byteLength)));
-      await sleep(20);
-    }
-    const silence = new Uint8Array(chunkBytes);
-    for (let i = 0; i < 125; i++) {
-      if (!fullPipelineTestActive) return;
-      if (ws.readyState !== WebSocket.OPEN) throw new Error("STT WS closed while streaming test silence");
-      ws.send(silence);
-      await sleep(20);
-    }
-    push("Full pipeline test trailing silence streamed (2500ms)");
-  }
-  function clearFullPipelineTestTimer() {
-    if (fullPipelineTestTimer) {
-      window.clearTimeout(fullPipelineTestTimer);
-      fullPipelineTestTimer = null;
-    }
-  }
-  function closeFullPipelineTestWs() {
-    const ws = fullPipelineTestWs;
-    fullPipelineTestWs = null;
-    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
-      try { ws.close(1000, "full-pipeline-test-complete"); } catch {}
-    }
-  }
-  function finishFullPipelineTest(success, reason) {
-    const wasActive = fullPipelineTestActive;
-    fullPipelineTestActive = false;
-    clearFullPipelineTestTimer();
-    closeFullPipelineTestWs();
-    if (!success) {
-      clearFlushTimer();
-      sttBuffer = [];
-    }
-    refreshButtons();
-    if (success) {
-      push("Full pipeline test completed");
-    } else if (wasActive) {
-      push(`Full pipeline test failed: ${reason || "unknown error"}`);
-    }
-  }
-  function failFullPipelineTest(reason) {
-    finishFullPipelineTest(false, reason);
-  }
-  async function startFullPipelineTest() {
-    if (fullPipelineTestActive) {
-      push("Full pipeline test failed: already running");
-      return;
-    }
-    const controlOk = controlWs && controlWs.readyState === WebSocket.OPEN;
-    const rtOk = rtWs && rtWs.readyState === WebSocket.OPEN;
-    if (!controlOk || !rtOk) {
-      push("Full pipeline test requires Control WS and Realtime WS to be connected.");
-      return;
-    }
-    if (sttWs && sttWs.readyState !== WebSocket.CLOSED) {
-      push("Full pipeline test requires live STT to be stopped first.");
-      return;
-    }
-    fullPipelineTestActive = true;
-    clearFlushTimer();
-    sttBuffer = [];
-    push("Full pipeline test started");
-    fullPipelineTestTimer = window.setTimeout(() => {
-      failFullPipelineTest("timeout waiting for STT/Agent/Realtime");
-    }, FULL_PIPELINE_TEST_TIMEOUT_MS);
-    refreshButtons();
-    try {
-      const pcmBytes = await loadFullPipelineTestAudio();
-      if (!fullPipelineTestActive) return;
-      const ws = await openFullPipelineTestSttWs();
-      if (!fullPipelineTestActive) return;
-      await streamFullPipelineTestAudio(ws, pcmBytes);
-      if (!fullPipelineTestActive) return;
-      push("Full pipeline test audio streamed");
-      push("Full pipeline test waiting for STT/Agent/Realtime");
-    } catch (e) {
-      failFullPipelineTest(e?.message || e);
-    }
-  }
   async function getLoopbackStream() {
     await window.electronAPI.enableLoopbackAudio();
     try {
@@ -2061,38 +1543,9 @@ if (btnInstrRefresh) {
     directAudioBytes += bytes.byteLength;
     if (directAudioBytes >= DIRECT_PCM_CHUNK_BYTES) flushDirectAudioChunks();
   }
-  async function stopLegacySttCaptureOnly(reason) {
-    clearFlushTimer();
-    sttBuffer = [];
-    sttPending = [];
-    stopAnalyser();
-    try { sttWs?.close(1000, reason || "direct-realtime"); } catch {}
-    sttWs = null;
-    try { sttStream?.getTracks().forEach((t) => t.stop()); } catch {}
-    sttStream = null;
-    try { loopMonitor.pause(); loopMonitor.srcObject = null; } catch {}
-    try { await sttCtx?.close(); } catch {}
-    sttCtx = null;
-  }
-  function disconnectControlForDirect() {
-    if (!controlWs) return;
-    const ws = controlWs;
-    controlWs = null;
-    try { if (controlPingTimer) window.clearInterval(controlPingTimer); } catch {}
-    controlPingTimer = null;
-    try { ws.onclose = null; } catch {}
-    try { ws.onerror = null; } catch {}
-    try { ws.onmessage = null; } catch {}
-    try { ws.close(1000, "direct-realtime"); } catch {}
-    setControlStatus("OFF");
-  }
   async function startDirectRealtime() {
     if (directRealtimeActive || directRealtimeStarting) {
       push("Direct Realtime is already running.");
-      return;
-    }
-    if (fullPipelineTestActive) {
-      push("Direct Realtime cannot start while Full Pipeline Test is running.");
       return;
     }
 
@@ -2101,11 +1554,6 @@ if (btnInstrRefresh) {
     refreshButtons();
 
     try {
-      if (sttWs || sttStream || sttCtx) {
-        await stopLegacySttCaptureOnly("direct-realtime-start");
-      }
-      disconnectControlForDirect();
-
       await refreshOutputDevicesUI();
       const playbackReady = await ensurePlayback();
       if (!playbackReady) throw new Error("Headphones output is required for Direct Realtime.");
@@ -2180,8 +1628,6 @@ if (btnInstrRefresh) {
     directCtx = null;
     try { await oldCtx?.close(); } catch {}
 
-    activeTurnId = null;
-
     if (closeRealtime) {
       desiredConnected = false;
       clearReconnectTimers();
@@ -2199,99 +1645,15 @@ if (btnInstrRefresh) {
     refreshButtons();
     if (!silent && wasRunning) push("Direct Realtime stopped.");
   }
-  async function startStt() {
-    if (!getSttEnabled()) {
-      push("STT is disabled (STT Enabled is OFF).");
-      return;
-    }
-    const { STT_WS } = cfg();
-    sttBuffer = [];
-    clearFlushTimer();
-    sttPending = [];
-    sttStream = await getLoopbackStream();
-    const audioTracks = sttStream.getAudioTracks();
-    push(`Loopback audio tracks: ${audioTracks.length}`);
-    audioTracks.forEach((t, i) =>
-      push(`  [${i}] label="${t.label}" enabled=${t.enabled} muted=${t.muted} readyState=${t.readyState}`)
-    );
-    loopMonitor.srcObject = sttStream;
-    try { await loopMonitor.play(); } catch {}
-    sttCtx = new AudioContext();
-    push(`AudioContext sampleRate=${sttCtx.sampleRate}`);
-    const src = sttCtx.createMediaStreamSource(sttStream);
-    analyser = sttCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    src.connect(analyser);
-    startAnalyser();
-    const workletUrl = new URL("stt-worklet-processor.js", window.location.href).toString();
-    await sttCtx.audioWorklet.addModule(workletUrl);
-    const node = new AudioWorkletNode(sttCtx, "stt-pcm16-16k");
-    src.connect(node);
-    node.port.onmessage = (e) => {
-      const buf = e.data;
-      if (!sttWs) return;
-      if (sttWs.readyState === WebSocket.OPEN) {
-        sttWs.send(buf);
-      } else if (sttWs.readyState === WebSocket.CONNECTING) {
-        sttPending.push(buf);
-        if (sttPending.length > 80) sttPending.shift();
-      }
-    };
-    push(`Connecting STT WS: ${STT_WS}`);
-    sttWs = new WebSocket(STT_WS);
-    sttWs.binaryType = "arraybuffer";
-    refreshButtons();
-    sttWs.onopen = () => {
-      push("STT WS connected");
-      for (const buf of sttPending) {
-        try { sttWs.send(buf); } catch {}
-      }
-      sttPending = [];
-      refreshButtons();
-    };
-    sttWs.onclose = (evt) => {
-      const code = evt?.code;
-      const reason = evt?.reason;
-      const clean = evt?.wasClean;
-      push(`STT WS closed (code=${code}, clean=${clean}, reason=${reason || ""})`);
-      sttWs = null;
-      setPill("sttStatus", "bad", "STT: OFF");
-      refreshButtons();
-    };
-    sttWs.onerror = () => push("STT WS error");
-    sttWs.onmessage = (evt) => {
-      handleSttMessageData(evt.data);
-    };
-    setPill("sttStatus", "ok", "STT: ON");
-    push(`STT streaming started (PCM16@16k mono). Language=${getSttLanguage()}`);
-    refreshButtons();
-  }
-  async function stopStt() {
-    clearFlushTimer();
-    try { await flushSttBuffer(); } catch {}
-    stopAnalyser();
-    try { sttWs?.close(1000, "stop"); } catch {}
-    sttWs = null;
-    try { sttStream?.getTracks().forEach((t) => t.stop()); } catch {}
-    sttStream = null;
-    try { loopMonitor.pause(); loopMonitor.srcObject = null; } catch {}
-    try { await sttCtx?.close(); } catch {}
-    sttCtx = null;
-    setPill("sttStatus", "bad", "STT: OFF");
-    push("STT stopped");
-    refreshButtons();
-  }
   function refreshButtons() {
-    const controlOk = controlWs && controlWs.readyState === WebSocket.OPEN;
     const rtOk = rtWs && rtWs.readyState === WebSocket.OPEN;
-    const sttOk = !!sttWs && sttWs.readyState !== WebSocket.CLOSED;
     const directBusy = directRealtimeActive || directRealtimeStarting;
     // Pause/Resume button is enabled only when Voice WS is open.
     if (btnPauseAudio) {
       btnPauseAudio.disabled = !rtOk;
     }
-    $("btnStart").disabled = directBusy || fullPipelineTestActive;
-    $("btnStop").disabled = !(directBusy || sttOk);
+    $("btnStart").disabled = directBusy;
+    $("btnStop").disabled = !directBusy;
   }
   // ------------------------------
   // Reset Session (Ready state; user clicks Connect)
@@ -2303,20 +1665,12 @@ if (btnInstrRefresh) {
       refreshButtons();
       return;
     }
-    if (fullPipelineTestActive) {
-      failFullPipelineTest("session reset");
-    }
     desiredConnected = false;
     clearReconnectTimers();
     clearPingTimers();
     try { await stopDirectRealtime({ closeRealtime: true, silent: true }); } catch {}
-    try { await stopLegacySttCaptureOnly("reset"); } catch {}
-    try { controlWs?.close(1000, "reset"); } catch {}
     try { rtWs?.close(1000, "reset"); } catch {}
-    controlWs = null;
     rtWs = null;
-    activeTurnId = null;
-    controlReconnectAttempt = 0;
     rtReconnectAttempt = 0;
     setAssistantSpeaking(false);
     setListeningIndicator(false);
@@ -2326,7 +1680,6 @@ if (btnInstrRefresh) {
         : ("test-" + Math.random().toString(16).slice(2));
     $("sid").textContent = sid;
     setDirectStatusOn(false);
-    setControlStatus("OFF");
     setRealtimeStatus("OFF");
     refreshButtons();
     push(`Session reset complete. New sessionId=${sid}. Ready for Direct Realtime.`);
@@ -2484,7 +1837,6 @@ if (playbackVolumeEl) {
     if (directRealtimeActive || directRealtimeStarting || directStream || directCtx) {
       await stopDirectRealtime();
     } else {
-      await stopLegacySttCaptureOnly("manual-stop");
       setDirectStatusOn(false);
       refreshButtons();
     }
@@ -2509,18 +1861,11 @@ if (playbackVolumeEl) {
     desiredConnected = false;
     clearReconnectTimers();
     clearPingTimers();
-    clearFullPipelineTestTimer();
     setAssistantSpeaking(false);
     setListeningIndicator(false);
     try { stopDirectRealtime({ closeRealtime: false, silent: true }); } catch {}
-    try { controlWs?.close(1000, "reset"); } catch {}
     try { rtWs?.close(1000, "reset"); } catch {}
-    try { sttWs?.close(1000, "stop"); } catch {}
-    try { fullPipelineTestWs?.close(1000, "window unload"); } catch {}
-    controlWs = null;
     rtWs = null;
-    sttWs = null;
-    fullPipelineTestWs = null;
     try {
       if (navigator?.mediaDevices) {
         navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
@@ -2529,7 +1874,6 @@ if (playbackVolumeEl) {
   });
   // Initial UI state
   setDirectStatusOn(false);
-  setControlStatus("OFF");
   setRealtimeStatus("OFF");
   setListeningIndicator(false);
   setSpeakingIndicator(false);
