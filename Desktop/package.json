@@ -8,11 +8,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-
-    "build:ui": "npm --prefix ../frontend run build -- --base=./ --outDir ../desktop/renderer --emptyOutDir",
-
     "build": "electron-builder --win",
-
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
