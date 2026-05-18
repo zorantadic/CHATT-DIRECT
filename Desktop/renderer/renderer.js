@@ -2298,6 +2298,11 @@ if (btnInstrRefresh) {
   // ------------------------------
   async function resetSessionToReady() {
     push("Reset session requested...");
+    if (directRealtimeActive || directRealtimeStarting) {
+      push("Reset session skipped because Direct Realtime is running. Stop Direct Realtime first to create a new session.");
+      refreshButtons();
+      return;
+    }
     if (fullPipelineTestActive) {
       failFullPipelineTest("session reset");
     }
