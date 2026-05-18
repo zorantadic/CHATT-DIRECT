@@ -25,6 +25,7 @@
 **/.env.*
 !.env.example
 !backend/.env.example
+backend/provider_config.local.json
 
 # Ignore Python runtime/cache
 **/.venv/

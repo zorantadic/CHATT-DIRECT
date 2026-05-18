@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "defaultProvider": "azure-openai-realtime",
+  "providers": {
+    "azure-openai-realtime": {
+      "displayName": "Azure OpenAI Realtime",
+      "supportsRealtimeAudio": true,
+      "requiresRegion": true,
+      "requiresEndpoint": true,
+      "requiresApiVersion": true,
+      "requiresApiKey": true,
+      "modelLabel": "Deployment / model name",
+      "defaultApiVersion": "2025-05-01-preview",
+      "defaultModel": "gpt-realtime-1.5",
+      "defaultVoice": "alloy",
+      "supportedVoices": [
+        "alloy"
+      ],
+      "defaultIncomingLanguage": "en",
+      "defaultOutgoingLanguage": "en",
+      "supportedIncomingLanguages": [
+        { "code": "en", "label": "English" }
+      ],
+      "supportedOutgoingLanguages": [
+        { "code": "en", "label": "English" }
+      ]
+    },
+    "openai-realtime": {
+      "displayName": "OpenAI Realtime",
+      "supportsRealtimeAudio": true,
+      "requiresRegion": false,
+      "requiresEndpoint": false,
+      "requiresApiVersion": false,
+      "requiresApiKey": true,
+      "modelLabel": "Realtime model",
+      "defaultModel": "gpt-realtime",
+      "defaultVoice": "alloy",
+      "supportedVoices": [
+        "alloy"
+      ],
+      "defaultIncomingLanguage": "en",
+      "defaultOutgoingLanguage": "en",
+      "supportedIncomingLanguages": [
+        { "code": "en", "label": "English" }
+      ],
+      "supportedOutgoingLanguages": [
+        { "code": "en", "label": "English" }
+      ]
+    }
+  }
+}
