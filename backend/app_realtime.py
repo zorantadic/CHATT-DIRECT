@@ -63,11 +63,8 @@ PORT = int(os.getenv("PORT", "50505"))
 # Flat-file stores
 INSTRUCTIONS_PATH = os.getenv("INSTRUCTIONS_PATH", "instructions.json")
 INSTRUCTION_PROFILES_PATH = os.getenv("INSTRUCTION_PROFILES_PATH", "instruction_profiles.json")
-MANUAL_ANSWERS_PATH = os.getenv("MANUAL_ANSWERS_PATH", "manual_answers.json")
 
 MAX_INSTRUCTIONS_LEN = int(os.getenv("MAX_INSTRUCTIONS_LEN", "8192"))
-MAX_MANUAL_ANSWERS = int(os.getenv("MAX_MANUAL_ANSWERS", "10"))
-MAX_MANUAL_ANSWER_LEN = int(os.getenv("MAX_MANUAL_ANSWER_LEN", "4096"))
 
 # Audio format expected by the desktop app events:
 # - Realtime from Azure Realtime is pcm16 @ 24000 Hz
@@ -242,70 +239,11 @@ def _instructions_snapshot(target: str) -> Dict[str, Any]:
 
 
 # ----------------------------
-# Manual answers store (file + memory cache)
-# ----------------------------
-_manual_lock = asyncio.Lock()
-_manual_cache: Dict[str, Any] = {"answers": [], "updatedAt": ""}
-
-
-def _validate_manual_answers(payload: Any) -> List[str]:
-    if payload is None:
-        raise ValueError("answers is required")
-    if not isinstance(payload, list):
-        raise ValueError("answers must be a list of strings")
-
-    if len(payload) > MAX_MANUAL_ANSWERS:
-        raise ValueError(f"answers too long (max {MAX_MANUAL_ANSWERS})")
-
-    out: List[str] = []
-    for i, v in enumerate(payload):
-        s = str(v).strip()
-        if len(s) > MAX_MANUAL_ANSWER_LEN:
-            raise ValueError(f"answers[{i}] too long (max {MAX_MANUAL_ANSWER_LEN})")
-        out.append(s)
-    return out
-
-
-def _ensure_manual_answers_file() -> None:
-    if not os.path.exists(MANUAL_ANSWERS_PATH):
-        data = {"answers": [], "updatedAt": _now_iso()}
-        _atomic_write_json(MANUAL_ANSWERS_PATH, data)
-        return
-
-    try:
-        data = _read_json_file(MANUAL_ANSWERS_PATH)
-        ans = data.get("answers", [])
-        if not isinstance(ans, list):
-            ans = []
-        updated = str(data.get("updatedAt", _now_iso())).strip() or _now_iso()
-        _atomic_write_json(MANUAL_ANSWERS_PATH, {"answers": ans, "updatedAt": updated})
-    except Exception:
-        data = {"answers": [], "updatedAt": _now_iso()}
-        _atomic_write_json(MANUAL_ANSWERS_PATH, data)
-
-
-async def _load_manual_to_cache() -> None:
-    async with _manual_lock:
-        _ensure_manual_answers_file()
-        data = _read_json_file(MANUAL_ANSWERS_PATH)
-        ans = data.get("answers", [])
-        if not isinstance(ans, list):
-            ans = []
-        _manual_cache["answers"] = ans
-        _manual_cache["updatedAt"] = str(data.get("updatedAt", "")).strip() or _now_iso()
-
-
-def _manual_snapshot() -> Dict[str, Any]:
-    return {"answers": _manual_cache["answers"], "updatedAt": _manual_cache["updatedAt"], "source": "file"}
-
-
-# ----------------------------
 # Startup
 # ----------------------------
 @app.on_event("startup")
 async def _startup():
     await _load_instructions_to_cache()
-    await _load_manual_to_cache()
     if DEBUG:
         print("[startup] Realtime endpoint:", AZURE_OPENAI_ENDPOINT)
         print("[startup] TTS endpoint:", AZURE_OPENAI_TTS_ENDPOINT)
