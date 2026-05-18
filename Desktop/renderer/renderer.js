@@ -265,9 +265,12 @@ Do not introduce new topics.`;
   // Initialize settings into inputs
   // ------------------------------
   function loadEndpointSettingsIntoInputs() {
-    $("sttBase").value = loadStrLS(LS_STT_BASE, DEFAULTS.STT_WS_BASE);
-    $("orchHttp").value = loadStrLS(LS_ORCH_HTTP, DEFAULTS.ORCH_HTTP);
-    $("controlBase").value = loadStrLS(LS_CONTROL_BASE, DEFAULTS.ORCH_CONTROL_WS_BASE);
+    const sttBaseEl = $("sttBase");
+    const orchHttpEl = $("orchHttp");
+    const controlBaseEl = $("controlBase");
+    if (sttBaseEl) sttBaseEl.value = loadStrLS(LS_STT_BASE, DEFAULTS.STT_WS_BASE);
+    if (orchHttpEl) orchHttpEl.value = loadStrLS(LS_ORCH_HTTP, DEFAULTS.ORCH_HTTP);
+    if (controlBaseEl) controlBaseEl.value = loadStrLS(LS_CONTROL_BASE, DEFAULTS.ORCH_CONTROL_WS_BASE);
     $("rtHttp").value = loadStrLS(LS_RT_HTTP, DEFAULTS.REALTIME_HTTP);
     $("rtWs").value = loadStrLS(LS_RT_WS, DEFAULTS.REALTIME_WS);
   }
@@ -2494,7 +2497,7 @@ if (playbackVolumeEl) {
     }
     await applyRealtimeSink();
   });
-  $("btnConnect").addEventListener("click", async () => {
+  $("btnConnect")?.addEventListener("click", async () => {
     desiredConnected = true;
     clearReconnectTimers();
     await refreshOutputDevicesUI();
@@ -2502,7 +2505,7 @@ if (playbackVolumeEl) {
     await loadInstructionsEffective();
     refreshButtons();
   });
-  $("btnReloadInstr").addEventListener("click", async () => {
+  $("btnReloadInstr")?.addEventListener("click", async () => {
     await loadInstructionsEffective();
   });
   $("btnStart").addEventListener("click", async () => {
