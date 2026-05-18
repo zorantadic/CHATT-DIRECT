@@ -243,7 +243,7 @@
         </div>
       </div>
 
-      <div class="box" style="margin-top:14px;">
+            <div class="box" style="margin-top:14px;">
         <h3>Diagnostics</h3>
 
         <div class="row">
@@ -260,6 +260,22 @@
           Pravilo za Windows: <b>NE postavljati Electron u Volume Mixer na Headphones</b>.
           Electron ostaje <b>Default</b>, a mi Realtime rutujemo na slušalice iz aplikacije (Settings → Realtime output).
         </div>
+      </div>
+
+      <div class="box" style="margin-top:14px;">
+        <h3>Log</h3>
+        <div class="logbar">
+          <input id="logFilter" type="text" placeholder="Filter log (contains)..." />
+          <div class="check" title="When ON, the log view follows new messages.">
+            <input id="logAutoscroll" type="checkbox" checked />
+            <span>Auto-scroll</span>
+          </div>
+          <div class="spacer"></div>
+          <button id="btnLogCopy" type="button">Copy</button>
+          <button id="btnLogClear" type="button">Clear</button>
+          <button id="btnLogDownload" type="button">Download</button>
+        </div>
+        <pre id="log"></pre>
       </div>
     </div>
 
