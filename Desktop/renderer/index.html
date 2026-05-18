@@ -185,7 +185,64 @@
           <span id="settingsSaved" class="small"></span>
         </div>
       </div>
+      <div class="box" style="margin-top:14px;">
+        <h3>Provider Configuration</h3>
 
+        <div class="row">
+          <label>Active provider</label>
+          <select id="providerActive">
+            <option value="azure-openai-realtime">Azure OpenAI Realtime</option>
+            <option value="openai-realtime">OpenAI Realtime</option>
+          </select>
+        </div>
+
+        <div class="row" id="providerRegionRow">
+          <label>Region</label>
+          <input id="providerRegion" type="text" placeholder="eastus2" />
+        </div>
+
+        <div class="row" id="providerEndpointRow">
+          <label>Endpoint</label>
+          <input id="providerEndpoint" type="text" placeholder="https://your-resource-name.cognitiveservices.azure.com" />
+        </div>
+
+        <div class="row" id="providerApiVersionRow">
+          <label>API version</label>
+          <input id="providerApiVersion" type="text" placeholder="2025-05-01-preview" />
+        </div>
+
+        <div class="row">
+          <label id="providerModelLabel">Model</label>
+          <input id="providerModel" type="text" />
+        </div>
+
+        <div class="row">
+          <label>Voice</label>
+          <select id="providerVoice"></select>
+        </div>
+
+        <div class="row">
+          <label>Incoming language</label>
+          <select id="providerIncomingLanguage"></select>
+        </div>
+
+        <div class="row">
+          <label>Outgoing language</label>
+          <select id="providerOutgoingLanguage"></select>
+        </div>
+
+        <div class="row">
+          <label>API key</label>
+          <input id="providerApiKey" type="password" placeholder="Stored locally in provider_config.local.json" />
+        </div>
+
+        <div class="row">
+          <button id="btnProviderTest" type="button">Test connection</button>
+          <button id="btnProviderSave" type="button">Save provider</button>
+          <button id="btnProviderReset" type="button">Reset provider settings</button>
+          <span id="providerStatus" class="small"></span>
+        </div>
+      </div>
       <div class="box" style="margin-top:14px;">
         <h3>Login / Auth (optional)</h3>
 

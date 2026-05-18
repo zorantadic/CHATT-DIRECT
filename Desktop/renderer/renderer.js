@@ -192,6 +192,23 @@ Do not introduce new topics.`;
   const btnSaveSettings = $("btnSaveSettings");
   const btnResetSettings = $("btnResetSettings");
   const settingsSaved = $("settingsSaved");
+  const providerActiveEl = $("providerActive");
+  const providerRegionRow = $("providerRegionRow");
+  const providerRegionEl = $("providerRegion");
+  const providerEndpointRow = $("providerEndpointRow");
+  const providerEndpointEl = $("providerEndpoint");
+  const providerApiVersionRow = $("providerApiVersionRow");
+  const providerApiVersionEl = $("providerApiVersion");
+  const providerModelLabelEl = $("providerModelLabel");
+  const providerModelEl = $("providerModel");
+  const providerVoiceEl = $("providerVoice");
+  const providerIncomingLanguageEl = $("providerIncomingLanguage");
+  const providerOutgoingLanguageEl = $("providerOutgoingLanguage");
+  const providerApiKeyEl = $("providerApiKey");
+  const btnProviderTest = $("btnProviderTest");
+  const btnProviderSave = $("btnProviderSave");
+  const btnProviderReset = $("btnProviderReset");
+  const providerStatusEl = $("providerStatus");
   const authTokenEl = $("authToken");
   const btnSaveToken = $("btnSaveToken");
   const btnClearToken = $("btnClearToken");
@@ -265,11 +282,77 @@ function loadInstructionsTargetIntoInputs() {
     if (authTokenEl) authTokenEl.value = token ? token : "";
     if (authStatusEl) authStatusEl.textContent = token ? "Token set" : "No token";
   }
+  let providerCapabilitiesState = null;
+  let providerConfigState = null;
+
   loadEndpointSettingsIntoInputs();
   initAuthUi();
   loadVoiceSettingsIntoInputs();
   applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
   loadInstructionsTargetIntoInputs();
+  loadProviderUi().catch(() => {});
+
+  function setProviderStatus(message) {
+    if (providerStatusEl) providerStatusEl.textContent = message || "";
+  }
+
+  function fillSelectOptions(selectEl, items, selectedValue) {
+    if (!selectEl) return;
+    selectEl.innerHTML = "";
+    for (const item of items || []) {
+      const opt = document.createElement("option");
+      opt.value = item.code || item;
+      opt.textContent = item.label || item.code || item;
+      selectEl.appendChild(opt);
+    }
+    if (selectedValue) selectEl.value = selectedValue;
+  }
+
+  function getSelectedProviderId() {
+    return (providerActiveEl?.value || "azure-openai-realtime").toString();
+  }
+
+  function applyProviderUi(providerId) {
+    const caps = providerCapabilitiesState?.providers?.[providerId];
+    const cfgProvider = providerConfigState?.providers?.[providerId] || {};
+    if (!caps) return;
+
+    if (providerRegionRow) providerRegionRow.style.display = caps.requiresRegion ? "" : "none";
+    if (providerEndpointRow) providerEndpointRow.style.display = caps.requiresEndpoint ? "" : "none";
+    if (providerApiVersionRow) providerApiVersionRow.style.display = caps.requiresApiVersion ? "" : "none";
+
+    if (providerModelLabelEl) providerModelLabelEl.textContent = caps.modelLabel || "Model";
+    if (providerRegionEl) providerRegionEl.value = cfgProvider.region || "";
+    if (providerEndpointEl) providerEndpointEl.value = cfgProvider.endpoint || "";
+    if (providerApiVersionEl) providerApiVersionEl.value = cfgProvider.apiVersion || caps.defaultApiVersion || "";
+    if (providerModelEl) providerModelEl.value = cfgProvider.model || caps.defaultModel || "";
+    if (providerApiKeyEl) providerApiKeyEl.value = cfgProvider.apiKey || "";
+
+    fillSelectOptions(providerVoiceEl, caps.supportedVoices || [], cfgProvider.voice || caps.defaultVoice);
+    fillSelectOptions(providerIncomingLanguageEl, caps.supportedIncomingLanguages || [], cfgProvider.incomingLanguage || caps.defaultIncomingLanguage || "en");
+    fillSelectOptions(providerOutgoingLanguageEl, caps.supportedOutgoingLanguages || [], cfgProvider.outgoingLanguage || caps.defaultOutgoingLanguage || "en");
+  }
+
+  async function loadProviderUi() {
+    try {
+      const c = directRealtimeCfg();
+      const [capsRes, cfgRes] = await Promise.all([
+        fetch(`${c.REALTIME_HTTP}/v1/provider/capabilities`, { headers: authHeaders() }),
+        fetch(`${c.REALTIME_HTTP}/v1/provider/config`, { headers: authHeaders() }),
+      ]);
+      if (!capsRes.ok) throw new Error(`capabilities HTTP ${capsRes.status}`);
+      if (!cfgRes.ok) throw new Error(`config HTTP ${cfgRes.status}`);
+      providerCapabilitiesState = await capsRes.json();
+      providerConfigState = await cfgRes.json();
+
+      const active = providerConfigState.activeProvider || providerCapabilitiesState.defaultProvider || "azure-openai-realtime";
+      if (providerActiveEl) providerActiveEl.value = active;
+      applyProviderUi(active);
+      setProviderStatus("Provider config loaded");
+    } catch (e) {
+      setProviderStatus(`Provider config load failed: ${e?.message || e}`);
+    }
+  }
 function normalizeRealtimeRate(rate) {
   const r = (rate || "").toString().trim();
   return ALLOWED_REALTIME_RATES.includes(r) ? r : DEFAULT_REALTIME_RATE;
@@ -1725,7 +1808,20 @@ if (btnInstrRefresh) {
     resetSettingsToDefaults();
     try { refreshInstructionsPage().catch(() => {}); } catch {}
   });
-// Realtime rate
+  if (providerActiveEl) {
+    providerActiveEl.addEventListener("change", () => {
+      if (directRealtimeActive || directRealtimeStarting) {
+        setProviderStatus("Stop Direct Realtime before changing provider.");
+        providerActiveEl.value = providerConfigState?.activeProvider || providerCapabilitiesState?.defaultProvider || "azure-openai-realtime";
+        applyProviderUi(providerActiveEl.value);
+        return;
+      }
+
+      applyProviderUi(getSelectedProviderId());
+      setProviderStatus("Provider changed. Save provider to persist.");
+    });
+  }
+  // Realtime rate
 async function reconnectVoiceWs(reason) {
   if (!desiredConnected) return;
   try {
