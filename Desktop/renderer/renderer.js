@@ -1873,7 +1873,33 @@ if (btnInstrRefresh) {
     });
   }
 
-  // Realtime rate  // Realtime rate
+  if (btnProviderTest) {
+    btnProviderTest.addEventListener("click", async () => {
+      try {
+        const c = directRealtimeCfg();
+        const payload = buildProviderConfigFromUi();
+        const res = await fetch(`${c.REALTIME_HTTP}/v1/provider/test`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+        if (data?.ok) {
+          setProviderStatus("Provider test passed");
+        } else {
+          const missing = Array.isArray(data?.missing) ? data.missing.join(", ") : "";
+          setProviderStatus(missing ? `Provider test incomplete: missing ${missing}` : "Provider test incomplete");
+        }
+      } catch (e) {
+        setProviderStatus(`Provider test failed: ${e?.message || e}`);
+      }
+    });
+  }
+
+  // Realtime rate
 async function reconnectVoiceWs(reason) {
   if (!desiredConnected) return;
   try {
