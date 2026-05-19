@@ -3,6 +3,7 @@ import os
 from .base import (
     RealtimeProviderAdapter,
     RealtimeProviderConnection,
+    probe_realtime_websocket,
 )
 
 
@@ -68,7 +69,7 @@ class OpenAIRealtimeAdapter(RealtimeProviderAdapter):
             },
         }
 
-    def test_connection(self, provider_config: dict[str, object]) -> dict[str, object]:
+    async def test_connection(self, provider_config: dict[str, object]) -> dict[str, object]:
         connection = self.build_connection(provider_config)
 
         if not connection.url:
@@ -84,9 +85,9 @@ class OpenAIRealtimeAdapter(RealtimeProviderAdapter):
                 "message": "OpenAI API key is missing.",
             }
 
-        return {
-            "ok": True,
-            "message": "OpenAI Realtime provider config is ready for network validation.",
-            "provider": self.provider_id,
-            "url": connection.url,
-        }
+        return await probe_realtime_websocket(
+            provider_id=self.provider_id,
+            provider_label="OpenAI",
+            url=connection.url,
+            headers=connection.headers,
+        )

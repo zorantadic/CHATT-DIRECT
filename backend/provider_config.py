@@ -159,7 +159,7 @@ def get_active_provider_config() -> Dict[str, Any]:
     }
 
 
-def test_provider_config(config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def _provider_test_context(config: Dict[str, Any] | None = None) -> tuple[str, Dict[str, Any], Dict[str, Any] | None]:
     caps = load_provider_capabilities()
     effective_config = validate_provider_config(config or load_provider_config(), caps)
     active_provider = effective_config["activeProvider"]
@@ -182,15 +182,36 @@ def test_provider_config(config: Dict[str, Any] | None = None) -> Dict[str, Any]
         missing.append("voice")
 
     if missing:
-        return {
+        return active_provider, provider_config, {
             "ok": False,
             "activeProvider": active_provider,
             "missing": missing,
             "message": "Provider config is incomplete.",
         }
 
+    return active_provider, provider_config, None
+
+
+def test_provider_config(config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    active_provider, _provider_config, local_result = _provider_test_context(config)
+    if local_result:
+        return local_result
+
+    return {
+        "activeProvider": active_provider,
+        "missing": [],
+        "ok": True,
+        "message": "Provider config has required fields. Use async provider test for network validation.",
+    }
+
+
+async def test_provider_config_async(config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    active_provider, provider_config, local_result = _provider_test_context(config)
+    if local_result:
+        return local_result
+
     adapter = get_realtime_provider_adapter(active_provider)
-    test_result = adapter.test_connection(provider_config)
+    test_result = await adapter.test_connection(provider_config)
 
     return {
         "activeProvider": active_provider,

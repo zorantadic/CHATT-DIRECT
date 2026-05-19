@@ -8,7 +8,7 @@ from provider_config import (
     load_provider_capabilities,
     load_provider_config,
     save_provider_config,
-    test_provider_config,
+    test_provider_config_async,
 )
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
@@ -306,7 +306,7 @@ async def provider_active_get():
 
 @app.post("/v1/provider/test")
 async def provider_config_test(payload: Optional[Dict[str, Any]] = None):
-    return test_provider_config(payload)
+    return await test_provider_config_async(payload)
 
 @app.get("/")
 async def root():
