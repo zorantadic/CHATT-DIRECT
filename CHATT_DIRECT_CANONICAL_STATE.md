@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -22,8 +22,10 @@ Canonical runtime direction:
 
 ```text
 Electron Desktop app
-Direct Azure OpenAI Realtime voice
+Direct Realtime voice
 single active backend service
+multi-provider Realtime adapter runtime
+Azure OpenAI Realtime and OpenAI Realtime support
 loopback/system/browser audio input
 selected headphones/output device playback
 BYOK provider/API configuration
@@ -54,8 +56,10 @@ Active Direct Realtime flow:
 Electron Desktop app
 -> loopback/system/browser audio capture
 -> backend/app_realtime.py /voice/ws on port 50505
--> Azure OpenAI Realtime session
--> Azure Realtime VAD/interruption
+-> active Realtime provider adapter
+-> Azure OpenAI Realtime or OpenAI Realtime session
+-> provider-specific session.update payload
+-> provider VAD/interruption behavior
 -> audio response
 -> Desktop playback pipeline
 -> selected headphones/output device
@@ -218,6 +222,8 @@ AZURE_OPENAI_KEY=<your-azure-openai-key>
 AZURE_OPENAI_MODEL=gpt-realtime-1.5
 AZURE_OPENAI_API_VERSION=2025-05-01-preview
 AZURE_OPENAI_PROFILE=byom-azure-openai-realtime
+OPENAI_API_KEY=<your-openai-key>
+OPENAI_REALTIME_MODEL=gpt-realtime
 REALTIME_SAMPLE_RATE=24000
 AUDIO_CHANNELS=1
 INSTRUCTIONS_PATH=instructions.json
@@ -268,6 +274,13 @@ Important active backend files:
 backend/app_realtime.py
 backend/audio_utils.py
 backend/instructions.json
+backend/provider_capabilities.json
+backend/provider_config.py
+backend/provider_config.local.example.json
+backend/providers/base.py
+backend/providers/__init__.py
+backend/providers/azure_openai_realtime.py
+backend/providers/openai_realtime.py
 backend/.env.example
 backend/requirements.txt
 ```
@@ -417,6 +430,10 @@ node --check Desktop/renderer/renderer.js: OK
 Desktop package JSON parse: OK
 Desktop app runtime test: OK
 Direct Realtime voice test: OK
+Azure OpenAI Realtime runtime test: OK
+OpenAI Realtime runtime test: OK
+Provider-specific session.update payload handling: OK
+OpenAI Realtime session schema compatibility: OK
 Start Direct Realtime: OK
 Stop Direct Realtime: OK
 Reset session while Direct Realtime is running: skipped without closing runtime
@@ -438,7 +455,7 @@ For backend changes, also run:
 
 ```powershell
 cd C:\Projects\chatt-direct
-python -m py_compile backend/app_realtime.py
+python -m py_compile backend/app_realtime.py backend/provider_config.py backend/providers/base.py backend/providers/azure_openai_realtime.py backend/providers/openai_realtime.py
 ```
 
 ---
@@ -450,10 +467,22 @@ Current stable runtime baseline:
 ```text
 CHATT Direct is a Windows/Electron Direct Realtime voice app
 Backend is Realtime-only on app_realtime.py port 50505
+Backend supports active Realtime provider selection through provider adapters
+Azure OpenAI Realtime and OpenAI Realtime are both validated providers
 Desktop renderer no longer contains active STT/Orchestrator/Control/Full Pipeline runtime paths
 backend/speech_server.py and backend/Dockerfile.speech are removed
 Docker/start/stop runtime helpers are reduced to Direct Realtime 50505
 Desktop runtime and voice flow were tested and worked after cleanup
+OpenAI Realtime runtime worked and produced better natural voice quality during local testing
+Real websocket provider network tests passed for OpenAI and Azure
+```
+
+Recent provider integration commits:
+
+```text
+Add provider-specific realtime session payload handling
+Add adapter-level provider config test
+Add realtime provider network connection test
 ```
 
 Before continuing in a new session, run:
@@ -471,11 +500,12 @@ Interpret broad grep results carefully. Some terms may appear in dependency hash
 
 ---
 
-## 15. Provider Configuration Baseline
 
-Provider configuration is now part of the Direct runtime setup surface, but it does not yet drive the active Realtime runtime session.
+## 15. Provider Configuration and Runtime Adapter Baseline
 
-Current supported setup providers:
+Provider configuration is now part of the Direct runtime setup surface and drives the active Realtime runtime session.
+
+Current supported setup/runtime providers:
 
 ```text
 Azure OpenAI Realtime
@@ -513,6 +543,10 @@ backend/provider_capabilities.json
 backend/provider_config.local.example.json
 backend/provider_config.py
 backend/provider_config.local.json   # generated locally and ignored by Git
+backend/providers/base.py
+backend/providers/__init__.py
+backend/providers/azure_openai_realtime.py
+backend/providers/openai_realtime.py
 ```
 
 Current provider backend API endpoints:
@@ -528,10 +562,39 @@ POST /v1/provider/test
 Current Test connection behavior:
 
 ```text
-Test connection currently performs required-field validation only.
-Example: missing API key returns missing apiKey.
-If required fields are present, it returns Provider test passed.
-It does not yet make a real provider network/API call.
+POST /v1/provider/test performs required-field validation first.
+If required fields are present, it performs a real async Realtime websocket network probe.
+The probe opens the configured provider websocket and closes immediately.
+The probe does not send audio.
+The probe does not send session.update.
+The probe does not start Direct Realtime.
+```
+
+Confirmed provider network test results:
+
+```text
+OpenAI Realtime websocket connection succeeded.
+Azure OpenAI Realtime websocket connection succeeded.
+```
+
+Current runtime provider behavior:
+
+```text
+/voice/ws reads activeProvider from saved provider config.
+The selected adapter builds provider URL and authentication headers.
+The selected adapter builds provider-specific session.update payload.
+Desktop audio routing remains unchanged.
+Loopback/system/browser audio remains the only allowed input source.
+PCM16 24k mono audio path remains unchanged.
+```
+
+Provider-specific session.update rules:
+
+```text
+Azure OpenAI Realtime uses the existing Azure-compatible session.update payload.
+OpenAI Realtime uses session.type = "realtime".
+OpenAI Realtime VAD configuration is under session.audio.input.turn_detection.
+OpenAI Realtime does not accept Azure-style session.turn_detection.
 ```
 
 Current local config storage:
@@ -563,6 +626,13 @@ Azure region: East US 2
 Voice: alloy
 Incoming language: English
 Outgoing language: English
+```
+
+Current known provider UX limitation:
+
+```text
+Desktop Test connection UI may show a generic pass/fail label.
+The backend API returns the detailed provider/network message.
 ```
 
 ---

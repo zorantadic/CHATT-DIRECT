@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -13,8 +13,9 @@ The project is no longer the old multi-service CHATT architecture.
 Current product direction:
 ```text
 Windows Electron desktop app
-Direct Azure OpenAI Realtime voice
-single-engine runtime
+Direct Realtime voice
+multi-provider Realtime adapter runtime
+Azure OpenAI Realtime and OpenAI Realtime support
 BYOK provider/API configuration
 packaged Windows app
 ```
@@ -25,6 +26,7 @@ low latency
 headphones/output-device routing
 clean local setup
 user-owned provider credentials
+real provider connection validation
 workflow-specific voice assistant use cases
 ```
 ---
@@ -65,8 +67,10 @@ Canonical active runtime:
 Electron Desktop app
 -> loopback/system/browser audio capture
 -> backend/app_realtime.py /voice/ws on port 50505
--> Azure OpenAI Realtime session
--> Azure Realtime VAD/interruption
+-> active Realtime provider adapter
+-> Azure OpenAI Realtime or OpenAI Realtime session
+-> provider-specific session.update payload
+-> provider VAD/interruption behavior
 -> audio response
 -> Desktop playback pipeline
 -> selected headphones/output device
@@ -107,6 +111,13 @@ Desktop/renderer/stt-worklet-processor.js
 backend/app_realtime.py
 backend/audio_utils.py
 backend/instructions.json
+backend/provider_capabilities.json
+backend/provider_config.py
+backend/provider_config.local.example.json
+backend/providers/base.py
+backend/providers/__init__.py
+backend/providers/azure_openai_realtime.py
+backend/providers/openai_realtime.py
 backend/.env.example
 backend/requirements.txt
 docker-compose.yml
@@ -194,13 +205,15 @@ Committed non-secret template:
 ```text
 C:\Projects\chatt-direct\backend\.env.example
 ```
-Current relevant Direct Realtime settings:
+Current relevant Direct Realtime fallback/default settings:
 ```env
 AZURE_OPENAI_ENDPOINT=https://agentfield.cognitiveservices.azure.com
 AZURE_OPENAI_KEY=<your-azure-openai-key>
 AZURE_OPENAI_MODEL=gpt-realtime-1.5
 AZURE_OPENAI_API_VERSION=2025-05-01-preview
 AZURE_OPENAI_PROFILE=byom-azure-openai-realtime
+OPENAI_API_KEY=<your-openai-key>
+OPENAI_REALTIME_MODEL=gpt-realtime
 REALTIME_SAMPLE_RATE=24000
 AUDIO_CHANNELS=1
 INSTRUCTIONS_PATH=instructions.json
@@ -208,6 +221,13 @@ MAX_INSTRUCTIONS_LEN=8192
 PORT=50505
 DEBUG=false
 ```
+
+Active provider configuration is saved locally in:
+```text
+backend/provider_config.local.json
+```
+
+This generated file is ignored by Git and may contain user-owned provider credentials.
 Do not commit real secrets.
 The Desktop settings currently use only:
 ```text
@@ -320,11 +340,20 @@ node --check Desktop/renderer/renderer.js: OK
 Desktop package JSON parse: OK
 Desktop app runtime test: OK
 Direct Realtime voice test: OK
+Azure OpenAI Realtime runtime test: OK
+OpenAI Realtime runtime test: OK
+OpenAI Realtime provider produced better natural voice quality during local testing
 Start Direct Realtime: OK
 Stop Direct Realtime: OK
 Reset session while Direct Realtime is running: skipped without closing runtime
 Reset session after Stop: creates a new session
 Direct Realtime worked normally after final cleanup
+Provider Adapter / Runtime Integration: OK
+Saved provider config drives runtime provider selection: OK
+Provider-specific session.update payload handling: OK
+OpenAI Realtime session.type and audio.input.turn_detection schema compatibility: OK
+Real provider network connection test for OpenAI Realtime: OK
+Real provider network connection test for Azure OpenAI Realtime: OK
 ```
 ---
 12. Current Known Good State
@@ -332,6 +361,8 @@ Current known good local state:
 ```text
 CHATT Direct is a Windows/Electron Direct Realtime voice app
 Backend is Realtime-only on app_realtime.py port 50505
+Backend supports active Realtime provider selection through provider adapters
+Azure OpenAI Realtime and OpenAI Realtime are both validated providers
 Desktop renderer no longer contains active STT/Orchestrator/Control/Full Pipeline runtime paths
 backend/speech_server.py and backend/Dockerfile.speech are removed
 Docker/start/stop runtime helpers are reduced to Direct Realtime 50505
@@ -355,7 +386,125 @@ git grep -n "speech_server\|50507\|50506\|/stt/ws\|orchestrator\|manual_answers\
 ```
 Interpret broad grep results carefully. Some terms may appear in dependency hashes or documentation; do not treat a broad grep result as proof of active runtime usage.
 ---
-14. Commercial Direction
+14. Provider Adapter / Runtime Integration Baseline
+
+Completed provider work:
+
+```text
+Provider Setup UI skeleton
+Provider save UI and region dropdown
+Provider test UI validation
+Provider configuration API
+Provider configuration schema
+Realtime provider adapter structure
+Azure Realtime provider adapter
+OpenAI Realtime provider adapter
+Runtime provider selection from saved config
+Saved Azure provider config at runtime
+Saved OpenAI provider config at runtime
+Provider-specific session.update payload handling
+Realtime provider error message normalization
+Adapter-level provider config test
+Real Realtime provider websocket network connection test
+```
+
+Current supported active providers:
+
+```text
+azure-openai-realtime
+openai-realtime
+```
+
+Current runtime adapter files:
+
+```text
+backend/providers/base.py
+backend/providers/__init__.py
+backend/providers/azure_openai_realtime.py
+backend/providers/openai_realtime.py
+```
+
+Current provider configuration files:
+
+```text
+backend/provider_capabilities.json
+backend/provider_config.py
+backend/provider_config.local.example.json
+backend/provider_config.local.json   # generated locally and ignored by Git
+```
+
+Current provider API endpoints:
+
+```text
+GET  /v1/provider/capabilities
+GET  /v1/provider/config
+POST /v1/provider/config
+GET  /v1/provider/active
+POST /v1/provider/test
+```
+
+Current provider test behavior:
+
+```text
+POST /v1/provider/test performs required-field validation first.
+If required fields are present, it performs a real Realtime websocket network probe.
+The probe opens the configured provider websocket and closes immediately.
+The probe does not send audio.
+The probe does not send session.update.
+The probe does not start Direct Realtime.
+```
+
+Confirmed provider test results:
+
+```text
+OpenAI Realtime websocket connection succeeded.
+Azure OpenAI Realtime websocket connection succeeded.
+```
+
+Current provider runtime behavior:
+
+```text
+/voice/ws reads activeProvider from saved provider config.
+The selected adapter builds provider URL and auth headers.
+The selected adapter builds provider-specific session.update payload.
+Desktop audio routing remains unchanged.
+Loopback/system/browser audio remains the only allowed input source.
+PCM16 24k mono audio path remains unchanged.
+```
+
+Important OpenAI compatibility finding:
+
+```text
+OpenAI Realtime requires session.type = "realtime".
+OpenAI VAD config belongs under session.audio.input.turn_detection.
+OpenAI does not accept Azure-style session.turn_detection.
+```
+
+Important Azure compatibility finding:
+
+```text
+Azure OpenAI Realtime voice-agent endpoint continues to use the existing Azure-compatible session.update shape.
+Azure provider retains Azure voice object with name/type/rate.
+```
+
+Recent provider integration commits:
+
+```text
+Add realtime provider adapter structure
+Add Azure realtime provider adapter
+Use Azure realtime provider adapter in voice runtime
+Select realtime provider from saved config
+Use saved config for Azure realtime provider
+Enable OpenAI realtime provider factory
+Use saved config for OpenAI realtime provider
+Normalize realtime provider error messages
+Add provider-specific realtime session payload handling
+Add adapter-level provider config test
+Add realtime provider network connection test
+```
+
+---
+15. Commercial Direction
 Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
@@ -371,7 +520,7 @@ BYOK privacy/control
 workflow-specific use cases
 ```
 ---
-15. Work Process Rules
+16. Work Process Rules
 For all future project work:
 ```text
 Analyze first
