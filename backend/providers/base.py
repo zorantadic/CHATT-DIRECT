@@ -12,5 +12,5 @@ class RealtimeProviderConnection:
 class RealtimeProviderAdapter:
     provider_id: str
 
-    def build_connection(self) -> RealtimeProviderConnection:
+    def build_connection(self, provider_config: dict[str, Any]) -> RealtimeProviderConnection:
         raise NotImplementedError
