@@ -19,6 +19,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from providers import get_realtime_provider_adapter
+from provider_config import get_active_provider_config
 
 load_dotenv()
 
@@ -384,11 +385,14 @@ async def voice_ws(ws: WebSocket):
      print("[DBG] file realtime default head:", _instructions_cache["realtime"]["default"][:120])
      print("[DBG] file realtime current  head:", _instructions_cache["realtime"]["current"][:120])
 
-    adapter = get_realtime_provider_adapter("azure-openai-realtime")
+    active_provider = get_active_provider_config()
+    provider_id = active_provider["activeProvider"]
+
+    adapter = get_realtime_provider_adapter(provider_id)
     connection = adapter.build_connection()
 
-    if not connection.url or not connection.headers.get("api-key"):
-        await _send_error(ws, "Missing Azure OpenAI Realtime provider configuration")
+    if not connection.url or not connection.headers:
+        await _send_error(ws, f"Missing provider configuration for {provider_id}")
         await ws.close()
         return
 
