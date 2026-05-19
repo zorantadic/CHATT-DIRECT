@@ -38,7 +38,9 @@ class OpenAIRealtimeAdapter(RealtimeProviderAdapter):
             session_update=session_update,
         )
 
-    def build_session_update(self, voice_rate: str, instructions: str) -> dict[str, object]:
+    def build_session_update(self, provider_config: dict[str, object], voice_rate: str, instructions: str) -> dict[str, object]:
+        selected_voice = str(provider_config.get("voice") or "alloy").strip() or "alloy"
+
         return {
             "type": "session.update",
             "session": {
@@ -61,7 +63,7 @@ class OpenAIRealtimeAdapter(RealtimeProviderAdapter):
                             "type": "audio/pcm",
                             "rate": 24000,
                         },
-                        "voice": "alloy",
+                        "voice": selected_voice,
                         "speed": float(voice_rate),
                     },
                 },

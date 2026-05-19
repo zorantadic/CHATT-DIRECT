@@ -61,7 +61,12 @@ class AzureOpenAIRealtimeAdapter(RealtimeProviderAdapter):
             session_update=session_update,
         )
 
-    def build_session_update(self, voice_rate: str, instructions: str) -> dict[str, object]:
+    def build_session_update(self, provider_config: dict[str, object], voice_rate: str, instructions: str) -> dict[str, object]:
+        selected_voice = str(
+            provider_config.get("voice")
+            or "en-US-Ava:DragonHDLatestNeural"
+        ).strip() or "en-US-Ava:DragonHDLatestNeural"
+
         return {
             "type": "session.update",
             "session": {
@@ -74,7 +79,7 @@ class AzureOpenAIRealtimeAdapter(RealtimeProviderAdapter):
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
                 "voice": {
-                    "name": "en-US-Ava:DragonHDLatestNeural",
+                    "name": selected_voice,
                     "type": "azure-standard",
                     "rate": voice_rate,
                 },

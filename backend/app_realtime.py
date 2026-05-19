@@ -424,6 +424,7 @@ async def voice_ws(ws: WebSocket):
             print("[DBG] session.update instructions head:", eff_instructions[:120])
 
         session_update = adapter.build_session_update(
+            provider_config=active_provider["config"],
             voice_rate=voice_rate,
             instructions=eff_instructions,
         )

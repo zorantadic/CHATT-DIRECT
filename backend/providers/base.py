@@ -17,7 +17,7 @@ class RealtimeProviderAdapter:
     def build_connection(self, provider_config: dict[str, Any]) -> RealtimeProviderConnection:
         raise NotImplementedError
 
-    def build_session_update(self, voice_rate: str, instructions: str) -> dict[str, Any]:
+    def build_session_update(self, provider_config: dict[str, Any], voice_rate: str, instructions: str) -> dict[str, Any]:
         raise NotImplementedError
 
     async def test_connection(self, provider_config: dict[str, Any]) -> dict[str, Any]:
