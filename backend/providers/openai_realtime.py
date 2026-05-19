@@ -17,8 +17,9 @@ class OpenAIRealtimeAdapter(RealtimeProviderAdapter):
 
         model = str(
             provider_config.get("model")
-            or os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime-2")
+            or os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime")
         )
+
         url = (
             "wss://api.openai.com/v1/realtime"
             f"?model={model}"
@@ -35,4 +36,34 @@ class OpenAIRealtimeAdapter(RealtimeProviderAdapter):
             headers=headers,
             session_update=session_update,
         )
-    
+
+    def build_session_update(self, voice_rate: str, instructions: str) -> dict[str, object]:
+        return {
+            "type": "session.update",
+            "session": {
+                "type": "realtime",
+                "output_modalities": ["audio"],
+                "audio": {
+                    "input": {
+                        "format": {
+                            "type": "audio/pcm",
+                            "rate": 24000,
+                        },
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "create_response": True,
+                            "interrupt_response": True,
+                        },
+                    },
+                    "output": {
+                        "format": {
+                            "type": "audio/pcm",
+                            "rate": 24000,
+                        },
+                        "voice": "alloy",
+                        "speed": float(voice_rate),
+                    },
+                },
+                "instructions": instructions,
+            },
+        }

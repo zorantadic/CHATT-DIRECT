@@ -59,3 +59,27 @@ class AzureOpenAIRealtimeAdapter(RealtimeProviderAdapter):
             headers=headers,
             session_update=session_update,
         )
+
+    def build_session_update(self, voice_rate: str, instructions: str) -> dict[str, object]:
+        return {
+            "type": "session.update",
+            "session": {
+                "turn_detection": {
+                    "type": "server_vad",
+                    "create_response": True,
+                    "interrupt_response": True,
+                },
+                "modalities": ["audio"],
+                "input_audio_format": "pcm16",
+                "output_audio_format": "pcm16",
+                "voice": {
+                    "name": "en-US-Ava:DragonHDLatestNeural",
+                    "type": "azure-standard",
+                    "rate": voice_rate,
+                },
+                "temperature": 0.8,
+                "instructions": instructions,
+            },
+            
+        }
+    

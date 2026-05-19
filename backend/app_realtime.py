@@ -423,30 +423,11 @@ async def voice_ws(ws: WebSocket):
         if DEBUG:
             print("[DBG] session.update instructions head:", eff_instructions[:120])
 
-        await rws.send(
-            json.dumps(
-                {
-                    "type": "session.update",
-                    "session": {
-                        "turn_detection": {
-                            "type": "server_vad",
-                            "create_response": True,
-                            "interrupt_response": True,
-                        },
-                        "modalities": ["audio"],
-                        "input_audio_format": "pcm16",
-                        "output_audio_format": "pcm16",
-                        "voice": {
-                            "name": "en-US-Ava:DragonHDLatestNeural",
-                            "type": "azure-standard",
-                            "rate": voice_rate,
-                        },
-                        "temperature": 0.8,
-                        "instructions": eff_instructions,
-                    },
-                }
-            )
+        session_update = adapter.build_session_update(
+            voice_rate=voice_rate,
+            instructions=eff_instructions,
         )
+        await rws.send(json.dumps(session_update))
 
     async def append_audio_to_realtime(rws, audio_bytes: bytes):
         if not audio_bytes:
