@@ -468,9 +468,106 @@ git grep -n "speech_server\|50507\|50506\|/stt/ws\|orchestrator\|manual_answers\
 
 Interpret broad grep results carefully. Some terms may appear in dependency hashes or documentation; do not treat a broad grep result as proof of active runtime usage.
 
+
 ---
 
-## 15. Remaining Work
+## 15. Provider Configuration Baseline
+
+Provider configuration is now part of the Direct runtime setup surface, but it does not yet drive the active Realtime runtime session.
+
+Current supported setup providers:
+
+```text
+Azure OpenAI Realtime
+OpenAI Realtime
+```
+
+Runtime rule:
+
+```text
+Only one Realtime voice provider can be active at a time.
+Provider/model/language changes must not be applied while Direct Realtime is running.
+```
+
+Current Desktop Settings tab includes Provider Configuration with:
+
+```text
+Active provider
+Region dropdown for Azure OpenAI Realtime
+Endpoint
+API version
+Deployment / model name
+Voice
+Incoming language
+Outgoing language
+API key
+Test connection
+Save provider
+Reset provider settings placeholder
+```
+
+Current provider backend files:
+
+```text
+backend/provider_capabilities.json
+backend/provider_config.local.example.json
+backend/provider_config.py
+backend/provider_config.local.json   # generated locally and ignored by Git
+```
+
+Current provider backend API endpoints:
+
+```text
+GET  /v1/provider/capabilities
+GET  /v1/provider/config
+POST /v1/provider/config
+GET  /v1/provider/active
+POST /v1/provider/test
+```
+
+Current Test connection behavior:
+
+```text
+Test connection currently performs required-field validation only.
+Example: missing API key returns missing apiKey.
+If required fields are present, it returns Provider test passed.
+It does not yet make a real provider network/API call.
+```
+
+Current local config storage:
+
+```text
+backend/provider_config.local.json
+```
+
+Packaging requirement:
+
+```text
+Before packaged Windows app release, provider settings must be stored in a user-specific app data location, not inside the installed app folder or repository backend folder.
+Target pattern: Electron app.getPath("userData") / Windows AppData.
+```
+
+Language control:
+
+```text
+Incoming language and Outgoing language are explicit Setup settings.
+Default: English incoming, English outgoing.
+Dropdown values must be loaded from the selected provider capability profile.
+Do not guess supported provider languages.
+```
+
+Current minimal capability values:
+
+```text
+Azure region: East US 2
+Voice: alloy
+Incoming language: English
+Outgoing language: English
+```
+
+---
+
+## 16. Remaining Work
 
 Known remaining cleanup is documentation-only unless a new scan proves otherwise:
 
@@ -483,7 +580,7 @@ Runtime cleanup is complete for the currently verified Direct Realtime baseline.
 
 ---
 
-## 16. Commercial Direction
+## 17. Commercial Direction
 
 Preferred commercial packaging model:
 
@@ -505,7 +602,7 @@ workflow-specific use cases
 
 ---
 
-## 17. Work Rules
+## 18. Work Rules
 
 For all future work:
 
