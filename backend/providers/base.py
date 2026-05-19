@@ -1,0 +1,16 @@
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass(frozen=True)
+class RealtimeProviderConnection:
+    url: str
+    headers: dict[str, str]
+    session_update: dict[str, Any]
+
+
+class RealtimeProviderAdapter:
+    provider_id: str
+
+    def build_connection(self) -> RealtimeProviderConnection:
+        raise NotImplementedError
