@@ -418,6 +418,15 @@ async def voice_ws(ws: WebSocket):
             eff_instructions = (_instructions_cache.get("realtime", {}).get("default") or "").strip()
         if not eff_instructions:
             eff_instructions = _default_instructions_fallback()
+
+        outgoing_language = str(active_provider["config"].get("outgoingLanguage") or "").strip()
+        if outgoing_language:
+            eff_instructions = (
+                f"{eff_instructions}\n\n"
+                f"LANGUAGE RULE:\n"
+                f"Always answer in the selected outgoing language code: {outgoing_language}."
+            )
+
         if len(eff_instructions) > MAX_INSTRUCTIONS_LEN:
             eff_instructions = eff_instructions[:MAX_INSTRUCTIONS_LEN]
         if DEBUG:
