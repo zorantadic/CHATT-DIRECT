@@ -17,6 +17,10 @@ Direct Realtime voice
 multi-provider Realtime adapter runtime
 Azure OpenAI Realtime and OpenAI Realtime support
 BYOK provider/API configuration
+capability-driven provider setup
+selected provider voice applied in Realtime session.update
+outgoing language steering through final Realtime instructions
+incoming language planned as transcription language hint
 packaged Windows app
 ```
 Primary value:
@@ -27,6 +31,8 @@ headphones/output-device routing
 clean local setup
 user-owned provider credentials
 real provider connection validation
+capability-driven voice/language/region setup
+multilingual conversation stabilization
 workflow-specific voice assistant use cases
 ```
 ---
@@ -70,6 +76,8 @@ Electron Desktop app
 -> active Realtime provider adapter
 -> Azure OpenAI Realtime or OpenAI Realtime session
 -> provider-specific session.update payload
+-> selected provider voice applied in session.update
+-> outgoing language rule appended to final session instructions
 -> provider VAD/interruption behavior
 -> audio response
 -> Desktop playback pipeline
@@ -227,7 +235,20 @@ Active provider configuration is saved locally in:
 backend/provider_config.local.json
 ```
 
-This generated file is ignored by Git and may contain user-owned provider credentials.
+Provider capability lists are defined in:
+```text
+backend/provider_capabilities.json
+```
+
+Current capability-driven setup includes:
+```text
+Azure OpenAI Realtime regions
+OpenAI/Azure voice lists
+Incoming language list
+Outgoing language list
+```
+
+This generated provider config file is ignored by Git and may contain user-owned provider credentials.
 Do not commit real secrets.
 The Desktop settings currently use only:
 ```text
@@ -354,6 +375,14 @@ Provider-specific session.update payload handling: OK
 OpenAI Realtime session.type and audio.input.turn_detection schema compatibility: OK
 Real provider network connection test for OpenAI Realtime: OK
 Real provider network connection test for Azure OpenAI Realtime: OK
+Expanded provider capability lists for regions, voices, and languages: OK
+Capability-driven Provider Configuration dropdowns: OK
+Provider save/load persistence for selected voice/language/region: OK
+Selected provider voice applied in Realtime session.update: OK
+OpenAI selected voice runtime test: OK
+Azure selected voice runtime test: OK
+Outgoing language rule appended to final Realtime instructions: OK
+Outgoing language runtime behavior test: OK
 ```
 ---
 12. Current Known Good State
@@ -367,6 +396,10 @@ Desktop renderer no longer contains active STT/Orchestrator/Control/Full Pipelin
 backend/speech_server.py and backend/Dockerfile.speech are removed
 Docker/start/stop runtime helpers are reduced to Direct Realtime 50505
 Desktop runtime and voice flow were tested and worked after cleanup
+Provider capability lists are expanded and rendered correctly in Desktop settings
+Provider save/load persistence is confirmed
+Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
+Outgoing language is added to final Realtime instructions and works as language steering
 ```
 ---
 13. Remaining Cleanup Work
@@ -406,6 +439,9 @@ Provider-specific session.update payload handling
 Realtime provider error message normalization
 Adapter-level provider config test
 Real Realtime provider websocket network connection test
+Expanded provider capability lists
+Selected provider voice applied in Realtime session.update
+Outgoing language rule added to final Realtime instructions
 ```
 
 Current supported active providers:
@@ -467,6 +503,8 @@ Current provider runtime behavior:
 /voice/ws reads activeProvider from saved provider config.
 The selected adapter builds provider URL and auth headers.
 The selected adapter builds provider-specific session.update payload.
+Selected provider voice is included in session.update.
+Outgoing language is appended to final Realtime instructions as a language rule.
 Desktop audio routing remains unchanged.
 Loopback/system/browser audio remains the only allowed input source.
 PCM16 24k mono audio path remains unchanged.
@@ -485,6 +523,10 @@ Important Azure compatibility finding:
 ```text
 Azure OpenAI Realtime voice-agent endpoint continues to use the existing Azure-compatible session.update shape.
 Azure provider retains Azure voice object with name/type/rate.
+OpenAI provider uses the selected saved voice in session.audio.output.voice.
+Azure provider uses the selected saved voice as voice.name while preserving type/rate shape.
+Outgoing language is not a separate Realtime API field in this project; it is applied through instructions.
+Incoming language is planned as a transcription language hint to stabilize input language recognition.
 ```
 
 Recent provider integration commits:
@@ -501,10 +543,58 @@ Normalize realtime provider error messages
 Add provider-specific realtime session payload handling
 Add adapter-level provider config test
 Add realtime provider network connection test
+Expand provider capability lists
+Use selected provider voice in realtime session
+Add outgoing language rule to realtime instructions
 ```
 
 ---
-15. Commercial Direction
+15. Language Steering Baseline
+
+Current language design:
+
+```text
+Modern Realtime voice models are multilingual.
+The project problem is not whether the model can speak multiple languages.
+The project problem is stabilizing input language recognition and response language behavior.
+```
+
+Canonical language meanings:
+
+```text
+incomingLanguage
+= transcription language hint
+= tells the model which language to expect in the incoming audio
+= speech recognition guidance, not response language control
+
+outgoingLanguage
+= response language guidance
+= appended to the final session instructions
+= tells the model which language to answer in
+```
+
+Current implemented behavior:
+
+```text
+Outgoing language is appended to effective Realtime instructions before session.update.
+Existing instruction text remains unchanged in the Instruction tab.
+The final session instruction sent to the model is:
+current instruction + outgoing language rule.
+Changing Outgoing language requires Save provider so the backend reads the saved provider config.
+```
+
+Current planned behavior:
+
+```text
+Incoming language should be added as provider-specific transcription language hint.
+Do not treat incomingLanguage as translation mode.
+Do not treat outgoingLanguage as a separate voice-agent API language field unless provider documentation confirms it.
+```
+
+Do not introduce translation endpoint/runtime unless explicitly approved.
+
+---
+16. Commercial Direction
 Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
@@ -520,7 +610,7 @@ BYOK privacy/control
 workflow-specific use cases
 ```
 ---
-16. Work Process Rules
+17. Work Process Rules
 For all future project work:
 ```text
 Analyze first

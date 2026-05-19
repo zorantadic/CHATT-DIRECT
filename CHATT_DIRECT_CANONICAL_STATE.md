@@ -27,6 +27,9 @@ single active backend service
 multi-provider Realtime adapter runtime
 Azure OpenAI Realtime and OpenAI Realtime support
 loopback/system/browser audio input
+selected provider voice in Realtime session.update
+outgoing language steering through final Realtime instructions
+incoming language planned as transcription language hint
 selected headphones/output device playback
 BYOK provider/API configuration
 ```
@@ -59,6 +62,8 @@ Electron Desktop app
 -> active Realtime provider adapter
 -> Azure OpenAI Realtime or OpenAI Realtime session
 -> provider-specific session.update payload
+-> selected provider voice applied in session.update
+-> outgoing language rule appended to effective instructions
 -> provider VAD/interruption behavior
 -> audio response
 -> Desktop playback pipeline
@@ -434,6 +439,14 @@ Azure OpenAI Realtime runtime test: OK
 OpenAI Realtime runtime test: OK
 Provider-specific session.update payload handling: OK
 OpenAI Realtime session schema compatibility: OK
+Expanded provider capability lists for regions, voices, and languages: OK
+Capability-driven Provider Configuration dropdowns: OK
+Provider save/load persistence for selected voice/language/region: OK
+Selected provider voice applied in Realtime session.update: OK
+OpenAI selected voice runtime test: OK
+Azure selected voice runtime test: OK
+Outgoing language rule appended to final Realtime instructions: OK
+Outgoing language runtime behavior test: OK
 Start Direct Realtime: OK
 Stop Direct Realtime: OK
 Reset session while Direct Realtime is running: skipped without closing runtime
@@ -475,6 +488,10 @@ Docker/start/stop runtime helpers are reduced to Direct Realtime 50505
 Desktop runtime and voice flow were tested and worked after cleanup
 OpenAI Realtime runtime worked and produced better natural voice quality during local testing
 Real websocket provider network tests passed for OpenAI and Azure
+Provider capability lists are expanded and rendered correctly in Desktop settings
+Provider save/load persistence is confirmed
+Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
+Outgoing language is added to final Realtime instructions and works as language steering
 ```
 
 Recent provider integration commits:
@@ -483,6 +500,9 @@ Recent provider integration commits:
 Add provider-specific realtime session payload handling
 Add adapter-level provider config test
 Add realtime provider network connection test
+Expand provider capability lists
+Use selected provider voice in realtime session
+Add outgoing language rule to realtime instructions
 ```
 
 Before continuing in a new session, run:
@@ -583,6 +603,8 @@ Current runtime provider behavior:
 /voice/ws reads activeProvider from saved provider config.
 The selected adapter builds provider URL and authentication headers.
 The selected adapter builds provider-specific session.update payload.
+Selected provider voice is included in session.update.
+Outgoing language is appended to effective Realtime instructions before session.update.
 Desktop audio routing remains unchanged.
 Loopback/system/browser audio remains the only allowed input source.
 PCM16 24k mono audio path remains unchanged.
@@ -595,6 +617,10 @@ Azure OpenAI Realtime uses the existing Azure-compatible session.update payload.
 OpenAI Realtime uses session.type = "realtime".
 OpenAI Realtime VAD configuration is under session.audio.input.turn_detection.
 OpenAI Realtime does not accept Azure-style session.turn_detection.
+OpenAI provider uses selected saved voice in session.audio.output.voice.
+Azure provider uses selected saved voice as voice.name while preserving type/rate shape.
+Outgoing language is not sent as a separate voice-agent API field; it is applied through final session instructions.
+Incoming language is planned as provider-specific transcription language hint.
 ```
 
 Current local config storage:
@@ -619,13 +645,49 @@ Dropdown values must be loaded from the selected provider capability profile.
 Do not guess supported provider languages.
 ```
 
-Current minimal capability values:
+Canonical language design:
 
 ```text
-Azure region: East US 2
-Voice: alloy
-Incoming language: English
-Outgoing language: English
+Modern Realtime voice models are multilingual.
+The project problem is stabilizing language behavior, not adding translation mode.
+
+incomingLanguage
+= transcription language hint
+= tells the model which language to expect in incoming audio
+= speech recognition guidance
+
+outgoingLanguage
+= response language guidance
+= appended to final Realtime session instructions
+= tells the model which language to answer in
+```
+
+Implemented outgoing language behavior:
+
+```text
+The editable Instruction tab text is not modified.
+Before session.update, backend creates effective instructions:
+current instruction + LANGUAGE RULE for selected outgoingLanguage.
+Changing Outgoing language requires Save provider.
+Refresh Instructions resends the effective instruction with the saved outgoingLanguage rule.
+```
+
+Planned incoming language behavior:
+
+```text
+Add incomingLanguage to session.update as provider-specific transcription language hint.
+Do not route this through translation mode.
+Do not use microphone input.
+Do not change the loopback/system/browser audio flow.
+```
+
+Current capability values:
+
+```text
+Azure regions: Canada Central, Central US, East US 2, France Central, Sweden Central, South India
+Voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar
+Incoming language: full supported dropdown list from provider_capabilities.json
+Outgoing language: full supported dropdown list from provider_capabilities.json
 ```
 
 Current known provider UX limitation:
