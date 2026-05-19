@@ -9,17 +9,30 @@ from .base import (
 class AzureOpenAIRealtimeAdapter(RealtimeProviderAdapter):
     provider_id = "azure-openai-realtime"
 
-    def build_connection(self) -> RealtimeProviderConnection:
-        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
-        api_key = os.getenv("AZURE_OPENAI_KEY", "")
-        model = os.getenv("AZURE_OPENAI_MODEL", "gpt-realtime-mini")
-        api_version = os.getenv(
-            "AZURE_OPENAI_API_VERSION",
-            "2025-05-01-preview",
+    def build_connection(self, provider_config: dict[str, str]) -> RealtimeProviderConnection:
+        endpoint = str(
+            provider_config.get("endpoint")
+            or os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        ).rstrip("/")
+
+        api_key = str(
+            provider_config.get("apiKey")
+            or os.getenv("AZURE_OPENAI_KEY", "")
         )
-        profile = os.getenv(
-            "AZURE_OPENAI_PROFILE",
-            "byom-azure-openai-realtime",
+
+        model = str(
+            provider_config.get("model")
+            or os.getenv("AZURE_OPENAI_MODEL", "gpt-realtime-1.5")
+        )
+
+        api_version = str(
+            provider_config.get("apiVersion")
+            or os.getenv("AZURE_OPENAI_API_VERSION", "2025-05-01-preview")
+        )
+
+        profile = str(
+            provider_config.get("profile")
+            or os.getenv("AZURE_OPENAI_PROFILE", "byom-azure-openai-realtime")
         )
 
         host = (

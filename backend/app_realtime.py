@@ -389,7 +389,7 @@ async def voice_ws(ws: WebSocket):
     provider_id = active_provider["activeProvider"]
 
     adapter = get_realtime_provider_adapter(provider_id)
-    connection = adapter.build_connection()
+    connection = adapter.build_connection(active_provider["config"])
 
     if not connection.url or not connection.headers:
         await _send_error(ws, f"Missing provider configuration for {provider_id}")
