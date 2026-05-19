@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from providers import get_realtime_provider_adapter
 
 load_dotenv()
 
@@ -383,16 +384,18 @@ async def voice_ws(ws: WebSocket):
      print("[DBG] file realtime default head:", _instructions_cache["realtime"]["default"][:120])
      print("[DBG] file realtime current  head:", _instructions_cache["realtime"]["current"][:120])
 
-    if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_KEY:
-        await _send_error(ws, "Missing AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_KEY")
+    adapter = get_realtime_provider_adapter("azure-openai-realtime")
+    connection = adapter.build_connection()
+
+    if not connection.url or not connection.headers.get("api-key"):
+        await _send_error(ws, "Missing Azure OpenAI Realtime provider configuration")
         await ws.close()
         return
 
     import websockets
 
-    realtime_url = _realtime_ws_url()
-    headers = {"api-key": AZURE_OPENAI_KEY}
-
+    realtime_url = connection.url
+    headers = connection.headers
     if DEBUG:
         print("[realtime] connect url:", realtime_url)
 
