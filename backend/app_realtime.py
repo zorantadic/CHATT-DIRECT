@@ -503,7 +503,18 @@ async def voice_ws(ws: WebSocket):
                         elif t == "error":
                             if DEBUG:
                                 print("[direct-realtime] error", msg)
-                            await safe_send({"type": "error", "message": msg.get("message", "Realtime error"), "raw": msg})
+
+                            error_message = (
+                                msg.get("message")
+                                or msg.get("error", {}).get("message")
+                                or "Realtime error"
+                            )
+
+                            await safe_send({
+                                "type": "error",
+                                "message": error_message,
+                                "raw": msg,
+                            })
                 except Exception:
                     pass
 
