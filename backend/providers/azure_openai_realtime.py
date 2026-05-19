@@ -43,10 +43,8 @@ class AzureOpenAIRealtimeAdapter(RealtimeProviderAdapter):
         )
 
         url = (
-            f"wss://{host}/voice-agent/realtime"
-            f"?api-version={api_version}"
-            f"&model={model}"
-            f"&profile={profile}"
+            f"wss://{host}/openai/v1/realtime"
+            f"?model={model}"
         )
 
         headers = {
@@ -70,21 +68,30 @@ class AzureOpenAIRealtimeAdapter(RealtimeProviderAdapter):
         return {
             "type": "session.update",
             "session": {
-                "turn_detection": {
-                    "type": "server_vad",
-                    "create_response": True,
-                    "interrupt_response": True,
-                },
-                "modalities": ["audio"],
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "voice": {
-                    "name": selected_voice,
-                    "type": "azure-standard",
-                    "rate": voice_rate,
-                },
-                "temperature": 0.8,
+                "type": "realtime",
                 "instructions": instructions,
+                "output_modalities": ["audio"],
+                "audio": {
+                    "input": {
+                        "format": {
+                            "type": "audio/pcm",
+                            "rate": 24000,
+                        },
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "create_response": True,
+                            "interrupt_response": True,
+                        },
+                    },
+                    "output": {
+                        "voice": selected_voice,
+                        "format": {
+                            "type": "audio/pcm",
+                            "rate": 24000,
+                        },
+                        "speed": float(voice_rate),
+                    },
+                },
             },
         }
 

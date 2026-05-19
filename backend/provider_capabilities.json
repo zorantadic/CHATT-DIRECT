@@ -19,7 +19,7 @@
       ],
       "modelLabel": "Deployment / model name",
       "defaultApiVersion": "2025-05-01-preview",
-      "defaultModel": "gpt-realtime-1.5",
+      "defaultModel": "gpt-realtime-2",
       "defaultVoice": "alloy",
       "supportedVoices": [
         "alloy",
