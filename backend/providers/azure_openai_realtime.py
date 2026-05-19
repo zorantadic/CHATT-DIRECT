@@ -80,6 +80,27 @@ class AzureOpenAIRealtimeAdapter(RealtimeProviderAdapter):
                 "temperature": 0.8,
                 "instructions": instructions,
             },
-            
         }
-    
+
+    def test_connection(self, provider_config: dict[str, object]) -> dict[str, object]:
+        connection = self.build_connection(provider_config)
+
+        if not connection.url:
+            return {
+                "ok": False,
+                "message": "Azure OpenAI Realtime URL is missing.",
+            }
+
+        api_key = connection.headers.get("api-key", "")
+        if not api_key:
+            return {
+                "ok": False,
+                "message": "Azure OpenAI API key is missing.",
+            }
+
+        return {
+            "ok": True,
+            "message": "Azure OpenAI Realtime provider config is ready for network validation.",
+            "provider": self.provider_id,
+            "url": connection.url,
+        }

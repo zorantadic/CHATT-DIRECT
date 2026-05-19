@@ -67,3 +67,26 @@ class OpenAIRealtimeAdapter(RealtimeProviderAdapter):
                 "instructions": instructions,
             },
         }
+
+    def test_connection(self, provider_config: dict[str, object]) -> dict[str, object]:
+        connection = self.build_connection(provider_config)
+
+        if not connection.url:
+            return {
+                "ok": False,
+                "message": "OpenAI Realtime URL is missing.",
+            }
+
+        authorization = connection.headers.get("Authorization", "")
+        if not authorization or authorization == "Bearer ":
+            return {
+                "ok": False,
+                "message": "OpenAI API key is missing.",
+            }
+
+        return {
+            "ok": True,
+            "message": "OpenAI Realtime provider config is ready for network validation.",
+            "provider": self.provider_id,
+            "url": connection.url,
+        }

@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any, Dict
 
 from fastapi import HTTPException
+from providers import get_realtime_provider_adapter
 
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -180,9 +181,19 @@ def test_provider_config(config: Dict[str, Any] | None = None) -> Dict[str, Any]
     if provider_caps.get("supportsVoice") and not str(provider_config.get("voice", "")).strip():
         missing.append("voice")
 
+    if missing:
+        return {
+            "ok": False,
+            "activeProvider": active_provider,
+            "missing": missing,
+            "message": "Provider config is incomplete.",
+        }
+
+    adapter = get_realtime_provider_adapter(active_provider)
+    test_result = adapter.test_connection(provider_config)
+
     return {
-        "ok": len(missing) == 0,
         "activeProvider": active_provider,
-        "missing": missing,
-        "message": "Provider config is valid." if not missing else "Provider config is incomplete.",
+        "missing": [],
+        **test_result,
     }

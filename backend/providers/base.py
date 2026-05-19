@@ -17,3 +17,6 @@ class RealtimeProviderAdapter:
 
     def build_session_update(self, voice_rate: str, instructions: str) -> dict[str, Any]:
         raise NotImplementedError
+
+    def test_connection(self, provider_config: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
