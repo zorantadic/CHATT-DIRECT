@@ -38,9 +38,10 @@ PORT = int(os.getenv("PORT", "50505"))
 
 # Flat-file stores
 INSTRUCTIONS_PATH = os.getenv("INSTRUCTIONS_PATH", "instructions.json")
+SCENARIO_PRESETS_PATH = os.getenv("SCENARIO_PRESETS_PATH", "scenario_presets.local.json")
+SCENARIO_PRESETS_DEFAULT_PATH = os.getenv("SCENARIO_PRESETS_DEFAULT_PATH", "scenario_presets.json")
 
 MAX_INSTRUCTIONS_LEN = int(os.getenv("MAX_INSTRUCTIONS_LEN", "8192"))
-
 # Audio format expected by the desktop app events:
 # - Realtime from Azure Realtime is pcm16 @ 24000 Hz
 REALTIME_SAMPLE_RATE = int(os.getenv("REALTIME_SAMPLE_RATE", "24000"))
@@ -202,7 +203,47 @@ def _instructions_snapshot(target: str) -> Dict[str, Any]:
         "source": "file",
     }
 
+def _ensure_scenario_presets_file() -> None:
+    if os.path.exists(SCENARIO_PRESETS_PATH):
+        return
 
+    if not os.path.exists(SCENARIO_PRESETS_DEFAULT_PATH):
+        data = {
+            "version": 1,
+            "defaultScenarioId": "direct_answer",
+            "activeScenarioId": "direct_answer",
+            "scenarios": [],
+        }
+        _atomic_write_json(SCENARIO_PRESETS_PATH, data)
+        return
+
+    default_data = _read_json_file(SCENARIO_PRESETS_DEFAULT_PATH)
+    parent_dir = os.path.dirname(os.path.abspath(SCENARIO_PRESETS_PATH))
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
+    _atomic_write_json(SCENARIO_PRESETS_PATH, default_data)
+
+
+def _load_scenario_presets() -> Dict[str, Any]:
+    _ensure_scenario_presets_file()
+
+    data = _read_json_file(SCENARIO_PRESETS_PATH)
+    scenarios = data.get("scenarios", [])
+    if not isinstance(scenarios, list):
+        scenarios = []
+
+    default_scenario_id = str(data.get("defaultScenarioId", "direct_answer")).strip() or "direct_answer"
+    active_scenario_id = str(data.get("activeScenarioId", default_scenario_id)).strip() or default_scenario_id
+
+    return {
+        "version": data.get("version", 1),
+        "defaultScenarioId": default_scenario_id,
+        "activeScenarioId": active_scenario_id,
+        "scenarios": scenarios,
+        "source": SCENARIO_PRESETS_PATH,
+        "defaultSource": SCENARIO_PRESETS_DEFAULT_PATH,
+    }
 # ----------------------------
 # Startup
 # ----------------------------
@@ -216,6 +257,17 @@ async def _startup():
 # ----------------------------
 # REST APIs
 # ----------------------------
+
+@app.get("/v1/scenarios")
+async def get_scenarios():
+    try:
+        return JSONResponse(_load_scenario_presets())
+    except Exception as e:
+        return JSONResponse(
+            {"error": "SCENARIOS_IO_ERROR", "message": str(e)},
+            status_code=500,
+        )
+
 @app.get("/v1/instructions")
 async def get_instructions(target: str = Query("realtime")):
     try:

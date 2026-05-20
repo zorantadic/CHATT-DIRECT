@@ -80,3 +80,4 @@ cost_foundry.json
 cv.json
 query.json
 Desktop/.electron-userdata/
+backend/scenario_presets.local.json
