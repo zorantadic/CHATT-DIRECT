@@ -643,15 +643,31 @@ const INSTRUCTION_PRESETS = {
   cloud_solution_architect,
   interview_candidate,
 };
+const INSTRUCTION_PRESET_LABELS = {
+  neutral_conversation: "Neutral Conversation",
+  cloud_solution_architect: "Cloud Solution Architect",
+  interview_candidate: "Interview Candidate",
+};
 const DEFAULT_INSTRUCTION_PRESET = "neutral_conversation";
+let scenarioPresetStore = {
+  version: 0,
+  defaultScenarioId: "",
+  activeScenarioId: "",
+  scenarios: [],
+  byId: {},
+  source: "",
+  defaultSource: "",
+};
 
 function isInstructionPresetKey(presetKey) {
   const k = (presetKey || "").toString().trim();
-  return Object.prototype.hasOwnProperty.call(INSTRUCTION_PRESETS, k);
+  return Object.prototype.hasOwnProperty.call(INSTRUCTION_PRESETS, k) || !!getScenarioPresetById(k);
 }
 function normalizeInstructionPresetKey(presetKey) {
   const k = (presetKey || "").toString().trim();
-  return isInstructionPresetKey(k) ? k : DEFAULT_INSTRUCTION_PRESET;
+  if (isInstructionPresetKey(k)) return k;
+  const scenarioDefault = (scenarioPresetStore.activeScenarioId || scenarioPresetStore.defaultScenarioId || "").toString().trim();
+  return scenarioDefault && getScenarioPresetById(scenarioDefault) ? scenarioDefault : DEFAULT_INSTRUCTION_PRESET;
 }
 function normalizeStoredInstructionPresetKey(presetKey) {
   const k = (presetKey || "").toString().trim();
@@ -659,6 +675,9 @@ function normalizeStoredInstructionPresetKey(presetKey) {
 }
 function findInstructionPresetForText(text) {
   const t = (text || "").toString();
+  for (const scenario of scenarioPresetStore.scenarios || []) {
+    if (t === (scenario.instruction || "").toString()) return scenario.id;
+  }
   for (const [key, value] of Object.entries(INSTRUCTION_PRESETS)) {
     if (t === value) return key;
   }
@@ -676,7 +695,91 @@ function setInstructionPreset(presetKey) {
   return key;
 }
 function getInstructionPresetText(presetKey) {
-  return INSTRUCTION_PRESETS[normalizeInstructionPresetKey(presetKey)];
+  const key = normalizeInstructionPresetKey(presetKey);
+  const scenario = getScenarioPresetById(key);
+  return scenario ? scenario.instruction : INSTRUCTION_PRESETS[key];
+}
+function getScenarioPresetById(id) {
+  const key = (id || "").toString().trim();
+  return key ? (scenarioPresetStore.byId[key] || null) : null;
+}
+function normalizeScenarioPreset(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const id = (raw.id || "").toString().trim();
+  const instruction = (raw.instruction || "").toString();
+  if (!id || !instruction.trim()) return null;
+  return {
+    id,
+    name: (raw.name || id).toString(),
+    category: (raw.category || "").toString(),
+    shortDescription: (raw.shortDescription || "").toString(),
+    recommendedUse: (raw.recommendedUse || "").toString(),
+    defaultIncomingLanguage: (raw.defaultIncomingLanguage || "").toString(),
+    defaultOutgoingLanguage: (raw.defaultOutgoingLanguage || "").toString(),
+    instruction,
+  };
+}
+async function fetchScenariosFromBackend() {
+  const c = directRealtimeCfg();
+  const res = await fetch(`${c.REALTIME_HTTP}/v1/scenarios`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const scenarios = Array.isArray(data?.scenarios)
+    ? data.scenarios.map(normalizeScenarioPreset).filter(Boolean)
+    : [];
+  const byId = {};
+  for (const scenario of scenarios) byId[scenario.id] = scenario;
+  scenarioPresetStore = {
+    version: Number(data?.version || 0),
+    defaultScenarioId: (data?.defaultScenarioId || "").toString(),
+    activeScenarioId: (data?.activeScenarioId || "").toString(),
+    scenarios,
+    byId,
+    source: (data?.source || "").toString(),
+    defaultSource: (data?.defaultSource || "").toString(),
+  };
+  return scenarioPresetStore;
+}
+function appendPresetOption(parent, value, label) {
+  if (!parent) return;
+  const opt = document.createElement("option");
+  opt.value = value;
+  opt.textContent = label;
+  parent.appendChild(opt);
+}
+function renderScenarioPresetDropdown() {
+  if (!instructionPresetEl) return;
+  const storedPreset = loadStrLS(LS_INSTRUCTION_PRESET, "");
+  const scenarioDefault = (scenarioPresetStore.activeScenarioId || scenarioPresetStore.defaultScenarioId || "").toString().trim();
+  const previous = (
+    storedPreset ||
+    scenarioDefault ||
+    instructionPresetEl.value ||
+    DEFAULT_INSTRUCTION_PRESET
+  ).toString().trim();
+  instructionPresetEl.innerHTML = "";
+
+  if ((scenarioPresetStore.scenarios || []).length) {
+    const scenarioGroup = document.createElement("optgroup");
+    scenarioGroup.label = "Scenarios";
+    for (const scenario of scenarioPresetStore.scenarios) {
+      appendPresetOption(scenarioGroup, scenario.id, scenario.name || scenario.id);
+    }
+    instructionPresetEl.appendChild(scenarioGroup);
+
+    const legacyGroup = document.createElement("optgroup");
+    legacyGroup.label = "Legacy presets";
+    for (const key of Object.keys(INSTRUCTION_PRESETS)) {
+      appendPresetOption(legacyGroup, key, INSTRUCTION_PRESET_LABELS[key] || key);
+    }
+    instructionPresetEl.appendChild(legacyGroup);
+  } else {
+    for (const key of Object.keys(INSTRUCTION_PRESETS)) {
+      appendPresetOption(instructionPresetEl, key, INSTRUCTION_PRESET_LABELS[key] || key);
+    }
+  }
+
+  instructionPresetEl.value = normalizeInstructionPresetKey(previous);
 }
 function normalizeInstrTarget(_t) {
   return "realtime";
@@ -1047,6 +1150,23 @@ async function resetInstructionsToDefault() {
 async function refreshInstructionsPage() {
   const target = setInstrTarget("realtime");
   if (instrBackendEl) instrBackendEl.textContent = getBackendLabelForTarget(target);
+
+  try {
+    await fetchScenariosFromBackend();
+    renderScenarioPresetDropdown();
+  } catch (e) {
+    scenarioPresetStore = {
+      version: 0,
+      defaultScenarioId: "",
+      activeScenarioId: "",
+      scenarios: [],
+      byId: {},
+      source: "",
+      defaultSource: "",
+    };
+    renderScenarioPresetDropdown();
+    push(`WARN: scenario presets fetch failed: ${e?.message || e}`);
+  }
 
   await loadInstructionStoreEffective({ silent: true });
   applyTargetDocToEditor(target, "Loaded (local)", { silent: true });
