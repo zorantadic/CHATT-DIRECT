@@ -743,6 +743,40 @@ async function fetchScenariosFromBackend() {
   };
   return scenarioPresetStore;
 }
+
+async function saveActiveScenarioToBackend(scenarioId, { silent } = {}) {
+  const id = (scenarioId || "").toString().trim();
+  if (!id || !getScenarioPresetById(id)) {
+    return { ok: false, skipped: true };
+  }
+
+  const c = directRealtimeCfg();
+
+  try {
+    const res = await fetch(`${c.REALTIME_HTTP}/v1/scenarios/active`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ scenarioId: id }),
+    });
+
+    if (!res.ok) {
+      if (!silent) push(`WARN: active scenario save failed (HTTP ${res.status})`);
+      return { ok: false, status: res.status };
+    }
+
+    const data = await res.json();
+    scenarioPresetStore.activeScenarioId = (data?.activeScenarioId || id).toString();
+
+    return { ok: true, status: res.status };
+  } catch (e) {
+    if (!silent) push(`WARN: active scenario save failed: ${e?.message || e}`);
+    return { ok: false, status: 0 };
+  }
+}
+
 function appendPresetOption(parent, value, label) {
   if (!parent) return;
   const opt = document.createElement("option");
@@ -1016,6 +1050,8 @@ async function applyInstructionPresetToEditor(presetKey) {
     localOk = await writeLocalInstructionStore(instructionStore);
     if (!localOk) push("WARN: local preset write failed");
   }
+
+  await saveActiveScenarioToBackend(preset, { silent: true });
 
   const sync = await syncInstructionsToBackend("realtime", current, { silent: true });
   if (instrStatusEl) {
