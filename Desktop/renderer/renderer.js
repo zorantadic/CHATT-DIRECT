@@ -790,15 +790,22 @@ function updateVoiceScenarioUI() {
 
   const id = getInstructionPreset();
   const scenario = getScenarioPresetById(id);
+
   let name = "Not loaded";
   let description = "Scenario behavior is loaded from the Scenarios tab.";
 
   if (scenario) {
     name = scenario.name || scenario.id || name;
     description = scenario.shortDescription || scenario.recommendedUse || description;
-  } else if (Object.prototype.hasOwnProperty.call(INSTRUCTION_PRESETS, id)) {
-    name = INSTRUCTION_PRESET_LABELS[id] || id;
-    description = "Legacy local preset";
+  } else if (id === "neutral_conversation") {
+    name = "Neutral Conversation";
+    description = "General realtime conversation mode.";
+  } else if (id === "cloud_solution_architect") {
+    name = "Cloud Solution Architect";
+    description = "Cloud architecture guidance for live technical conversations.";
+  } else if (id === "interview_candidate") {
+    name = "Interview Candidate";
+    description = "Interview answer coaching for candidate-style responses.";
   }
 
   if (voiceScenarioNameEl) voiceScenarioNameEl.textContent = name;
