@@ -64,7 +64,8 @@ function writeJsonAtomic(filePath, obj) {
   }
 }
 
-const instructionsPath = path.join(userDataDir, "instructions.local.json");
+const instructionsPath = path.join(userDataDir, "instructions.json");
+const legacyInstructionsPath = path.join(userDataDir, "instructions.local.json");
 
 // ---- Instructions local-store helpers ----
 function nowIso() {
@@ -120,6 +121,14 @@ function normalizeInstructionsStore(store) {
 }
 
 function ensureInstructionsFile() {
+  if (!fs.existsSync(instructionsPath) && fs.existsSync(legacyInstructionsPath)) {
+    const legacy = readJsonSafe(legacyInstructionsPath);
+    if (legacy && typeof legacy === "object") {
+      writeJsonAtomic(instructionsPath, normalizeInstructionsStore(legacy));
+      return;
+    }
+  }
+
   const existing = readJsonSafe(instructionsPath);
   if (existing && typeof existing === "object") {
     const normalized = normalizeInstructionsStore(existing);
