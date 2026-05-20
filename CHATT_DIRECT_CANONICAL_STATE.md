@@ -26,6 +26,7 @@ Direct Realtime voice
 single active backend service
 multi-provider Realtime adapter runtime
 Azure OpenAI Realtime and OpenAI Realtime support
+Azure OpenAI Realtime uses gpt-realtime-2 through the OpenAI-compatible /openai/v1/realtime endpoint
 loopback/system/browser audio input
 selected provider voice in Realtime session.update
 outgoing language steering through final Realtime instructions
@@ -61,6 +62,7 @@ Electron Desktop app
 -> backend/app_realtime.py /voice/ws on port 50505
 -> active Realtime provider adapter
 -> Azure OpenAI Realtime or OpenAI Realtime session
+-> Azure provider uses OpenAI-compatible /openai/v1/realtime for gpt-realtime-2
 -> provider-specific session.update payload
 -> selected provider voice applied in session.update
 -> outgoing language rule appended to effective instructions
@@ -224,9 +226,11 @@ Current relevant Direct Realtime template values:
 ```env
 AZURE_OPENAI_ENDPOINT=https://agentfield.cognitiveservices.azure.com
 AZURE_OPENAI_KEY=<your-azure-openai-key>
-AZURE_OPENAI_MODEL=gpt-realtime-1.5
+AZURE_OPENAI_MODEL=gpt-realtime-2
 AZURE_OPENAI_API_VERSION=2025-05-01-preview
 AZURE_OPENAI_PROFILE=byom-azure-openai-realtime
+# AZURE_OPENAI_API_VERSION and AZURE_OPENAI_PROFILE remain present for compatibility/config history;
+# the current Azure gpt-realtime-2 adapter uses /openai/v1/realtime?model=<deployment>.
 OPENAI_API_KEY=<your-openai-key>
 OPENAI_REALTIME_MODEL=gpt-realtime
 REALTIME_SAMPLE_RATE=24000
@@ -445,6 +449,8 @@ Provider save/load persistence for selected voice/language/region: OK
 Selected provider voice applied in Realtime session.update: OK
 OpenAI selected voice runtime test: OK
 Azure selected voice runtime test: OK
+Azure gpt-realtime-2 runtime test through /openai/v1/realtime: OK
+Azure OpenAI-compatible session.update schema: OK
 Outgoing language rule appended to final Realtime instructions: OK
 Outgoing language runtime behavior test: OK
 Start Direct Realtime: OK
@@ -482,6 +488,7 @@ CHATT Direct is a Windows/Electron Direct Realtime voice app
 Backend is Realtime-only on app_realtime.py port 50505
 Backend supports active Realtime provider selection through provider adapters
 Azure OpenAI Realtime and OpenAI Realtime are both validated providers
+Azure OpenAI Realtime is validated on gpt-realtime-2 through /openai/v1/realtime
 Desktop renderer no longer contains active STT/Orchestrator/Control/Full Pipeline runtime paths
 backend/speech_server.py and backend/Dockerfile.speech are removed
 Docker/start/stop runtime helpers are reduced to Direct Realtime 50505
@@ -491,6 +498,7 @@ Real websocket provider network tests passed for OpenAI and Azure
 Provider capability lists are expanded and rendered correctly in Desktop settings
 Provider save/load persistence is confirmed
 Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
+Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
 ```
 
@@ -503,6 +511,7 @@ Add realtime provider network connection test
 Expand provider capability lists
 Use selected provider voice in realtime session
 Add outgoing language rule to realtime instructions
+Migrate Azure realtime provider to gpt-realtime-2
 ```
 
 Before continuing in a new session, run:
@@ -613,13 +622,15 @@ PCM16 24k mono audio path remains unchanged.
 Provider-specific session.update rules:
 
 ```text
-Azure OpenAI Realtime uses the existing Azure-compatible session.update payload.
+Azure OpenAI Realtime now uses the OpenAI-compatible /openai/v1/realtime endpoint for gpt-realtime-2.
+Azure OpenAI Realtime uses session.type = "realtime".
+Azure OpenAI Realtime VAD configuration is under session.audio.input.turn_detection.
 OpenAI Realtime uses session.type = "realtime".
 OpenAI Realtime VAD configuration is under session.audio.input.turn_detection.
 OpenAI Realtime does not accept Azure-style session.turn_detection.
 OpenAI provider uses selected saved voice in session.audio.output.voice.
-Azure provider uses selected saved voice as voice.name while preserving type/rate shape.
-Outgoing language is not sent as a separate voice-agent API field; it is applied through final session instructions.
+Azure provider uses selected saved voice as the OpenAI-compatible audio output voice string.
+Outgoing language is not sent as a separate Realtime API field; it is applied through final session instructions.
 Incoming language is planned as provider-specific transcription language hint.
 ```
 
@@ -684,6 +695,7 @@ Do not change the loopback/system/browser audio flow.
 Current capability values:
 
 ```text
+Azure default model: gpt-realtime-2
 Azure regions: Canada Central, Central US, East US 2, France Central, Sweden Central, South India
 Voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar
 Incoming language: full supported dropdown list from provider_capabilities.json

@@ -1,8 +1,8 @@
 /* global electronAPI */
 (function () {
   const DEFAULTS = {
-    REALTIME_HTTP: "https://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io",
-    REALTIME_WS: "wss://chatt-realtime.ashyglacier-62457361.eastus2.azurecontainerapps.io/voice/ws",
+    REALTIME_HTTP: "http://127.0.0.1:50505",
+    REALTIME_WS: "ws://127.0.0.1:50505/voice/ws",
   };
   const LOCAL_BACKEND_PRESET = {
     REALTIME_HTTP: "http://127.0.0.1:50505",
