@@ -222,6 +222,7 @@ Do not introduce new topics.`;
   const instrUpdatedAtEl = $("instrUpdatedAt");
   const instrStatusEl = $("instrStatus");
   const instructionPresetEl = $("instructionPreset");
+  const scenarioCardsEl = $("scenarioCards");
   const btnInstrLoad = $("btnInstrLoad");
   const btnInstrSave = $("btnInstrSave");
   const btnInstrReset = $("btnInstrReset");
@@ -784,6 +785,61 @@ function appendPresetOption(parent, value, label) {
   opt.textContent = label;
   parent.appendChild(opt);
 }
+function renderScenarioCards() {
+  if (!scenarioCardsEl) return;
+
+  const scenarios = Array.isArray(scenarioPresetStore?.scenarios)
+    ? scenarioPresetStore.scenarios
+    : [];
+
+  scenarioCardsEl.innerHTML = "";
+
+  if (!scenarios.length) {
+    const empty = document.createElement("div");
+    empty.className = "small";
+    empty.textContent = "Scenario cards will load from the backend.";
+    scenarioCardsEl.appendChild(empty);
+    return;
+  }
+
+  const selectedId = getInstructionPreset();
+
+  for (const scenario of scenarios) {
+    const id = (scenario?.id || "").toString().trim();
+    if (!id) continue;
+
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = id === selectedId ? "card scenarioCard active" : "card scenarioCard";
+    card.dataset.scenarioId = id;
+
+    const title = document.createElement("strong");
+    title.textContent = scenario.name || id;
+
+    const description = document.createElement("div");
+    description.className = "small";
+    description.textContent =
+      scenario.shortDescription ||
+      scenario.recommendedUse ||
+      "Scenario behavior is loaded from the backend.";
+
+    const meta = document.createElement("div");
+    meta.className = "small";
+    meta.textContent = scenario.category ? `Category: ${scenario.category}` : "";
+
+    card.appendChild(title);
+    card.appendChild(description);
+    if (meta.textContent) card.appendChild(meta);
+
+    card.addEventListener("click", () => {
+      applyInstructionPresetToEditor(id).catch((e) => {
+        push(`WARN: scenario card apply failed: ${e?.message || e}`);
+      });
+    });
+
+    scenarioCardsEl.appendChild(card);
+  }
+}
 function renderScenarioPresetDropdown() {
   if (!instructionPresetEl) return;
   const storedPreset = loadStrLS(LS_INSTRUCTION_PRESET, "");
@@ -817,6 +873,7 @@ function renderScenarioPresetDropdown() {
   }
 
   instructionPresetEl.value = normalizeInstructionPresetKey(previous);
+  renderScenarioCards();
   updateVoiceScenarioUI();
 }
 function updateVoiceScenarioUI() {
@@ -1043,6 +1100,7 @@ async function applyInstructionPresetToEditor(presetKey) {
   };
 
   applyTargetDocToEditor("realtime", "Preset applied", { silent: true });
+  renderScenarioCards();
   updateVoiceScenarioUI();
 
   let localOk = true;
