@@ -860,12 +860,6 @@ function renderScenarioPresetDropdown() {
     }
     instructionPresetEl.appendChild(scenarioGroup);
 
-    const legacyGroup = document.createElement("optgroup");
-    legacyGroup.label = "Legacy presets";
-    for (const key of Object.keys(INSTRUCTION_PRESETS)) {
-      appendPresetOption(legacyGroup, key, INSTRUCTION_PRESET_LABELS[key] || key);
-    }
-    instructionPresetEl.appendChild(legacyGroup);
   } else {
     for (const key of Object.keys(INSTRUCTION_PRESETS)) {
       appendPresetOption(instructionPresetEl, key, INSTRUCTION_PRESET_LABELS[key] || key);
