@@ -105,6 +105,8 @@ Do not introduce new topics.`;
   // Voice view: instructions preview panel
   const voiceInstrTextEl = $("voiceInstrText");
   const voiceInstrUpdatedAtEl = $("voiceInstrUpdatedAt");
+  const voiceScenarioNameEl = $("voiceScenarioName");
+  const voiceScenarioDescriptionEl = $("voiceScenarioDescription");
   const btnVoiceCopyInstr = $("btnVoiceCopyInstr");
   const btnVoiceOpenInstr = $("btnVoiceOpenInstr");
   function setActiveNav(btn) {
@@ -692,6 +694,7 @@ function setInstructionPreset(presetKey) {
   const key = normalizeInstructionPresetKey(presetKey);
   if (instructionPresetEl) instructionPresetEl.value = key;
   saveStrLS(LS_INSTRUCTION_PRESET, key);
+  updateVoiceScenarioUI();
   return key;
 }
 function getInstructionPresetText(presetKey) {
@@ -780,6 +783,26 @@ function renderScenarioPresetDropdown() {
   }
 
   instructionPresetEl.value = normalizeInstructionPresetKey(previous);
+  updateVoiceScenarioUI();
+}
+function updateVoiceScenarioUI() {
+  if (!voiceScenarioNameEl && !voiceScenarioDescriptionEl) return;
+
+  const id = getInstructionPreset();
+  const scenario = getScenarioPresetById(id);
+  let name = "Not loaded";
+  let description = "Scenario behavior is loaded from the Scenarios tab.";
+
+  if (scenario) {
+    name = scenario.name || scenario.id || name;
+    description = scenario.shortDescription || scenario.recommendedUse || description;
+  } else if (Object.prototype.hasOwnProperty.call(INSTRUCTION_PRESETS, id)) {
+    name = INSTRUCTION_PRESET_LABELS[id] || id;
+    description = "Legacy local preset";
+  }
+
+  if (voiceScenarioNameEl) voiceScenarioNameEl.textContent = name;
+  if (voiceScenarioDescriptionEl) voiceScenarioDescriptionEl.textContent = description;
 }
 function normalizeInstrTarget(_t) {
   return "realtime";
@@ -858,6 +881,7 @@ function getEffectiveInstructionsForEngine() {
 }
 
 function updateVoiceInstructionsUI() {
+  updateVoiceScenarioUI();
   if (!voiceInstrTextEl) return;
   const eff = getEffectiveInstructionsForEngine().trim();
   voiceInstrTextEl.textContent = eff ? eff : "(nije učitano)";
@@ -978,6 +1002,7 @@ async function applyInstructionPresetToEditor(presetKey) {
   };
 
   applyTargetDocToEditor("realtime", "Preset applied", { silent: true });
+  updateVoiceScenarioUI();
 
   let localOk = true;
   if (hasLocalInstructionStore()) {
@@ -1154,6 +1179,7 @@ async function refreshInstructionsPage() {
   try {
     await fetchScenariosFromBackend();
     renderScenarioPresetDropdown();
+    updateVoiceScenarioUI();
   } catch (e) {
     scenarioPresetStore = {
       version: 0,
@@ -1165,6 +1191,7 @@ async function refreshInstructionsPage() {
       defaultSource: "",
     };
     renderScenarioPresetDropdown();
+    updateVoiceScenarioUI();
     push(`WARN: scenario presets fetch failed: ${e?.message || e}`);
   }
 
