@@ -244,6 +244,33 @@ def _load_scenario_presets() -> Dict[str, Any]:
         "source": SCENARIO_PRESETS_PATH,
         "defaultSource": SCENARIO_PRESETS_DEFAULT_PATH,
     }
+
+def _save_active_scenario(scenario_id: Any) -> Dict[str, Any]:
+    requested_id = str(scenario_id or "").strip()
+    if not requested_id:
+        raise ValueError("scenarioId is required")
+
+    _ensure_scenario_presets_file()
+
+    data = _read_json_file(SCENARIO_PRESETS_PATH)
+    scenarios = data.get("scenarios", [])
+    if not isinstance(scenarios, list):
+        scenarios = []
+
+    valid_ids = {
+        str(s.get("id", "")).strip()
+        for s in scenarios
+        if isinstance(s, dict) and str(s.get("id", "")).strip()
+    }
+
+    if requested_id not in valid_ids:
+        raise ValueError(f"unknown scenarioId: {requested_id}")
+
+    data["activeScenarioId"] = requested_id
+    _atomic_write_json(SCENARIO_PRESETS_PATH, data)
+
+    return _load_scenario_presets()
+
 # ----------------------------
 # Startup
 # ----------------------------
@@ -262,6 +289,22 @@ async def _startup():
 async def get_scenarios():
     try:
         return JSONResponse(_load_scenario_presets())
+    except Exception as e:
+        return JSONResponse(
+            {"error": "SCENARIOS_IO_ERROR", "message": str(e)},
+            status_code=500,
+        )
+
+
+@app.post("/v1/scenarios/active")
+async def post_active_scenario(body: Dict[str, Any]):
+    try:
+        return JSONResponse(_save_active_scenario(body.get("scenarioId")))
+    except ValueError as e:
+        return JSONResponse(
+            {"error": "INVALID_SCENARIO", "message": str(e)},
+            status_code=400,
+        )
     except Exception as e:
         return JSONResponse(
             {"error": "SCENARIOS_IO_ERROR", "message": str(e)},
