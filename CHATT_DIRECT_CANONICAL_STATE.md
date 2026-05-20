@@ -812,7 +812,138 @@ Final packaged app direction:
 
 ---
 
-## 17. Remaining Work
+---
+
+## 17. Phase 2 AppData / userData Runtime Plan
+
+Phase 2 objective:
+
+```text
+Move packaged runtime/user state out of the install/backend folder and into Electron userData/AppData.
+```
+
+Canonical packaged app storage rule:
+
+```text
+Install folder = read-only application files and default templates.
+AppData/userData = writable runtime/user files.
+```
+
+Final user data folder:
+
+```text
+<AppData>\CHATT-DIRECT\
+```
+
+Final writable runtime files:
+
+```text
+<AppData>\CHATT-DIRECT\provider_config.local.json
+<AppData>\CHATT-DIRECT\instructions.json
+<AppData>\CHATT-DIRECT\scenario_presets.local.json
+<AppData>\CHATT-DIRECT\logs\
+```
+
+Final read-only install/template files:
+
+```text
+<install>\backend\provider_capabilities.json
+<install>\backend\provider_config.local.example.json
+<install>\backend\scenario_presets.json
+<install>\backend\app_realtime.py
+<install>\backend\providers\
+```
+
+Backend must receive explicit paths from Electron in packaged runtime:
+
+```env
+PROVIDER_CONFIG_PATH=<AppData>\CHATT-DIRECT\provider_config.local.json
+INSTRUCTIONS_PATH=<AppData>\CHATT-DIRECT\instructions.json
+SCENARIO_PRESETS_PATH=<AppData>\CHATT-DIRECT\scenario_presets.local.json
+PROVIDER_CAPABILITIES_PATH=<install>\backend\provider_capabilities.json
+PROVIDER_CONFIG_EXAMPLE_PATH=<install>\backend\provider_config.local.example.json
+SCENARIO_PRESETS_DEFAULT_PATH=<install>\backend\scenario_presets.json
+PORT=50505
+```
+
+Electron main process responsibilities for Phase 2:
+
+```text
+Use app.getPath("userData") as the root user data location.
+Create the CHATT-DIRECT user runtime folder if needed.
+Seed or migrate runtime files before backend startup.
+Start the backend as a child process with explicit env path variables.
+Keep backend stdout/stderr available for diagnostics/logging.
+Stop backend when Desktop exits.
+```
+
+First-run seed/migration rules:
+
+```text
+provider_config.local.json:
+  Create from provider_config.local.example.json if missing, or let backend fallback create equivalent initial state.
+
+instructions.json:
+  Use the existing instruction default/preset behavior.
+  If an older Electron instructions.local.json exists and instructions.json does not, migrate or normalize it.
+
+scenario_presets.local.json:
+  If missing, seed from install/backend/scenario_presets.json.
+  Never overwrite an existing user scenario file on app update.
+```
+
+Phase 2 must preserve existing runtime behavior:
+
+```text
+Desktop still connects to http://127.0.0.1:50505 and ws://127.0.0.1:50505/voice/ws.
+Loopback/system/browser audio remains the only input source.
+Microphone input remains forbidden.
+Provider runtime selection remains backend/provider adapter owned.
+Outgoing language remains instruction-level steering.
+Incoming language remains planned as transcription language hint.
+Scenario selection remains instruction behavior selection.
+```
+
+Phase 2 must not change:
+
+```text
+provider adapter Realtime schemas
+audio capture/playback pipeline
+instruction refresh WebSocket message shape
+scenario API shape unless explicitly approved
+manual/STT/TTS/Orchestrator/Agent1 legacy paths
+```
+
+Phase 2 validation commands:
+
+```powershell
+cd C:\Projects\chatt-direct
+node --check .\Desktop\electron\main.cjs
+node --check .\Desktop\electron\preload.cjs
+node --check .\Desktop\renderer\renderer.js
+python -m py_compile backend/app_realtime.py backend/provider_config.py
+git status --short
+git diff --name-status
+git diff --stat
+```
+
+Phase 2 runtime validation:
+
+```text
+Desktop starts backend or gives a clear backend startup error.
+Provider config API works through localhost.
+Instructions API works through localhost.
+Scenarios API works through localhost.
+Provider save writes to AppData.
+Instruction save writes to AppData.
+Scenario local runtime file is created in AppData if missing.
+Start Direct Realtime still works.
+Stop Direct Realtime still works.
+Reset session guard still works.
+```
+
+
+## 18. Remaining Work
 
 Known remaining cleanup is documentation-only unless a new scan proves otherwise:
 
@@ -825,7 +956,7 @@ Runtime cleanup is complete for the currently verified Direct Realtime baseline.
 
 ---
 
-## 18. Commercial Direction
+## 19. Commercial Direction
 
 Preferred commercial packaging model:
 
@@ -847,7 +978,7 @@ workflow-specific use cases
 
 ---
 
-## 19. Work Rules
+## 20. Work Rules
 
 For all future work:
 
@@ -869,4 +1000,3 @@ Run git status --short after Codex
 Inspect git diff --name-status and git diff --stat
 Do not commit unreviewed runtime-generated changes
 Restore accidental runtime changes before commit
-```

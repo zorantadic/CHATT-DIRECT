@@ -718,7 +718,137 @@ change Realtime session behavior because of scenarios
 ```
 
 ---
-17. Commercial Direction
+17. Phase 2 AppData / userData Runtime Plan
+
+Phase 2 objective:
+
+```text
+Prepare CHATT-DIRECT for packaged Windows app behavior where installed application files are read-only and all user/runtime files are stored under the user profile.
+```
+
+Canonical storage rule:
+
+```text
+Install folder = static application code and read-only templates
+AppData/userData = writable user/runtime state
+```
+
+Final packaged runtime user folder:
+
+```text
+<AppData>\CHATT-DIRECT\
+```
+
+Final user/runtime files:
+
+```text
+<AppData>\CHATT-DIRECT\provider_config.local.json
+<AppData>\CHATT-DIRECT\instructions.json
+<AppData>\CHATT-DIRECT\scenario_presets.local.json
+<AppData>\CHATT-DIRECT\logs\
+```
+
+Static install/backend files:
+
+```text
+<install>\backend\provider_capabilities.json
+<install>\backend\provider_config.local.example.json
+<install>\backend\scenario_presets.json
+<install>\backend\app_realtime.py
+<install>\backend\providers\
+```
+
+Required backend path variables for packaged runtime:
+
+```env
+PROVIDER_CONFIG_PATH=<AppData>\CHATT-DIRECT\provider_config.local.json
+INSTRUCTIONS_PATH=<AppData>\CHATT-DIRECT\instructions.json
+SCENARIO_PRESETS_PATH=<AppData>\CHATT-DIRECT\scenario_presets.local.json
+PROVIDER_CAPABILITIES_PATH=<install>\backend\provider_capabilities.json
+PROVIDER_CONFIG_EXAMPLE_PATH=<install>\backend\provider_config.local.example.json
+SCENARIO_PRESETS_DEFAULT_PATH=<install>\backend\scenario_presets.json
+PORT=50505
+```
+
+Phase 2 implementation direction:
+
+```text
+Electron main process owns app.getPath("userData").
+Electron main process creates the CHATT-DIRECT user data folder.
+Electron main process seeds or migrates required user/runtime files when missing.
+Electron main process starts the backend child process with explicit env path variables.
+Renderer continues to use localhost endpoints.
+Backend continues to own provider, instruction, scenario, and Realtime APIs.
+```
+
+First-run behavior:
+
+```text
+If provider_config.local.json does not exist in AppData:
+  seed from provider_config.local.example.json or allow backend fallback to template.
+
+If instructions.json does not exist in AppData:
+  seed from current instruction default logic or migrate existing Electron local instruction store.
+
+If scenario_presets.local.json does not exist in AppData:
+  seed from install/backend/scenario_presets.json.
+
+Do not overwrite existing AppData files on application update.
+```
+
+Important risk to resolve in Phase 2:
+
+```text
+The current local/dev app can have two instruction stores:
+- Electron local instruction store
+- backend instructions.json
+
+Phase 2 must unify final packaged runtime around:
+<AppData>\CHATT-DIRECT\instructions.json
+```
+
+Phase 2 must not change:
+
+```text
+loopback/system/browser audio capture
+microphone prohibition
+provider adapter behavior
+Realtime WebSocket path
+selected output/headphones playback
+instruction refresh WebSocket message shape
+scenario behavior model
+outgoing language rule behavior
+incoming language plan
+```
+
+Phase 2 validation requirements:
+
+```powershell
+cd C:\Projects\chatt-direct
+node --check .\Desktop\electron\main.cjs
+node --check .\Desktop\electron\preload.cjs
+node --check .\Desktop\renderer\renderer.js
+python -m py_compile backend/app_realtime.py backend/provider_config.py
+git status --short
+git diff --name-status
+git diff --stat
+```
+
+Runtime validation:
+
+```text
+Desktop starts backend or reports a clear backend startup failure.
+GET /v1/provider/config works through localhost.
+GET /v1/instructions works through localhost.
+GET /v1/scenarios works through localhost.
+Provider save persists to AppData.
+Instruction save persists to AppData.
+Scenario local file is created in AppData if missing.
+Start Direct Realtime still works with loopback/system audio only.
+```
+
+---
+18. Commercial Direction
 Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
@@ -734,7 +864,7 @@ BYOK privacy/control
 workflow-specific use cases
 ```
 ---
-18. Work Process Rules
+19. Work Process Rules
 For all future project work:
 ```text
 Analyze first
@@ -752,4 +882,4 @@ Run git status --short after Codex
 Inspect git diff --name-status and git diff --stat
 Do not commit unreviewed runtime-generated changes
 Restore accidental runtime changes before commit
-````
+`````
