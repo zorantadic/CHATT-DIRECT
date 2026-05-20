@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -35,6 +35,9 @@ real provider connection validation
 capability-driven voice/language/region setup
 multilingual conversation stabilization
 workflow-specific voice assistant use cases
+scenario preset based behavior selection
+Scenarios tab with one-click assistant behavior selection
+Voice page selected scenario visibility
 ```
 ---
 2. Canonical File Roles
@@ -124,6 +127,8 @@ backend/instructions.json
 backend/provider_capabilities.json
 backend/provider_config.py
 backend/provider_config.local.example.json
+backend/scenario_presets.json
+backend/scenario_presets.local.json   # generated locally and ignored by Git
 backend/providers/base.py
 backend/providers/__init__.py
 backend/providers/azure_openai_realtime.py
@@ -230,6 +235,8 @@ REALTIME_SAMPLE_RATE=24000
 AUDIO_CHANNELS=1
 INSTRUCTIONS_PATH=instructions.json
 MAX_INSTRUCTIONS_LEN=8192
+SCENARIO_PRESETS_PATH=scenario_presets.local.json
+SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
 PORT=50505
 DEBUG=false
 ```
@@ -262,7 +269,7 @@ Realtime WS
 Realtime rate
 Playback volume
 Output device
-Instruction controls
+Scenario & Instructions controls
 ```
 There are no active Desktop settings for:
 ```text
@@ -302,7 +309,8 @@ Realtime rate selector
 Realtime playback volume slider
 Selected output/headphones routing
 Listening/Speaking indicators
-Instruction preset selector/editor
+Scenario preset selector/editor
+Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
 Barge-in/interruption behavior
@@ -390,6 +398,10 @@ Azure gpt-realtime-2 runtime test through /openai/v1/realtime: OK
 Azure OpenAI-compatible session.update schema: OK
 Outgoing language rule appended to final Realtime instructions: OK
 Outgoing language runtime behavior test: OK
+Scenario presets backend API: OK
+Scenario first-run local seed from default template: OK
+Desktop Scenarios tab loads backend scenario presets: OK
+Voice page displays selected scenario: OK
 ```
 ---
 12. Current Known Good State
@@ -409,6 +421,9 @@ Provider save/load persistence is confirmed
 Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
+Scenario preset foundation is implemented through backend/scenario_presets.json and GET /v1/scenarios
+Desktop Scenarios tab loads backend scenario presets and falls back to legacy local presets
+Voice page displays the selected scenario name and behavior description
 ```
 ---
 13. Remaining Cleanup Work
@@ -605,7 +620,105 @@ Do not treat outgoingLanguage as a separate Realtime API language field unless p
 Do not introduce translation endpoint/runtime unless explicitly approved.
 
 ---
-16. Commercial Direction
+16. Scenario Presets Baseline
+
+Scenario presets are now part of the product direction.
+
+Current scenario preset architecture:
+
+```text
+install default file = read-only built-in template
+runtime local file = user-editable scenario state
+```
+
+Current default scenario template file:
+
+```text
+backend/scenario_presets.json
+```
+
+Current local runtime scenario file for Phase 1 local/dev:
+
+```text
+backend/scenario_presets.local.json
+```
+
+The local runtime file is generated/seeded on first use and ignored by Git.
+
+Current backend scenario environment variables:
+
+```env
+SCENARIO_PRESETS_PATH=scenario_presets.local.json
+SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
+```
+
+Current backend scenario API:
+
+```text
+GET /v1/scenarios
+```
+
+Current behavior:
+
+```text
+Backend reads SCENARIO_PRESETS_PATH.
+If SCENARIO_PRESETS_PATH does not exist, backend seeds it from SCENARIO_PRESETS_DEFAULT_PATH.
+Backend does not overwrite the local scenario file once it exists.
+Desktop Scenarios UI loads backend scenarios from GET /v1/scenarios.
+Scenario dropdown selection loads the selected scenario instruction into the existing instruction editor.
+Voice page displays the selected scenario name and behavior description.
+Existing Save / Reset / Refresh Instructions behavior remains unchanged.
+```
+
+Implemented default scenarios include:
+
+```text
+Direct Answer
+Candidate Coach
+Interviewer Evaluator
+Meeting Advisor
+Translator + Coach
+Technical Consultant
+Sales Objection Handler
+Support Troubleshooter
+Compliance / Risk Monitor
+Trainer Mode
+```
+
+Current Desktop UI direction:
+
+```text
+Instructions tab is renamed to Scenarios.
+Page title is Scenario & Instructions.
+Existing instruction editor remains the editing surface.
+Scenario preset dropdown is populated from backend scenarios when available.
+Legacy hardcoded presets remain as fallback.
+Voice page shows Selected Scenario and Scenario behavior.
+```
+
+Final packaged app direction:
+
+```text
+<install>\backend\scenario_presets.json = read-only default templates
+<AppData>\CHATT-DIRECT\scenario_presets.local.json = user-editable runtime scenario file
+<AppData>\CHATT-DIRECT\instructions.json = user-editable active instructions file
+<AppData>\CHATT-DIRECT\provider_config.local.json = user provider configuration
+<AppData>\CHATT-DIRECT\logs\ = runtime logs
+```
+
+Do not:
+
+```text
+write to install default scenario file at runtime
+overwrite user local scenario file during app update
+mix scenario runtime state with provider config
+change audio flow because of scenarios
+change provider runtime because of scenarios
+change Realtime session behavior because of scenarios
+```
+
+---
+17. Commercial Direction
 Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
@@ -621,7 +734,7 @@ BYOK privacy/control
 workflow-specific use cases
 ```
 ---
-17. Work Process Rules
+18. Work Process Rules
 For all future project work:
 ```text
 Analyze first

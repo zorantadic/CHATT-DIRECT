@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -33,6 +33,9 @@ outgoing language steering through final Realtime instructions
 incoming language planned as transcription language hint
 selected headphones/output device playback
 BYOK provider/API configuration
+scenario preset based behavior selection
+Scenarios tab with one-click assistant behavior selection
+Voice page selected scenario visibility
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -197,6 +200,7 @@ session state
 loopback/system audio capture
 Realtime start/stop controls
 instruction UI
+scenario selection/display
 Realtime rate selection
 playback pipeline
 playback volume
@@ -237,6 +241,8 @@ REALTIME_SAMPLE_RATE=24000
 AUDIO_CHANNELS=1
 INSTRUCTIONS_PATH=instructions.json
 MAX_INSTRUCTIONS_LEN=8192
+SCENARIO_PRESETS_PATH=scenario_presets.local.json
+SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
 PORT=50505
 DEBUG=false
 ```
@@ -286,6 +292,8 @@ backend/instructions.json
 backend/provider_capabilities.json
 backend/provider_config.py
 backend/provider_config.local.example.json
+backend/scenario_presets.json
+backend/scenario_presets.local.json   # generated locally and ignored by Git
 backend/providers/base.py
 backend/providers/__init__.py
 backend/providers/azure_openai_realtime.py
@@ -353,7 +361,8 @@ Realtime rate selector
 Realtime playback volume slider
 Selected output/headphones routing
 Listening/Speaking indicators
-Instruction preset selector/editor
+Scenario preset selector/editor
+Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
 Barge-in/interruption behavior
@@ -458,6 +467,10 @@ Stop Direct Realtime: OK
 Reset session while Direct Realtime is running: skipped without closing runtime
 Reset session after Stop: creates a new session
 Direct Realtime worked normally after final cleanup
+Scenario presets backend API: OK
+Scenario first-run local seed from default template: OK
+Desktop Scenarios tab loads backend scenario presets: OK
+Voice page displays selected scenario: OK
 ```
 
 Before committing runtime changes, always run at minimum:
@@ -500,6 +513,9 @@ Provider save/load persistence is confirmed
 Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
+Scenario preset foundation is implemented through backend/scenario_presets.json and GET /v1/scenarios
+Desktop Scenarios tab loads backend scenario presets and falls back to legacy local presets
+Voice page displays the selected scenario name and behavior description
 ```
 
 Recent provider integration commits:
@@ -711,7 +727,92 @@ The backend API returns the detailed provider/network message.
 
 ---
 
-## 16. Remaining Work
+---
+
+## 16. Scenario Presets Runtime Baseline
+
+Scenario presets are now supported as a Direct Realtime behavior selection layer.
+
+Current backend scenario files:
+
+```text
+backend/scenario_presets.json
+backend/scenario_presets.local.json   # generated locally and ignored by Git
+```
+
+Current scenario path variables:
+
+```env
+SCENARIO_PRESETS_PATH=scenario_presets.local.json
+SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
+```
+
+Current scenario API:
+
+```text
+GET /v1/scenarios
+```
+
+Current first-run behavior:
+
+```text
+If SCENARIO_PRESETS_PATH does not exist, backend seeds/copies from SCENARIO_PRESETS_DEFAULT_PATH.
+After the local file exists, backend reads the local file for runtime scenario state.
+The local file is not committed.
+The install/default file is treated as read-only template content.
+```
+
+Current Desktop behavior:
+
+```text
+Scenarios tab loads GET /v1/scenarios.
+Scenario dropdown displays backend scenario presets when available.
+Legacy hardcoded presets remain fallback.
+Selecting a scenario loads scenario.instruction into the existing instruction editor.
+Voice page displays the selected scenario name and scenario behavior.
+Save / Reset / Refresh Instructions behavior remains unchanged.
+Refresh Instructions still sends the current backend instruction state to the active Realtime session.
+```
+
+Current implemented default scenarios include:
+
+```text
+Direct Answer
+Candidate Coach
+Interviewer Evaluator
+Meeting Advisor
+Translator + Coach
+Technical Consultant
+Sales Objection Handler
+Support Troubleshooter
+Compliance / Risk Monitor
+Trainer Mode
+```
+
+This scenario layer must not change:
+
+```text
+loopback/system/browser audio input
+selected headphones/output-device playback
+provider runtime selection
+Realtime provider adapter behavior
+Realtime WebSocket path
+instruction refresh WebSocket message shape
+```
+
+Final packaged app direction:
+
+```text
+<install>\backend\scenario_presets.json
+<AppData>\CHATT-DIRECT\scenario_presets.local.json
+<AppData>\CHATT-DIRECT\instructions.json
+<AppData>\CHATT-DIRECT\provider_config.local.json
+<AppData>\CHATT-DIRECT\logs\
+```
+
+---
+
+## 17. Remaining Work
 
 Known remaining cleanup is documentation-only unless a new scan proves otherwise:
 
@@ -724,7 +825,7 @@ Runtime cleanup is complete for the currently verified Direct Realtime baseline.
 
 ---
 
-## 17. Commercial Direction
+## 18. Commercial Direction
 
 Preferred commercial packaging model:
 
@@ -746,7 +847,7 @@ workflow-specific use cases
 
 ---
 
-## 18. Work Rules
+## 19. Work Rules
 
 For all future work:
 
