@@ -1794,6 +1794,8 @@ if (btnInstrRefresh) {
   let directAudioChunks = [];
   let directAudioBytes = 0;
   let directFramePending = [];
+  let directSessionStartedAt = 0;
+  let directLastSpeechStartedAt = 0;
   const DIRECT_PCM_CHUNK_BYTES = 960; // 20ms @ 24kHz mono PCM16
   const DIRECT_FRAME_PENDING_LIMIT = 80;
   async function getLoopbackStream() {
@@ -1900,6 +1902,8 @@ if (btnInstrRefresh) {
     }
 
     directRealtimeStarting = true;
+    directSessionStartedAt = Date.now();
+    directLastSpeechStartedAt = directSessionStartedAt;
     setDirectStatusOn(false, "DIRECT: STARTING");
     refreshButtons();
 
