@@ -95,7 +95,7 @@
     <div class="nav">
       <button id="navVoice" type="button" class="active">Voice</button>
       <button id="navSettings" type="button">Settings</button>
-      <button id="navInstructions" type="button">Instructions</button>
+      <button id="navInstructions" type="button">Scenarios</button>
     </div>
 
     <!-- ===========================
@@ -299,10 +299,10 @@
          =========================== -->
     <div id="viewInstructions" class="view">
       <div class="box">
-        <h3>Instructions</h3>
+        <h3>Scenario & Instructions</h3>
 
         <div class="row">
-          <label>Instruction Preset</label>
+          <label>Scenario Preset</label>
           <select id="instructionPreset">
             <option value="neutral_conversation">Neutral Conversation</option>
             <option value="cloud_solution_architect">Cloud Solution Architect</option>
@@ -311,7 +311,7 @@
         </div>
 
         <div class="small">
-          Selected preset is applied as the full Realtime session instructions when the Direct Realtime session starts.
+          Selected scenario defines the assistant role and behavior for the Direct Realtime session.
         </div>
 
         <div class="small" style="margin-top:6px;">
@@ -320,7 +320,7 @@
 
         <h3>Edit Instructions</h3>
         <div class="small">
-          Edit the active instruction text for the selected preset. Click Save to keep manual changes.
+          Edit the active instruction text for the selected scenario. Click Save to keep manual changes.
         </div>
         <textarea id="instrCurrent" rows="18" class="mono"></textarea>
 
@@ -330,7 +330,7 @@
 
         <div class="row">
           <button id="btnInstrSave" type="button">Save</button>
-          <button id="btnInstrReset" type="button">Reset to preset default</button>
+          <button id="btnInstrReset" type="button">Reset to scenario default</button>
           <span id="instrStatus" class="small"></span>
         </div>
 
