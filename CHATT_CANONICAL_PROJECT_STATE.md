@@ -37,6 +37,7 @@ multilingual conversation stabilization
 workflow-specific voice assistant use cases
 scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
+clickable scenario cards with selected-state styling
 Voice page selected scenario visibility
 ```
 ---
@@ -310,6 +311,7 @@ Realtime playback volume slider
 Selected output/headphones routing
 Listening/Speaking indicators
 Scenario preset selector/editor
+Clickable scenario cards with selected-state styling
 Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
@@ -399,9 +401,12 @@ Azure OpenAI-compatible session.update schema: OK
 Outgoing language rule appended to final Realtime instructions: OK
 Outgoing language runtime behavior test: OK
 Scenario presets backend API: OK
+Scenario active selection persistence: OK
 Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
+Desktop UI renders clickable backend scenario cards: OK
 Voice page displays selected scenario: OK
+Legacy dropdown presets hidden when backend scenarios are available: OK
 ```
 ---
 12. Current Known Good State
@@ -421,8 +426,8 @@ Provider save/load persistence is confirmed
 Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
-Scenario preset foundation is implemented through backend/scenario_presets.json and GET /v1/scenarios
-Desktop Scenarios tab loads backend scenario presets and falls back to legacy local presets
+Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, and POST /v1/scenarios/active
+Desktop Scenarios tab loads backend scenario presets, renders clickable scenario cards, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 ```
 ---
@@ -655,7 +660,8 @@ SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
 Current backend scenario API:
 
 ```text
-GET /v1/scenarios
+GET  /v1/scenarios
+POST /v1/scenarios/active
 ```
 
 Current behavior:
@@ -665,7 +671,9 @@ Backend reads SCENARIO_PRESETS_PATH.
 If SCENARIO_PRESETS_PATH does not exist, backend seeds it from SCENARIO_PRESETS_DEFAULT_PATH.
 Backend does not overwrite the local scenario file once it exists.
 Desktop Scenarios UI loads backend scenarios from GET /v1/scenarios.
-Scenario dropdown selection loads the selected scenario instruction into the existing instruction editor.
+Desktop Scenarios UI renders clickable backend scenario cards.
+Selecting a scenario card or dropdown item loads the selected scenario instruction into the existing instruction editor.
+Desktop calls POST /v1/scenarios/active to persist activeScenarioId in the local scenario runtime state.
 Voice page displays the selected scenario name and behavior description.
 Existing Save / Reset / Refresh Instructions behavior remains unchanged.
 ```
@@ -683,6 +691,8 @@ Sales Objection Handler
 Support Troubleshooter
 Compliance / Risk Monitor
 Trainer Mode
+Cloud Architecture Advisor
+Interview Answer Mode
 ```
 
 Current Desktop UI direction:
@@ -691,8 +701,9 @@ Current Desktop UI direction:
 Instructions tab is renamed to Scenarios.
 Page title is Scenario & Instructions.
 Existing instruction editor remains the editing surface.
+Scenario cards are populated from backend scenarios when available.
 Scenario preset dropdown is populated from backend scenarios when available.
-Legacy hardcoded presets remain as fallback.
+Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
 Voice page shows Selected Scenario and Scenario behavior.
 ```
 
@@ -715,6 +726,14 @@ mix scenario runtime state with provider config
 change audio flow because of scenarios
 change provider runtime because of scenarios
 change Realtime session behavior because of scenarios
+```
+
+Prompt migration rule:
+
+```text
+Cloud Architecture Advisor and Interview Answer Mode were migrated from legacy renderer prompts.
+Their instruction text must be treated as preserved prompt-engineering work.
+Do not rewrite those scenario instructions unless explicitly approved.
 ```
 
 ---

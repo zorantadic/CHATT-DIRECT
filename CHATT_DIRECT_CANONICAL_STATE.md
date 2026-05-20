@@ -35,6 +35,7 @@ selected headphones/output device playback
 BYOK provider/API configuration
 scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
+clickable scenario cards with selected-state styling
 Voice page selected scenario visibility
 ```
 
@@ -201,6 +202,7 @@ loopback/system audio capture
 Realtime start/stop controls
 instruction UI
 scenario selection/display
+clickable scenario cards
 Realtime rate selection
 playback pipeline
 playback volume
@@ -362,6 +364,7 @@ Realtime playback volume slider
 Selected output/headphones routing
 Listening/Speaking indicators
 Scenario preset selector/editor
+Clickable scenario cards with selected-state styling
 Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
@@ -468,9 +471,12 @@ Reset session while Direct Realtime is running: skipped without closing runtime
 Reset session after Stop: creates a new session
 Direct Realtime worked normally after final cleanup
 Scenario presets backend API: OK
+Scenario active selection persistence: OK
 Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
+Desktop UI renders clickable backend scenario cards: OK
 Voice page displays selected scenario: OK
+Legacy dropdown presets hidden when backend scenarios are available: OK
 ```
 
 Before committing runtime changes, always run at minimum:
@@ -513,8 +519,8 @@ Provider save/load persistence is confirmed
 Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
-Scenario preset foundation is implemented through backend/scenario_presets.json and GET /v1/scenarios
-Desktop Scenarios tab loads backend scenario presets and falls back to legacy local presets
+Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, and POST /v1/scenarios/active
+Desktop Scenarios tab loads backend scenario presets, renders clickable scenario cards, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 ```
 
@@ -750,7 +756,8 @@ SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
 Current scenario API:
 
 ```text
-GET /v1/scenarios
+GET  /v1/scenarios
+POST /v1/scenarios/active
 ```
 
 Current first-run behavior:
@@ -766,9 +773,11 @@ Current Desktop behavior:
 
 ```text
 Scenarios tab loads GET /v1/scenarios.
+Scenario cards display backend scenario presets when available.
 Scenario dropdown displays backend scenario presets when available.
-Legacy hardcoded presets remain fallback.
-Selecting a scenario loads scenario.instruction into the existing instruction editor.
+Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
+Selecting a scenario card or dropdown item loads scenario.instruction into the existing instruction editor.
+Desktop calls POST /v1/scenarios/active to persist activeScenarioId in the local scenario runtime state.
 Voice page displays the selected scenario name and scenario behavior.
 Save / Reset / Refresh Instructions behavior remains unchanged.
 Refresh Instructions still sends the current backend instruction state to the active Realtime session.
@@ -787,6 +796,8 @@ Sales Objection Handler
 Support Troubleshooter
 Compliance / Risk Monitor
 Trainer Mode
+Cloud Architecture Advisor
+Interview Answer Mode
 ```
 
 This scenario layer must not change:
@@ -798,6 +809,14 @@ provider runtime selection
 Realtime provider adapter behavior
 Realtime WebSocket path
 instruction refresh WebSocket message shape
+```
+
+Prompt migration rule:
+
+```text
+Cloud Architecture Advisor and Interview Answer Mode were migrated from legacy renderer prompts.
+Their instruction text must be treated as preserved prompt-engineering work.
+Do not rewrite those scenario instructions unless explicitly approved.
 ```
 
 Final packaged app direction:
