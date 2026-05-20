@@ -227,6 +227,7 @@ Do not introduce new topics.`;
   const btnInstrSave = $("btnInstrSave");
   const btnInstrReset = $("btnInstrReset");
   const btnInstrRefresh = $("btnInstrRefresh");
+  const btnRepeatLastAnswer = $("btnRepeatLastAnswer");
   const instrTargetEl = $("instrTarget");
 
   // Playback pipeline (Realtime) routed to rtOutEl via MediaStreamDestination
@@ -1312,6 +1313,24 @@ if (instructionPresetEl) {
 }
 if (btnInstrSave) btnInstrSave.addEventListener("click", () => saveInstructionsToBackend().catch(() => {}));
 if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructionsToDefault().catch(() => {}));
+if (btnRepeatLastAnswer) {
+  btnRepeatLastAnswer.addEventListener("click", () => {
+    if (!rtWs || rtWs.readyState !== WebSocket.OPEN) {
+      push("WARN: Realtime WS not connected; cannot repeat last answer.");
+      return;
+    }
+
+    try {
+      rtWs.send(JSON.stringify({
+        type: "repeat_last_answer"
+      }));
+
+      push("Repeat Last Answer sent to realtime session.");
+    } catch (e) {
+      push(`ERROR: Repeat Last Answer failed: ${e?.message || e}`);
+    }
+  });
+}
 if (btnInstrRefresh) {
   btnInstrRefresh.addEventListener("click", () => {
     if (!rtWs || rtWs.readyState !== WebSocket.OPEN) {

@@ -640,6 +640,39 @@ async def voice_ws(ws: WebSocket):
                                 print("response.cancel error:", repr(e))
                             await safe_send({"type": "error", "message": str(e)})
 
+                    elif data.get("type") == "repeat_last_answer":
+                        try:
+                            await rws.send(json.dumps({
+                                "type": "conversation.item.create",
+                                "item": {
+                                    "type": "message",
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "input_text",
+                                            "text": "Please repeat your last answer."
+                                        }
+                                    ]
+                                }
+                            }))
+
+                            await rws.send(json.dumps({
+                                "type": "response.create"
+                            }))
+
+                            await safe_send({
+                                "type": "log",
+                                "message": "Repeat Last Answer requested"
+                            })
+
+                        except Exception as e:
+                            if DEBUG:
+                                print("repeat_last_answer error:", repr(e))
+
+                            await safe_send({
+                                "type": "error",
+                                "message": f"Repeat Last Answer failed: {str(e)}"
+                            })
                     elif data.get("type") == "refresh_instructions":
                         try:
                             async with _instructions_lock:
