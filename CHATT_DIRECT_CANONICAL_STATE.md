@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-20
+Last updated: 2026-05-21
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -37,6 +37,8 @@ scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
 clickable scenario cards with selected-state styling
 Voice page selected scenario visibility
+Repeat Last Answer control for active Realtime sessions
+Session Transcript intentionally removed/deferred for current phase
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -74,6 +76,7 @@ Electron Desktop app
 -> audio response
 -> Desktop playback pipeline
 -> selected headphones/output device
+-> optional Repeat Last Answer command path through the same active Realtime session
 ```
 
 Only one backend service is canonical for active runtime:
@@ -200,6 +203,7 @@ The Desktop app owns:
 session state
 loopback/system audio capture
 Realtime start/stop controls
+Repeat Last Answer control
 instruction UI
 scenario selection/display
 clickable scenario cards
@@ -359,6 +363,7 @@ Start Direct Realtime
 Stop Direct Realtime
 Reset session guard while Direct Realtime is active
 Refresh Instructions
+Repeat Last Answer
 Realtime rate selector
 Realtime playback volume slider
 Selected output/headphones routing
@@ -377,6 +382,28 @@ Reset behavior:
 If Direct Realtime is running, Reset session must not stop runtime.
 It must log that Reset is skipped and tell the user to stop Direct Realtime first.
 After Stop, Reset session may create a new session ID.
+```
+
+Repeat Last Answer behavior:
+
+```text
+Desktop Voice UI includes button id btnRepeatLastAnswer.
+Renderer sends { type: "repeat_last_answer" } only when the active Realtime WebSocket is open.
+backend/app_realtime.py handles repeat_last_answer by adding a user message with input_text: "Please repeat your last answer."
+Backend then sends response.create to the provider session.
+Backend does not store the previous answer.
+The model repeats from its own active Realtime session context.
+This feature must remain independent from transcript storage.
+```
+
+Current transcript decision:
+
+```text
+Session Transcript UI is not active in the current phase.
+Assistant transcript delta/done forwarding was tested and then removed/deferred.
+The experiment showed extra transcript WebSocket traffic could interfere with Desktop audio playback stability.
+Current runtime should not include sessionTranscript DOM, assistant_transcript messages, appendSessionTranscript helpers, or backend response.output_audio_transcript forwarding.
+A future transcript feature needs a separate design covering both user question transcription and assistant answer capture.
 ```
 
 ---
@@ -477,6 +504,9 @@ Desktop Scenarios tab loads backend scenario presets: OK
 Desktop UI renders clickable backend scenario cards: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
+Repeat Last Answer control: code reviewed and ready for runtime validation/commit
+Session Transcript feature: removed/deferred from active runtime
+response.cancel guard: preserve guard so cancel is sent only while speaking indicator is active
 ```
 
 Before committing runtime changes, always run at minimum:
@@ -522,6 +552,8 @@ Outgoing language is added to final Realtime instructions and works as language 
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, and POST /v1/scenarios/active
 Desktop Scenarios tab loads backend scenario presets, renders clickable scenario cards, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
+Repeat Last Answer is the only retained runtime addition from the transcript experiment
+Session Transcript is not part of the current active runtime
 ```
 
 Recent provider integration commits:
@@ -1009,6 +1041,9 @@ No broad cleanup without reference checks
 No commit before diff review and runtime validation
 Always specify exact folder/path for commands
 Use one or two tasks at a time
+For file edits, inspect the relevant file section before generating any patch
+When using scripted edits, prefer PowerShell scripted patch, one file at a time, after showing exact target lines
+Do not generate blind insert/replace scripts without current file context
 ```
 
 For Codex work:
