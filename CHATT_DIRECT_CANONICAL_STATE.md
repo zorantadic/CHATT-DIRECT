@@ -35,7 +35,8 @@ selected headphones/output device playback
 BYOK provider/API configuration
 scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
-clickable scenario cards with selected-state styling
+compact clickable scenario cards with selected-state styling
+hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
 ```
 
@@ -202,7 +203,8 @@ loopback/system audio capture
 Realtime start/stop controls
 instruction UI
 scenario selection/display
-clickable scenario cards
+compact clickable scenario cards
+scenario hover details popup
 Realtime rate selection
 playback pipeline
 playback volume
@@ -364,7 +366,8 @@ Realtime playback volume slider
 Selected output/headphones routing
 Listening/Speaking indicators
 Scenario preset selector/editor
-Clickable scenario cards with selected-state styling
+Compact clickable scenario cards with selected-state styling
+Scenario hover details popup
 Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
@@ -475,7 +478,8 @@ Scenario active selection persistence: OK
 Scenario per-scenario instruction override API: OK
 Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
-Desktop UI renders clickable backend scenario cards: OK
+Desktop UI renders compact clickable backend scenario cards: OK
+Desktop scenario hover details popup: OK
 Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
@@ -523,7 +527,7 @@ Selected provider voice is passed into Realtime session.update and works for Ope
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
-Desktop Scenarios tab loads backend scenario presets, renders clickable scenario cards, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
+Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 ```
 
@@ -784,6 +788,11 @@ Current Desktop behavior:
 ```text
 Scenarios tab loads GET /v1/scenarios.
 Scenario cards display backend scenario presets when available.
+Scenario cards are compact and show only the scenario name plus Selected / Click to select state.
+Hovering over a scenario card shows a human-readable details popup.
+The hover popup shows scenario name, category, shortDescription, and recommendedUse.
+The hover popup does not show the model-facing instruction prompt.
+The hover popup is informational only and does not select or modify the scenario.
 Scenario dropdown displays backend scenario presets when available.
 Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
 Selecting a scenario card or dropdown item loads scenario.userInstruction into Current Instructions when present; otherwise it loads scenario.instruction.
@@ -860,6 +869,14 @@ Cloud Architecture Advisor and Interview Answer Mode were migrated from legacy r
 Their instruction text must be treated as preserved prompt-engineering work.
 Do not rewrite those scenario instructions unless explicitly approved.
 Custom user edits must be stored as userInstruction overrides, not by modifying the default instruction text.
+```
+
+Scenario UX rule:
+
+```text
+Scenario card content is intentionally compact.
+Scenario card hover details use human-readable metadata, not the model-facing instruction prompt.
+Future scenario_presets.json may add displayDetails to separate product-facing explanation from model-facing instructions.
 ```
 
 Final packaged app direction:
