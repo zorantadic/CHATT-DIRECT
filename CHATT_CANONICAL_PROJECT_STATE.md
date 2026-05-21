@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-21
+Last updated: 2026-05-20
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -39,8 +39,6 @@ scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
 clickable scenario cards with selected-state styling
 Voice page selected scenario visibility
-Repeat Last Answer control for active Realtime sessions
-Transcript UI intentionally removed/deferred for current phase to preserve audio stability
 ```
 ---
 2. Canonical File Roles
@@ -90,7 +88,6 @@ Electron Desktop app
 -> audio response
 -> Desktop playback pipeline
 -> selected headphones/output device
--> optional Repeat Last Answer control sends a text command into the active Realtime session
 ```
 Only active backend service:
 ```text
@@ -273,6 +270,7 @@ Realtime WS
 Realtime rate
 Playback volume
 Output device
+Session Cost Guard controls
 Scenario & Instructions controls
 ```
 There are no active Desktop settings for:
@@ -309,7 +307,6 @@ Start Direct Realtime
 Stop Direct Realtime
 Reset session guard while Direct Realtime is active
 Refresh Instructions
-Repeat Last Answer
 Realtime rate selector
 Realtime playback volume slider
 Selected output/headphones routing
@@ -326,14 +323,6 @@ Reset behavior:
 If Direct Realtime is running, Reset session must not stop runtime.
 It must log that Reset is skipped and tell the user to stop Direct Realtime first.
 After Stop, Reset session may create a new session ID.
-```
-
-Current transcript decision:
-```text
-Session Transcript UI is intentionally not active in the current phase.
-Realtime assistant transcript delta forwarding was tested and removed/deferred because it added extra Desktop WebSocket traffic during audio playback and could affect audio stability.
-Repeat Last Answer remains active and must not depend on transcript storage.
-A future transcript feature requires a separate design for both user-question transcription and assistant-answer capture.
 ```
 ---
 10. Completed Cleanup Baseline
@@ -419,8 +408,6 @@ Desktop Scenarios tab loads backend scenario presets: OK
 Desktop UI renders clickable backend scenario cards: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
-Repeat Last Answer control: implemented and ready for runtime validation/commit after local test
-Session Transcript feature: removed/deferred from current active runtime
 ```
 ---
 12. Current Known Good State
@@ -443,8 +430,6 @@ Outgoing language is added to final Realtime instructions and works as language 
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, and POST /v1/scenarios/active
 Desktop Scenarios tab loads backend scenario presets, renders clickable scenario cards, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
-Repeat Last Answer is the only retained post-cleanup runtime addition from the transcript experiment
-Session Transcript is not part of the current active runtime
 ```
 ---
 13. Remaining Cleanup Work
@@ -593,6 +578,11 @@ Expand provider capability lists
 Use selected provider voice in realtime session
 Add outgoing language rule to realtime instructions
 Migrate Azure realtime provider to gpt-realtime-2
+Track direct realtime session activity timestamps
+Update direct realtime idle timestamp on speech start
+Add session cost guard settings
+Add session cost guard warning timer
+Stop direct realtime on session cost guard limits
 ```
 
 ---
@@ -883,7 +873,69 @@ Start Direct Realtime still works with loopback/system audio only.
 ```
 
 ---
-18. Commercial Direction
+18. Session Cost Guard Baseline
+
+Session Cost Guard is now part of the Direct Realtime runtime cost-protection layer.
+
+Current implemented behavior:
+
+```text
+Settings -> Connection + Audio Settings includes:
+- Auto-stop if idle: Off / 5 / 10 / 15 minutes
+- Warn before auto-stop: checkbox
+- Hard max session duration: Off / 15 / 30 / 60 minutes
+```
+
+Persistence:
+
+```text
+Cost Guard settings are stored in renderer localStorage:
+chatt.costGuard.idleMinutes
+chatt.costGuard.warnBeforeStop
+chatt.costGuard.maxSessionMinutes
+```
+
+Runtime behavior:
+
+```text
+directSessionStartedAt records successful Start Direct Realtime time.
+directLastSpeechStartedAt records the latest provider/server VAD input_audio_buffer.speech_started event.
+A lightweight renderer setInterval checks limits every 5 seconds.
+Warning messages are written to the Desktop log through push(...).
+Idle auto-stop triggers when now - directLastSpeechStartedAt >= selected idle limit.
+Hard max auto-stop triggers when now - directSessionStartedAt >= selected max duration.
+Both stop paths call the existing stopDirectRealtime({ closeRealtime: true }) flow.
+```
+
+Confirmed behavior:
+
+```text
+Idle warning appears approximately 30 seconds before the idle limit.
+Idle limit reached logs a clear message and stops Direct Realtime.
+Local audio playback stops immediately.
+Realtime WebSocket closes cleanly with direct-realtime-stop.
+New speech_started activity resets the idle timer.
+Hard max session duration does not reset on speech activity.
+```
+
+Design boundaries:
+
+```text
+Do not use audio frame/chunk activity as the idle signal.
+Do not add microphone input.
+Do not change AudioWorklet, sample rate, PCM format, WebSocket audio append, provider adapter payloads, or backend app_realtime.py for Cost Guard.
+Cost Guard belongs to Connection + Audio Settings, not Provider Configuration.
+```
+
+Next candidate improvements:
+
+```text
+Cost Guard UX: countdown/status in UI, remaining time display, toast/modal warning instead of log-only warning.
+Stability and cost: auto-stop or protection when app is minimized/inactive, pause/resume behavior, reconnect policy review.
+```
+
+---
+19. Commercial Direction
 Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
@@ -899,7 +951,7 @@ BYOK privacy/control
 workflow-specific use cases
 ```
 ---
-19. Work Process Rules
+20. Work Process Rules
 For all future project work:
 ```text
 Analyze first
@@ -909,9 +961,6 @@ No broad cleanup without reference checks
 No commit before diff review and runtime validation
 Always specify exact folder/path for commands
 Use one or two tasks at a time
-For file edits, inspect the relevant file section before generating any patch
-When using scripted edits, prefer PowerShell scripted patch, one file at a time, after showing exact target lines
-Do not generate blind insert/replace scripts without current file context
 ```
 For Codex work:
 ```text
