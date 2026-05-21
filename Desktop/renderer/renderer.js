@@ -1777,6 +1777,7 @@ if (btnInstrRefresh) {
         push(msg.message || JSON.stringify(msg));
         const logText = String(msg.event || msg.message || "");
         if (logText.includes("input_audio_buffer.speech_started")) {
+          directLastSpeechStartedAt = Date.now();
           setListeningIndicator(true);
           stopAudioNow();
           if (speakStatusEl && speakStatusEl.classList.contains("ok")) {
