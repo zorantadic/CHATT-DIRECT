@@ -673,6 +673,7 @@ async def voice_ws(ws: WebSocket):
                                 "type": "error",
                                 "message": f"Repeat Last Answer failed: {str(e)}"
                             })
+
                     elif data.get("type") == "refresh_instructions":
                         try:
                             async with _instructions_lock:
