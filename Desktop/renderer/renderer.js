@@ -1868,6 +1868,12 @@ if (btnInstrRefresh) {
     if (idleMinutes > 0 && directLastSpeechStartedAt > 0) {
       const idleMs = now - directLastSpeechStartedAt;
       const idleLimitMs = idleMinutes * 60 * 1000;
+
+      if (idleMs >= idleLimitMs) {
+        push(`Session Cost Guard: idle limit reached (${idleMinutes} min). Stopping Direct Realtime.`);
+        stopDirectRealtime({ closeRealtime: true }).catch((e) => push(`ERROR(Session Cost Guard stop): ${e?.message || e}`));
+        return;
+      }
       if (warnEnabled && idleMs >= Math.max(0, idleLimitMs - 30000) && now - costGuardLastIdleWarnAt > 30000) {
         costGuardLastIdleWarnAt = now;
         push(`Session Cost Guard: idle limit approaching (${idleMinutes} min).`);
@@ -1877,6 +1883,12 @@ if (btnInstrRefresh) {
     if (maxMinutes > 0 && directSessionStartedAt > 0) {
       const sessionMs = now - directSessionStartedAt;
       const maxLimitMs = maxMinutes * 60 * 1000;
+
+      if (sessionMs >= maxLimitMs) {
+        push(`Session Cost Guard: max session duration reached (${maxMinutes} min). Stopping Direct Realtime.`);
+        stopDirectRealtime({ closeRealtime: true }).catch((e) => push(`ERROR(Session Cost Guard stop): ${e?.message || e}`));
+        return;
+      }
       if (warnEnabled && sessionMs >= Math.max(0, maxLimitMs - 30000) && now - costGuardLastMaxWarnAt > 30000) {
         costGuardLastMaxWarnAt = now;
         push(`Session Cost Guard: max session limit approaching (${maxMinutes} min).`);
