@@ -66,6 +66,16 @@ Do not introduce new topics.`;
     // Filtered view: re-render
     renderLog();
   }
+
+  const sessionTranscriptLines = [];
+  function appendSessionTranscript(eventText) {
+    if (!sessionTranscriptEl) return;
+    const ts = new Date().toISOString();
+    sessionTranscriptLines.push(`${ts}  ${eventText}`);
+    if (sessionTranscriptLines.length > 1000) sessionTranscriptLines.shift();
+    sessionTranscriptEl.textContent = sessionTranscriptLines.join("\n") + (sessionTranscriptLines.length ? "\n" : "");
+    sessionTranscriptEl.scrollTop = sessionTranscriptEl.scrollHeight;
+  }
   function setPill(id, state, text) {
     const el = $(id);
     if (!el) return;
@@ -178,6 +188,7 @@ Do not introduce new topics.`;
   // ------------------------------
   const loopMonitor = $("loopMonitor");
   const rtOutEl = $("rtOut");
+  const sessionTranscriptEl = $("sessionTranscript");
   const rtDeviceSel = $("rtDevice");
   const listenStatusEl = $("listenStatus");
   const speakStatusEl = $("speakStatus");
@@ -1326,6 +1337,7 @@ if (btnRepeatLastAnswer) {
       }));
 
       push("Repeat Last Answer sent to realtime session.");
+      appendSessionTranscript("Manual command: Repeat Last Answer");
     } catch (e) {
       push(`ERROR: Repeat Last Answer failed: ${e?.message || e}`);
     }
@@ -1777,13 +1789,17 @@ if (btnInstrRefresh) {
         const logText = String(msg.event || msg.message || "");
         if (logText.includes("input_audio_buffer.speech_started")) {
           setListeningIndicator(true);
+          appendSessionTranscript("User speech started");
           stopAudioNow();
-          try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
-          setAssistantSpeaking(false);
-          push("Barge-in detected: cancelled current response and stopped local playback");
+          if (speakStatusEl && speakStatusEl.classList.contains("ok")) {
+            try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
+            setAssistantSpeaking(false);
+            push("Barge-in detected: cancelled current response and stopped local playback");
+          }
         }
         if (logText.includes("input_audio_buffer.speech_stopped")) {
           setListeningIndicator(false);
+          appendSessionTranscript("User speech stopped");
         }
         return;
       }
@@ -1795,6 +1811,7 @@ if (btnInstrRefresh) {
         setAssistantSpeaking(false);
         if (directRealtimeActive || directRealtimeStarting) {
           push("Direct Realtime response done");
+          appendSessionTranscript("Assistant response done");
           return;
         }
         push("Realtime response done");
