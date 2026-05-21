@@ -1840,8 +1840,55 @@ if (btnInstrRefresh) {
   let directFramePending = [];
   let directSessionStartedAt = 0;
   let directLastSpeechStartedAt = 0;
+  let costGuardTimer = null;
+  let costGuardLastIdleWarnAt = 0;
+  let costGuardLastMaxWarnAt = 0;
   const DIRECT_PCM_CHUNK_BYTES = 960; // 20ms @ 24kHz mono PCM16
   const DIRECT_FRAME_PENDING_LIMIT = 80;
+  function readCostGuardMinutes(selectEl) {
+    const n = Number(selectEl?.value || "0");
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function stopCostGuardTimer() {
+    try { if (costGuardTimer) window.clearInterval(costGuardTimer); } catch {}
+    costGuardTimer = null;
+    costGuardLastIdleWarnAt = 0;
+    costGuardLastMaxWarnAt = 0;
+  }
+
+  function checkCostGuard() {
+    if (!directRealtimeActive) return;
+
+    const idleMinutes = readCostGuardMinutes(idleGuardMinutesEl);
+    const maxMinutes = readCostGuardMinutes(maxSessionMinutesEl);
+    const now = Date.now();
+    const warnEnabled = idleGuardWarnEl?.checked !== false;
+
+    if (idleMinutes > 0 && directLastSpeechStartedAt > 0) {
+      const idleMs = now - directLastSpeechStartedAt;
+      const idleLimitMs = idleMinutes * 60 * 1000;
+      if (warnEnabled && idleMs >= Math.max(0, idleLimitMs - 30000) && now - costGuardLastIdleWarnAt > 30000) {
+        costGuardLastIdleWarnAt = now;
+        push(`Session Cost Guard: idle limit approaching (${idleMinutes} min).`);
+      }
+    }
+
+    if (maxMinutes > 0 && directSessionStartedAt > 0) {
+      const sessionMs = now - directSessionStartedAt;
+      const maxLimitMs = maxMinutes * 60 * 1000;
+      if (warnEnabled && sessionMs >= Math.max(0, maxLimitMs - 30000) && now - costGuardLastMaxWarnAt > 30000) {
+        costGuardLastMaxWarnAt = now;
+        push(`Session Cost Guard: max session limit approaching (${maxMinutes} min).`);
+      }
+    }
+  }
+
+  function startCostGuardTimer() {
+    stopCostGuardTimer();
+    costGuardTimer = window.setInterval(checkCostGuard, 5000);
+  }
+
   async function getLoopbackStream() {
     await window.electronAPI.enableLoopbackAudio();
     try {
@@ -1986,6 +2033,7 @@ if (btnInstrRefresh) {
       directRealtimeActive = true;
       directSource.connect(directNode);
       setDirectStatusOn(true);
+      startCostGuardTimer();
       push("Direct Realtime streaming started (loopback PCM16@24k mono -> /voice/ws).");
     } catch (e) {
       push(`ERROR(Direct Realtime start): ${e?.message || e}`);
@@ -2004,6 +2052,7 @@ if (btnInstrRefresh) {
 
     directRealtimeActive = false;
     directRealtimeStarting = false;
+    stopCostGuardTimer();
     setAssistantSpeaking(false);
     setListeningIndicator(false);
     directAudioChunks = [];
