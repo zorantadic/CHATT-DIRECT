@@ -37,6 +37,7 @@ scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
+scenario displayDetails metadata for product-facing explanations
 Voice page selected scenario visibility
 ```
 
@@ -205,6 +206,7 @@ instruction UI
 scenario selection/display
 compact clickable scenario cards
 scenario hover details popup
+scenario displayDetails metadata for product-facing explanations
 Realtime rate selection
 playback pipeline
 playback volume
@@ -480,6 +482,8 @@ Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
 Desktop UI renders compact clickable backend scenario cards: OK
 Desktop scenario hover details popup: OK
+Desktop scenario hover popup uses displayDetails human-readable text: OK
+Scenario displayDetails metadata in backend/scenario_presets.json: OK
 Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
@@ -527,7 +531,7 @@ Selected provider voice is passed into Realtime session.update and works for Ope
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
-Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
+Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details from scenario.displayDetails, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 ```
 
@@ -790,7 +794,8 @@ Scenarios tab loads GET /v1/scenarios.
 Scenario cards display backend scenario presets when available.
 Scenario cards are compact and show only the scenario name plus Selected / Click to select state.
 Hovering over a scenario card shows a human-readable details popup.
-The hover popup shows scenario name, category, shortDescription, and recommendedUse.
+The hover popup shows scenario name, category, displayDetails, and recommendedUse.
+The hover popup may fall back to shortDescription if displayDetails is missing.
 The hover popup does not show the model-facing instruction prompt.
 The hover popup is informational only and does not select or modify the scenario.
 Scenario dropdown displays backend scenario presets when available.
@@ -821,6 +826,22 @@ scenario.userInstruction
 
 scenario.userInstructionUpdatedAt
 = timestamp for the userInstruction override
+```
+
+Scenario display metadata:
+
+```text
+scenario.displayDetails
+= human-readable product/UX explanation for the scenario hover popup
+= explains what the user should expect from the scenario
+= not sent to the Realtime model as instructions
+= separate from scenario.instruction and scenario.userInstruction
+
+scenario.shortDescription
+= short UI summary and fallback for displayDetails
+
+scenario.recommendedUse
+= concise explanation of when to use the scenario
 ```
 
 Runtime instruction selection rule:
@@ -876,7 +897,8 @@ Scenario UX rule:
 ```text
 Scenario card content is intentionally compact.
 Scenario card hover details use human-readable metadata, not the model-facing instruction prompt.
-Future scenario_presets.json may add displayDetails to separate product-facing explanation from model-facing instructions.
+scenario.displayDetails separates product-facing explanation from model-facing instructions.
+Do not derive human-facing popup text from scenario.instruction.
 ```
 
 Final packaged app direction:

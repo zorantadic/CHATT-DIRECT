@@ -39,6 +39,7 @@ scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
+scenario displayDetails metadata for product-facing explanations
 Voice page selected scenario visibility
 ```
 ---
@@ -410,6 +411,8 @@ Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
 Desktop UI renders compact clickable backend scenario cards: OK
 Desktop scenario hover details popup: OK
+Desktop scenario hover popup uses displayDetails human-readable text: OK
+Scenario displayDetails metadata in backend/scenario_presets.json: OK
 Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
@@ -434,7 +437,7 @@ Selected provider voice is passed into Realtime session.update and works for Ope
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
-Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
+Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details from scenario.displayDetails, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 ```
 ---
@@ -687,6 +690,7 @@ Backend does not overwrite the local scenario file once it exists.
 Desktop Scenarios UI loads backend scenarios from GET /v1/scenarios.
 Desktop Scenarios UI renders compact clickable backend scenario cards.
 Hovering over a scenario card shows a human-readable details popup built from scenario metadata.
+The hover popup uses scenario.displayDetails as the primary product-facing explanation, with shortDescription as fallback.
 The hover popup is informational only and does not select or modify the scenario.
 Selecting a scenario card or dropdown item loads the selected scenario instruction into the existing instruction editor.
 If a scenario has userInstruction, Desktop loads userInstruction as Current Instructions.
@@ -715,6 +719,22 @@ userInstructionUpdatedAt
 = timestamp for the userInstruction override
 ```
 
+Scenario display metadata in scenario_presets.json:
+
+```text
+displayDetails
+= human-readable product/UX explanation for the scenario hover popup
+= explains what the user should expect from the scenario
+= not sent to the Realtime model as instructions
+= separate from instruction and userInstruction
+
+shortDescription
+= short UI summary and fallback for displayDetails
+
+recommendedUse
+= concise explanation of when to use the scenario
+```
+
 Implemented default scenarios include:
 
 ```text
@@ -741,13 +761,14 @@ Existing instruction editor remains the editing surface.
 Scenario cards are populated from backend scenarios when available.
 Scenario cards are compact and display only the scenario name plus Selected / Click to select state.
 Hovering over a scenario card opens a small human-readable details popup.
-Scenario hover popup shows name, category, shortDescription, and recommendedUse.
+Scenario hover popup shows name, category, displayDetails, and recommendedUse.
+Scenario hover popup may fall back to shortDescription if displayDetails is missing.
 Scenario hover popup does not show the technical instruction prompt.
 Scenario hover popup is informational only; clicking the card remains the only selection action.
 Scenario preset dropdown is populated from backend scenarios when available.
 Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
 Voice page shows Selected Scenario and Scenario behavior.
-Future scenario metadata should add displayDetails for richer human-readable popup text while keeping instruction as the model-facing prompt.
+Scenario displayDetails is the canonical field for richer human-readable popup text while keeping instruction as the model-facing prompt.
 ```
 
 Final packaged app direction:
@@ -785,7 +806,8 @@ Scenario UX rule:
 ```text
 Scenario card content is intentionally compact.
 Scenario card hover details use human-readable metadata, not the model-facing instruction prompt.
-Future scenario_presets.json may add displayDetails to separate product-facing explanation from model-facing instructions.
+scenario.displayDetails separates product-facing explanation from model-facing instructions.
+Do not derive human-facing popup text from scenario.instruction.
 ```
 
 ---
