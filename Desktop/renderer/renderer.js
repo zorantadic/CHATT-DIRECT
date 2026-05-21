@@ -21,6 +21,9 @@ const LS_REALTIME_RATE = "chatt.realtime.rate";
 const LS_PLAYBACK_VOLUME = "chatt.realtime.playbackVolume";
 const LS_INSTR_TARGET = "chatt.instructions.target"; // Direct Instructions target; always "realtime"
 const LS_INSTRUCTION_PRESET = "chatt.instructions.preset";
+const LS_IDLE_GUARD_MINUTES = "chatt.costGuard.idleMinutes";
+const LS_IDLE_GUARD_WARN = "chatt.costGuard.warnBeforeStop";
+const LS_MAX_SESSION_MINUTES = "chatt.costGuard.maxSessionMinutes";
 const ALLOWED_REALTIME_RATES = ["1", "0.9", "0.8"];
 const DEFAULT_REALTIME_RATE = "1";
   // HARD REQUIREMENT: Realtime audio must go to headphones only.
@@ -211,6 +214,9 @@ Do not introduce new topics.`;
   const btnProviderSave = $("btnProviderSave");
   const btnProviderReset = $("btnProviderReset");
   const providerStatusEl = $("providerStatus");
+  const idleGuardMinutesEl = $("idleGuardMinutes");
+  const idleGuardWarnEl = $("idleGuardWarn");
+  const maxSessionMinutesEl = $("maxSessionMinutes");
   const authTokenEl = $("authToken");
   const btnSaveToken = $("btnSaveToken");
   const btnClearToken = $("btnClearToken");
@@ -255,6 +261,20 @@ function loadVoiceSettingsIntoInputs() {
   if (realtimeRateEl) realtimeRateEl.value = rate;
   if (realtimeRateVoiceEl) realtimeRateVoiceEl.value = rate;
 }
+function loadCostGuardSettingsIntoInputs() {
+  if (idleGuardMinutesEl) {
+    idleGuardMinutesEl.value = loadStrLS(LS_IDLE_GUARD_MINUTES, "0");
+  }
+
+  if (idleGuardWarnEl) {
+    idleGuardWarnEl.checked = loadStrLS(LS_IDLE_GUARD_WARN, "1") !== "0";
+  }
+
+  if (maxSessionMinutesEl) {
+    maxSessionMinutesEl.value = loadStrLS(LS_MAX_SESSION_MINUTES, "0");
+  }
+}
+
 function normalizePlaybackVolume(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 1.0;
@@ -292,6 +312,7 @@ function loadInstructionsTargetIntoInputs() {
   loadEndpointSettingsIntoInputs();
   initAuthUi();
   loadVoiceSettingsIntoInputs();
+  loadCostGuardSettingsIntoInputs();
   applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
   loadInstructionsTargetIntoInputs();
   loadProviderUi().catch(() => {});
@@ -2075,14 +2096,21 @@ if (btnInstrRefresh) {
     saveStrLS(LS_RT_HTTP, $("rtHttp").value.trim());
     saveStrLS(LS_RT_WS, $("rtWs").value.trim());
     saveStrLS(LS_REALTIME_RATE, normalizeRealtimeRate((realtimeRateEl?.value || "").toString()));
+    saveStrLS(LS_IDLE_GUARD_MINUTES, (idleGuardMinutesEl?.value || "0").toString());
+    saveStrLS(LS_IDLE_GUARD_WARN, idleGuardWarnEl?.checked ? "1" : "0");
+    saveStrLS(LS_MAX_SESSION_MINUTES, (maxSessionMinutesEl?.value || "0").toString());
     markSettingsSaved("Saved");
   }
   function resetSettingsToDefaults() {
     saveStrLS(LS_RT_HTTP, "");
     saveStrLS(LS_RT_WS, "");
     saveStrLS(LS_REALTIME_RATE, "");
+    saveStrLS(LS_IDLE_GUARD_MINUTES, "");
+    saveStrLS(LS_IDLE_GUARD_WARN, "");
+    saveStrLS(LS_MAX_SESSION_MINUTES, "");
     loadEndpointSettingsIntoInputs();
     loadVoiceSettingsIntoInputs();
+    loadCostGuardSettingsIntoInputs();
     markSettingsSaved("Reset to defaults");
   }
   function applyLocalBackendPreset() {

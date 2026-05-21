@@ -233,6 +233,35 @@
           <button id="btnRefreshDevices" type="button">Refresh devices</button>
         </div>
 
+        <div class="row" style="margin-top:14px;">
+          <label>Auto-stop if idle</label>
+          <select id="idleGuardMinutes">
+            <option value="0">Off</option>
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="15">15 minutes</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Warn before auto-stop</label>
+          <input id="idleGuardWarn" type="checkbox" checked />
+        </div>
+
+        <div class="row">
+          <label>Hard max session duration</label>
+          <select id="maxSessionMinutes">
+            <option value="0">Off</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">60 minutes</option>
+          </select>
+        </div>
+
+        <div class="row small">
+          Automatically stops Direct Realtime sessions after inactivity or maximum session duration to reduce accidental usage cost.
+        </div>
+
         <div class="row">
           <button id="btnUseLocalBackend" type="button">Use Local Backend</button>
           <button id="btnSaveSettings" type="button">Save settings</button>
