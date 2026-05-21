@@ -77,25 +77,27 @@
 
       .scenarioCards {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 8px;
         margin: 12px 0 14px 0;
       }
 
       .scenarioCard {
+        position: relative;
         width: 100%;
+        min-height: 72px;
         text-align: left;
         background: #ffffff;
         border: 1px solid #cfd7e3;
-        border-radius: 12px;
-        padding: 12px;
+        border-radius: 10px;
+        padding: 10px 11px;
         cursor: pointer;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       }
 
       .scenarioCard:hover {
         border-color: #4f7cff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
       }
 
       .scenarioCard.active {
@@ -105,12 +107,14 @@
 
       .scenarioCard strong {
         margin-bottom: 6px;
+        font-size: 13px;
+        line-height: 1.25;
       }
 
       .scenarioCard::after {
         content: "Click to select";
         display: block;
-        margin-top: 8px;
+        margin-top: 6px;
         font-size: 11px;
         color: #2457ff;
         font-weight: 600;
@@ -119,6 +123,43 @@
       .scenarioCard.active::after {
         content: "Selected";
         color: #175f2c;
+      }
+
+      .scenarioTooltip {
+        display: none;
+        position: absolute;
+        z-index: 50;
+        left: 0;
+        top: calc(100% + 8px);
+        width: min(360px, 80vw);
+        background: #ffffff;
+        border: 1px solid #cfd7e3;
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+        color: #1f2937;
+      }
+
+      .scenarioCard:hover .scenarioTooltip,
+      .scenarioCard:focus-within .scenarioTooltip {
+        display: block;
+      }
+
+      .scenarioTooltipTitle {
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .scenarioTooltipMeta {
+        font-size: 12px;
+        color: #4b5563;
+        margin-bottom: 8px;
+      }
+
+      .scenarioTooltipText {
+        font-size: 12px;
+        line-height: 1.4;
+        margin-top: 6px;
       }
 
       .logbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin: 8px 0 10px 0; }

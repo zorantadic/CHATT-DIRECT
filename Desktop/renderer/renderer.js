@@ -912,20 +912,35 @@ function renderScenarioCards() {
     const title = document.createElement("strong");
     title.textContent = scenario.name || id;
 
-    const description = document.createElement("div");
-    description.className = "small";
-    description.textContent =
-      scenario.shortDescription ||
-      scenario.recommendedUse ||
-      "Scenario behavior is loaded from the backend.";
+    const tooltip = document.createElement("div");
+    tooltip.className = "scenarioTooltip";
 
-    const meta = document.createElement("div");
-    meta.className = "small";
-    meta.textContent = scenario.category ? `Category: ${scenario.category}` : "";
+    const tooltipTitle = document.createElement("div");
+    tooltipTitle.className = "scenarioTooltipTitle";
+    tooltipTitle.textContent = scenario.name || id;
+
+    const tooltipMeta = document.createElement("div");
+    tooltipMeta.className = "scenarioTooltipMeta";
+    tooltipMeta.textContent = scenario.category ? `Category: ${scenario.category}` : "Scenario details";
+
+    const tooltipDescription = document.createElement("div");
+    tooltipDescription.className = "scenarioTooltipText";
+    tooltipDescription.textContent =
+      scenario.shortDescription ||
+      "This scenario changes how the assistant responds during the live session.";
+
+    const tooltipUse = document.createElement("div");
+    tooltipUse.className = "scenarioTooltipText";
+    tooltipUse.textContent = scenario.recommendedUse
+      ? `Best for: ${scenario.recommendedUse}`
+      : "Best for: realtime assistance during live conversations.";
 
     card.appendChild(title);
-    card.appendChild(description);
-    if (meta.textContent) card.appendChild(meta);
+    tooltip.appendChild(tooltipTitle);
+    tooltip.appendChild(tooltipMeta);
+    tooltip.appendChild(tooltipDescription);
+    tooltip.appendChild(tooltipUse);
+    card.appendChild(tooltip);
 
     card.addEventListener("click", () => {
       applyInstructionPresetToEditor(id).catch((e) => {
