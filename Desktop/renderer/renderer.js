@@ -746,6 +746,7 @@ function normalizeScenarioPreset(raw) {
     category: (raw.category || "").toString(),
     shortDescription: (raw.shortDescription || "").toString(),
     recommendedUse: (raw.recommendedUse || "").toString(),
+    displayDetails: (raw.displayDetails || "").toString(),
     defaultIncomingLanguage: (raw.defaultIncomingLanguage || "").toString(),
     defaultOutgoingLanguage: (raw.defaultOutgoingLanguage || "").toString(),
     instruction,
@@ -926,6 +927,7 @@ function renderScenarioCards() {
     const tooltipDescription = document.createElement("div");
     tooltipDescription.className = "scenarioTooltipText";
     tooltipDescription.textContent =
+      scenario.displayDetails ||
       scenario.shortDescription ||
       "This scenario changes how the assistant responds during the live session.";
 
