@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-20
+Last updated: 2026-05-21
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -403,9 +403,12 @@ Outgoing language rule appended to final Realtime instructions: OK
 Outgoing language runtime behavior test: OK
 Scenario presets backend API: OK
 Scenario active selection persistence: OK
+Scenario per-scenario instruction override API: OK
 Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
 Desktop UI renders clickable backend scenario cards: OK
+Desktop Save persists custom instruction overrides per scenario: OK
+Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
 ```
@@ -427,8 +430,8 @@ Provider save/load persistence is confirmed
 Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
-Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, and POST /v1/scenarios/active
-Desktop Scenarios tab loads backend scenario presets, renders clickable scenario cards, and falls back to legacy local presets only when backend scenarios are unavailable
+Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
+Desktop Scenarios tab loads backend scenario presets, renders clickable scenario cards, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 ```
 ---
@@ -666,8 +669,10 @@ SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
 Current backend scenario API:
 
 ```text
-GET  /v1/scenarios
-POST /v1/scenarios/active
+GET    /v1/scenarios
+POST   /v1/scenarios/active
+POST   /v1/scenarios/instruction
+DELETE /v1/scenarios/instruction/{scenario_id}
 ```
 
 Current behavior:
@@ -679,9 +684,30 @@ Backend does not overwrite the local scenario file once it exists.
 Desktop Scenarios UI loads backend scenarios from GET /v1/scenarios.
 Desktop Scenarios UI renders clickable backend scenario cards.
 Selecting a scenario card or dropdown item loads the selected scenario instruction into the existing instruction editor.
+If a scenario has userInstruction, Desktop loads userInstruction as Current Instructions.
+Scenario Default Instructions remains the original scenario instruction from the scenario template.
 Desktop calls POST /v1/scenarios/active to persist activeScenarioId in the local scenario runtime state.
+Desktop Save stores edited Current Instructions as scenario.userInstruction in the local scenario runtime state by calling POST /v1/scenarios/instruction.
+Desktop Reset to scenario default deletes scenario.userInstruction by calling DELETE /v1/scenarios/instruction/{scenario_id} and restores Current Instructions to the original scenario instruction.
 Voice page displays the selected scenario name and behavior description.
-Existing Save / Reset / Refresh Instructions behavior remains unchanged.
+Refresh Instructions continues to send the current backend instruction state to the active Realtime session.
+```
+
+Per-scenario instruction override fields in scenario_presets.local.json:
+
+```text
+instruction
+= original/default scenario prompt
+= preserved built-in scenario behavior
+= used for Scenario Default Instructions
+
+userInstruction
+= optional user-edited prompt override for that scenario
+= used as Current Instructions when present
+= stored only in the local runtime scenario file
+
+userInstructionUpdatedAt
+= timestamp for the userInstruction override
 ```
 
 Implemented default scenarios include:
@@ -740,6 +766,7 @@ Prompt migration rule:
 Cloud Architecture Advisor and Interview Answer Mode were migrated from legacy renderer prompts.
 Their instruction text must be treated as preserved prompt-engineering work.
 Do not rewrite those scenario instructions unless explicitly approved.
+Custom user edits must be stored as userInstruction overrides, not by modifying the default instruction text.
 ```
 
 ---
@@ -866,6 +893,8 @@ Desktop starts backend or reports a clear backend startup failure.
 GET /v1/provider/config works through localhost.
 GET /v1/instructions works through localhost.
 GET /v1/scenarios works through localhost.
+POST /v1/scenarios/instruction persists userInstruction to AppData scenario runtime state.
+DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from AppData scenario runtime state.
 Provider save persists to AppData.
 Instruction save persists to AppData.
 Scenario local file is created in AppData if missing.
@@ -969,4 +998,4 @@ Run git status --short after Codex
 Inspect git diff --name-status and git diff --stat
 Do not commit unreviewed runtime-generated changes
 Restore accidental runtime changes before commit
-`````
+``````
