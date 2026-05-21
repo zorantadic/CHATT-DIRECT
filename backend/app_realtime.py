@@ -271,6 +271,51 @@ def _save_active_scenario(scenario_id: Any) -> Dict[str, Any]:
 
     return _load_scenario_presets()
 
+
+def _find_scenario(data: Dict[str, Any], scenario_id: Any) -> Dict[str, Any]:
+    requested_id = str(scenario_id or "").strip()
+    if not requested_id:
+        raise ValueError("scenarioId is required")
+
+    scenarios = data.get("scenarios", [])
+    if not isinstance(scenarios, list):
+        scenarios = []
+
+    for scenario in scenarios:
+        if isinstance(scenario, dict) and str(scenario.get("id", "")).strip() == requested_id:
+            return scenario
+
+    raise ValueError(f"unknown scenarioId: {requested_id}")
+
+
+def _save_scenario_user_instruction(scenario_id: Any, instruction: Any) -> Dict[str, Any]:
+    new_instruction = _validate_instructions_text(instruction)
+
+    _ensure_scenario_presets_file()
+    data = _read_json_file(SCENARIO_PRESETS_PATH)
+
+    scenario = _find_scenario(data, scenario_id)
+    scenario["userInstruction"] = new_instruction
+    scenario["userInstructionUpdatedAt"] = _now_iso()
+
+    _atomic_write_json(SCENARIO_PRESETS_PATH, data)
+
+    return _load_scenario_presets()
+
+
+def _delete_scenario_user_instruction(scenario_id: Any) -> Dict[str, Any]:
+    _ensure_scenario_presets_file()
+    data = _read_json_file(SCENARIO_PRESETS_PATH)
+
+    scenario = _find_scenario(data, scenario_id)
+    scenario.pop("userInstruction", None)
+    scenario.pop("userInstructionUpdatedAt", None)
+
+    _atomic_write_json(SCENARIO_PRESETS_PATH, data)
+
+    return _load_scenario_presets()
+
+
 # ----------------------------
 # Startup
 # ----------------------------
@@ -310,6 +355,44 @@ async def post_active_scenario(body: Dict[str, Any]):
             {"error": "SCENARIOS_IO_ERROR", "message": str(e)},
             status_code=500,
         )
+
+
+@app.post("/v1/scenarios/instruction")
+async def post_scenario_instruction(body: Dict[str, Any]):
+    try:
+        return JSONResponse(
+            _save_scenario_user_instruction(
+                body.get("scenarioId"),
+                body.get("instruction"),
+            )
+        )
+    except ValueError as e:
+        return JSONResponse(
+            {"error": "INVALID_SCENARIO_INSTRUCTION", "message": str(e)},
+            status_code=400,
+        )
+    except Exception as e:
+        return JSONResponse(
+            {"error": "SCENARIOS_IO_ERROR", "message": str(e)},
+            status_code=500,
+        )
+
+
+@app.delete("/v1/scenarios/instruction/{scenario_id}")
+async def delete_scenario_instruction(scenario_id: str):
+    try:
+        return JSONResponse(_delete_scenario_user_instruction(scenario_id))
+    except ValueError as e:
+        return JSONResponse(
+            {"error": "INVALID_SCENARIO", "message": str(e)},
+            status_code=400,
+        )
+    except Exception as e:
+        return JSONResponse(
+            {"error": "SCENARIOS_IO_ERROR", "message": str(e)},
+            status_code=500,
+        )
+
 
 @app.get("/v1/instructions")
 async def get_instructions(target: str = Query("realtime")):

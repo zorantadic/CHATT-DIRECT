@@ -723,6 +723,12 @@ function setInstructionPreset(presetKey) {
 function getInstructionPresetText(presetKey) {
   const key = normalizeInstructionPresetKey(presetKey);
   const scenario = getScenarioPresetById(key);
+  if (scenario) return scenario.userInstruction || scenario.instruction;
+  return INSTRUCTION_PRESETS[key];
+}
+function getInstructionPresetDefaultText(presetKey) {
+  const key = normalizeInstructionPresetKey(presetKey);
+  const scenario = getScenarioPresetById(key);
   return scenario ? scenario.instruction : INSTRUCTION_PRESETS[key];
 }
 function getScenarioPresetById(id) {
@@ -743,13 +749,11 @@ function normalizeScenarioPreset(raw) {
     defaultIncomingLanguage: (raw.defaultIncomingLanguage || "").toString(),
     defaultOutgoingLanguage: (raw.defaultOutgoingLanguage || "").toString(),
     instruction,
+    userInstruction: (raw.userInstruction || "").toString(),
+    userInstructionUpdatedAt: (raw.userInstructionUpdatedAt || "").toString(),
   };
 }
-async function fetchScenariosFromBackend() {
-  const c = directRealtimeCfg();
-  const res = await fetch(`${c.REALTIME_HTTP}/v1/scenarios`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+function applyScenarioPresetData(data) {
   const scenarios = Array.isArray(data?.scenarios)
     ? data.scenarios.map(normalizeScenarioPreset).filter(Boolean)
     : [];
@@ -765,6 +769,13 @@ async function fetchScenariosFromBackend() {
     defaultSource: (data?.defaultSource || "").toString(),
   };
   return scenarioPresetStore;
+}
+async function fetchScenariosFromBackend() {
+  const c = directRealtimeCfg();
+  const res = await fetch(`${c.REALTIME_HTTP}/v1/scenarios`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return applyScenarioPresetData(data);
 }
 
 async function saveActiveScenarioToBackend(scenarioId, { silent } = {}) {
@@ -796,6 +807,69 @@ async function saveActiveScenarioToBackend(scenarioId, { silent } = {}) {
     return { ok: true, status: res.status };
   } catch (e) {
     if (!silent) push(`WARN: active scenario save failed: ${e?.message || e}`);
+    return { ok: false, status: 0 };
+  }
+}
+
+async function saveScenarioUserInstructionToBackend(scenarioId, instruction, { silent } = {}) {
+  const id = (scenarioId || "").toString().trim();
+  if (!id || !getScenarioPresetById(id)) {
+    return { ok: false, skipped: true };
+  }
+
+  const c = directRealtimeCfg();
+
+  try {
+    const res = await fetch(`${c.REALTIME_HTTP}/v1/scenarios/instruction`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scenarioId: id,
+        instruction: (instruction || "").toString(),
+      }),
+    });
+
+    if (!res.ok) {
+      if (!silent) push(`WARN: scenario instruction save failed (HTTP ${res.status})`);
+      return { ok: false, status: res.status };
+    }
+
+    const data = await res.json();
+    applyScenarioPresetData(data);
+    return { ok: true, status: res.status };
+  } catch (e) {
+    if (!silent) push(`WARN: scenario instruction save failed: ${e?.message || e}`);
+    return { ok: false, status: 0 };
+  }
+}
+
+async function deleteScenarioUserInstructionFromBackend(scenarioId, { silent } = {}) {
+  const id = (scenarioId || "").toString().trim();
+  if (!id || !getScenarioPresetById(id)) {
+    return { ok: false, skipped: true };
+  }
+
+  const c = directRealtimeCfg();
+
+  try {
+    const res = await fetch(`${c.REALTIME_HTTP}/v1/scenarios/instruction/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    if (!res.ok) {
+      if (!silent) push(`WARN: scenario instruction reset failed (HTTP ${res.status})`);
+      return { ok: false, status: res.status };
+    }
+
+    const data = await res.json();
+    applyScenarioPresetData(data);
+    return { ok: true, status: res.status };
+  } catch (e) {
+    if (!silent) push(`WARN: scenario instruction reset failed: ${e?.message || e}`);
     return { ok: false, status: 0 };
   }
 }
@@ -1103,13 +1177,14 @@ function ensureRealtimeInstructionStoreSeeded() {
 async function applyInstructionPresetToEditor(presetKey) {
   const preset = setInstructionPreset(presetKey);
   const current = getInstructionPresetText(preset);
+  const defaultText = getInstructionPresetDefaultText(preset);
   const updatedAt = new Date().toISOString();
 
   setInstrTarget("realtime");
   instructionStore = instructionStore || normalizeStore(null);
   instructionStore.realtime = {
     current,
-    default: current,
+    default: defaultText,
     updatedAt,
     source: "preset-ui",
     preset,
@@ -1222,12 +1297,23 @@ async function saveInstructionsToBackend() {
       if (instrStatusEl) instrStatusEl.textContent = "Saved (local)";
       push(`Instructions saved locally (target=${target})`);
 
-      // Best-effort backend sync (does NOT overwrite local)
+      // Best-effort scenario override save and backend sync (do NOT overwrite local)
+      const scenarioSave = getScenarioPresetById(preset)
+        ? await saveScenarioUserInstructionToBackend(preset, currentToSave, { silent: true })
+        : { ok: true, skipped: true };
+      if (!scenarioSave.ok && !scenarioSave.skipped) {
+        push("WARN: scenario instruction save failed; local remains authoritative");
+      }
+
       const sync = await syncInstructionsToBackend(target, currentToSave, { silent: true });
       if (instrStatusEl) {
-        instrStatusEl.textContent = sync.ok ? "Saved (local) + synced" : "Saved (local) (sync failed)";
+        instrStatusEl.textContent = sync.ok
+          ? ((scenarioSave.ok || scenarioSave.skipped) ? "Saved (local) + synced" : "Saved (local) + synced (scenario save failed)")
+          : "Saved (local) (sync failed)";
       }
       if (!sync.ok) push("WARN: backend sync failed; local remains authoritative");
+      renderScenarioCards();
+      updateVoiceScenarioUI();
       return;
     }
 
@@ -1236,9 +1322,22 @@ async function saveInstructionsToBackend() {
 
   // Backend fallback (non-Electron / local store unavailable)
   try {
+    const scenarioSave = getScenarioPresetById(preset)
+      ? await saveScenarioUserInstructionToBackend(preset, currentToSave, { silent: true })
+      : { ok: true, skipped: true };
+    if (!scenarioSave.ok && !scenarioSave.skipped) {
+      push("WARN: scenario instruction save failed");
+    }
+
     const sync = await syncInstructionsToBackend(target, currentToSave, { silent: false });
-    if (instrStatusEl) instrStatusEl.textContent = sync.ok ? "Saved (backend)" : "Save failed";
+    if (instrStatusEl) {
+      instrStatusEl.textContent = sync.ok
+        ? ((scenarioSave.ok || scenarioSave.skipped) ? "Saved (backend)" : "Saved (backend, scenario save failed)")
+        : "Save failed";
+    }
     await loadInstructionsFromBackendExplicit({ silent: true });
+    renderScenarioCards();
+    updateVoiceScenarioUI();
   } catch {
     if (instrStatusEl) instrStatusEl.textContent = "Save failed (network error)";
   }
@@ -1247,7 +1346,7 @@ async function saveInstructionsToBackend() {
 async function resetInstructionsToDefault() {
   const target = getInstrTarget();
   const preset = getInstructionPreset();
-  const presetText = getInstructionPresetText(preset);
+  const presetText = getInstructionPresetDefaultText(preset);
   const updatedAt = new Date().toISOString();
   const payload = {
     current: presetText,
@@ -1272,18 +1371,42 @@ async function resetInstructionsToDefault() {
     if (instrStatusEl) instrStatusEl.textContent = "Reset (local)";
     push(`Instructions reset to preset default (target=${target}, preset=${preset})`);
 
+    const scenarioReset = getScenarioPresetById(preset)
+      ? await deleteScenarioUserInstructionFromBackend(preset, { silent: true })
+      : { ok: true, skipped: true };
+    if (!scenarioReset.ok && !scenarioReset.skipped) {
+      push("WARN: scenario instruction reset failed; local remains authoritative");
+    }
+
     const sync = await syncInstructionsToBackend(target, payload.current, { silent: true });
     if (instrStatusEl) {
-      instrStatusEl.textContent = sync.ok ? "Reset (local) + synced" : "Reset (local) (sync failed)";
+      instrStatusEl.textContent = sync.ok
+        ? ((scenarioReset.ok || scenarioReset.skipped) ? "Reset (local) + synced" : "Reset (local) + synced (scenario reset failed)")
+        : "Reset (local) (sync failed)";
     }
     if (!sync.ok) push("WARN: backend sync failed; local remains authoritative");
+    renderScenarioCards();
+    updateVoiceScenarioUI();
     return;
   }
 
   applyTargetDocToEditor(target, "Reset", { silent: true });
   try {
+    const scenarioReset = getScenarioPresetById(preset)
+      ? await deleteScenarioUserInstructionFromBackend(preset, { silent: true })
+      : { ok: true, skipped: true };
+    if (!scenarioReset.ok && !scenarioReset.skipped) {
+      push("WARN: scenario instruction reset failed");
+    }
+
     const sync = await syncInstructionsToBackend(target, payload.current, { silent: false });
-    if (instrStatusEl) instrStatusEl.textContent = sync.ok ? "Reset + synced" : "Reset (sync failed)";
+    if (instrStatusEl) {
+      instrStatusEl.textContent = sync.ok
+        ? ((scenarioReset.ok || scenarioReset.skipped) ? "Reset + synced" : "Reset + synced (scenario reset failed)")
+        : "Reset (sync failed)";
+    }
+    renderScenarioCards();
+    updateVoiceScenarioUI();
   } catch {
     if (instrStatusEl) instrStatusEl.textContent = "Reset (network error)";
   }
