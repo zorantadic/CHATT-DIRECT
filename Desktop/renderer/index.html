@@ -31,14 +31,15 @@
             <div class="brandSubtitle" data-i18n="app.subtitle">Realtime Voice</div>
           </div>
         </div>
-        <div class="headerCards" aria-label="Current runtime summary" data-i18n-aria-label="header.runtimeSummary">
-          <div class="headerCard">
-            <span class="eyebrow" data-i18n="header.backend">Backend</span>
-            <strong><span class="statusDot" aria-hidden="true"></span><span id="headerBackendStatus">127.0.0.1:50505</span></strong>
-          </div>
-          <div class="headerCard">
-            <span class="eyebrow" id="headerProviderEyebrow" data-i18n="header.provider">Provider</span>
-            <strong id="headerProviderSummary">Not loaded</strong>
+        <div class="headerCards" aria-label="Select Language" data-i18n-aria-label="header.selectLanguage">
+          <div class="headerLanguageControl">
+            <label id="headerDisplayLanguageLabel" class="eyebrow" for="headerDisplayLanguage" data-i18n="header.selectLanguage">Select Language</label>
+            <select id="headerDisplayLanguage" aria-labelledby="headerDisplayLanguageLabel">
+              <option value="en">🇺🇸 EN</option>
+              <option value="es">🇪🇸 ES</option>
+              <option value="de">🇩🇪 DE</option>
+              <option value="sr">🇷🇸 SR</option>
+            </select>
           </div>
         </div>
       </header>

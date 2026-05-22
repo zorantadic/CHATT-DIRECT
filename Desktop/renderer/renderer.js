@@ -317,6 +317,7 @@ Do not introduce new topics.`;
   const btnProviderSave = $("btnProviderSave");
   const btnProviderReset = $("btnProviderReset");
   const providerStatusEl = $("providerStatus");
+  const headerDisplayLanguageEl = $("headerDisplayLanguage");
   const displayLanguageEl = $("displayLanguage");
   const idleGuardMinutesEl = $("idleGuardMinutes");
   const idleGuardWarnEl = $("idleGuardWarn");
@@ -369,6 +370,13 @@ Do not introduce new topics.`;
 
   function getDisplayLanguage() {
     return normalizeDisplayLanguage(loadStrLS(LS_DISPLAY_LANGUAGE, DEFAULT_DISPLAY_LANGUAGE));
+  }
+
+  function syncDisplayLanguageControls(lang) {
+    const next = normalizeDisplayLanguage(lang);
+    if (displayLanguageEl) displayLanguageEl.value = next;
+    if (headerDisplayLanguageEl) headerDisplayLanguageEl.value = next;
+    return next;
   }
 
   function loadJsonAsset(path) {
@@ -450,7 +458,7 @@ Do not introduce new topics.`;
   function applyLocale() {
     const lang = getDisplayLanguage();
     try { document.documentElement.lang = lang; } catch {}
-    if (displayLanguageEl) displayLanguageEl.value = lang;
+    syncDisplayLanguageControls(lang);
     document.title = `CHATT Direct - ${t("app.subtitle", "Realtime Voice")}`;
 
     document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -478,7 +486,7 @@ Do not introduce new topics.`;
   function setDisplayLanguage(lang) {
     const next = normalizeDisplayLanguage(lang);
     saveStrLS(LS_DISPLAY_LANGUAGE, next);
-    if (displayLanguageEl) displayLanguageEl.value = next;
+    syncDisplayLanguageControls(next);
     applyLocale();
     loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     return next;
@@ -617,7 +625,7 @@ function loadInstructionsTargetIntoInputs() {
   loadCostGuardSettingsIntoInputs();
   applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
   loadInstructionsTargetIntoInputs();
-  if (displayLanguageEl) displayLanguageEl.value = getDisplayLanguage();
+  syncDisplayLanguageControls(getDisplayLanguage());
   applyLocale();
   loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   loadProviderUi().catch(() => {});
@@ -2843,6 +2851,11 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   if (displayLanguageEl) {
     displayLanguageEl.addEventListener("change", () => {
       setDisplayLanguage(displayLanguageEl.value);
+    });
+  }
+  if (headerDisplayLanguageEl) {
+    headerDisplayLanguageEl.addEventListener("change", () => {
+      setDisplayLanguage(headerDisplayLanguageEl.value);
     });
   }
   for (const el of [idleGuardMinutesEl, idleGuardWarnEl, maxSessionMinutesEl]) {
