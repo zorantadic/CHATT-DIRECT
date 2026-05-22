@@ -44,8 +44,22 @@ Do not introduce new topics.`;
   const btnLogClear = $("btnLogClear");
   const btnLogDownload = $("btnLogDownload");
   const logLines = [];
+  const voiceActivityLines = [];
   let logFilter = "";
   let logAutoscroll = true;
+  function renderVoiceActivityLine(line) {
+    const el = $("voiceActivityList");
+    if (!el) return;
+    voiceActivityLines.push(line);
+    while (voiceActivityLines.length > 5) voiceActivityLines.shift();
+    el.innerHTML = "";
+    for (const item of voiceActivityLines) {
+      const div = document.createElement("div");
+      div.className = "activityItem";
+      div.textContent = item;
+      el.appendChild(div);
+    }
+  }
   function renderLog() {
     if (!logEl) return;
     const f = (logFilter || "").toLowerCase();
@@ -57,6 +71,7 @@ Do not introduce new topics.`;
     const ts = new Date().toISOString();
     const line = `${ts}  ${m}`;
     logLines.push(line);
+    renderVoiceActivityLine(line);
     if (logLines.length > 5000) logLines.shift();
     if (!logEl) return;
     const f = (logFilter || "").toLowerCase();
@@ -80,16 +95,46 @@ Do not introduce new topics.`;
   function setPill(id, state, text) {
     setPillElement($(id), state, text);
   }
+  function getRealtimeHttpHost() {
+    const raw = ($("rtHttp")?.value || DEFAULTS.REALTIME_HTTP).toString().trim();
+    try {
+      return new URL(raw).host || "127.0.0.1:50505";
+    } catch {
+      return raw.replace(/^https?:\/\//, "").replace(/\/+$/, "") || "127.0.0.1:50505";
+    }
+  }
+  function updateEndpointSummaryUi() {
+    const httpHost = getRealtimeHttpHost();
+    const wsRaw = ($("rtWs")?.value || DEFAULTS.REALTIME_WS).toString().trim();
+    let wsPath = "/voice/ws";
+    try { wsPath = new URL(wsRaw).pathname || "/voice/ws"; } catch {}
+    if (bottomBackendEl) bottomBackendEl.textContent = httpHost;
+    if (bottomWsEl) bottomWsEl.textContent = wsPath;
+    if (headerBackendStatusEl && (!document.body.dataset.session || document.body.dataset.session === "off")) {
+      headerBackendStatusEl.textContent = httpHost;
+    }
+  }
   function setSessionStatus(state) {
-    if (state === "ON") setPillElement(sessionStatusEl, "ok", "Session: ON");
-    else if (state === "STARTING") setPillElement(sessionStatusEl, "warn", "Session: STARTING");
-    else if (state === "RECONNECTING") setPillElement(sessionStatusEl, "warn", "Session: RECONNECTING");
-    else setPillElement(sessionStatusEl, "bad", "Session: OFF");
+    const normalized = state === "ON" || state === "STARTING" || state === "RECONNECTING" ? state : "OFF";
+    const text = `Session: ${normalized}`;
+    const pillState = normalized === "ON" ? "ok" : normalized === "OFF" ? "bad" : "warn";
+    setPillElement(sessionStatusEl, pillState, text);
+    if (voiceStatusSessionEl) voiceStatusSessionEl.textContent = normalized;
+    if (headerBackendStatusEl) {
+      const host = getRealtimeHttpHost();
+      headerBackendStatusEl.textContent =
+        normalized === "ON" ? `Connected ${host}` :
+        normalized === "STARTING" ? `Starting ${host}` :
+        normalized === "RECONNECTING" ? `Reconnecting ${host}` :
+        host;
+    }
+    try { document.body.dataset.session = normalized.toLowerCase(); } catch {}
   }
   function updateActivityStatus() {
-    if (activitySpeakingActive) setPillElement(activityStatusEl, "ok", "Activity: Speaking");
-    else if (activityListeningActive) setPillElement(activityStatusEl, "ok", "Activity: Listening");
-    else setPillElement(activityStatusEl, "warn", "Activity: Idle");
+    const activity = activitySpeakingActive ? "Speaking" : activityListeningActive ? "Listening" : "Idle";
+    setPillElement(activityStatusEl, activity === "Idle" ? "warn" : "ok", `Activity: ${activity}`);
+    if (voiceStatusActivityEl) voiceStatusActivityEl.textContent = activity;
+    try { document.body.dataset.activity = activity.toLowerCase(); } catch {}
   }
   function setListeningIndicator(active) {
     activityListeningActive = !!active;
@@ -127,6 +172,19 @@ Do not introduce new topics.`;
   const voiceInstrUpdatedAtEl = $("voiceInstrUpdatedAt");
   const voiceScenarioNameEl = $("voiceScenarioName");
   const voiceScenarioDescriptionEl = $("voiceScenarioDescription");
+  const headerBackendStatusEl = $("headerBackendStatus");
+  const headerProviderSummaryEl = $("headerProviderSummary");
+  const voiceStatusSessionEl = $("voiceStatusSession");
+  const voiceStatusActivityEl = $("voiceStatusActivity");
+  const voiceStatusProviderEl = $("voiceStatusProvider");
+  const voiceStatusModelEl = $("voiceStatusModel");
+  const voiceStatusVoiceEl = $("voiceStatusVoice");
+  const voiceStatusOutputLanguageEl = $("voiceStatusOutputLanguage");
+  const bottomBackendEl = $("bottomBackend");
+  const bottomWsEl = $("bottomWs");
+  const bottomOutputEl = $("bottomOutput");
+  const bottomVolumeMirrorEl = $("bottomVolumeMirror");
+  const bottomVolumeValueEl = $("bottomVolumeValue");
   const btnVoiceCopyInstr = $("btnVoiceCopyInstr");
   const btnVoiceOpenInstr = $("btnVoiceOpenInstr");
   function setActiveNav(btn) {
@@ -275,6 +333,7 @@ Do not introduce new topics.`;
   function loadEndpointSettingsIntoInputs() {
     $("rtHttp").value = loadStrLS(LS_RT_HTTP, DEFAULTS.REALTIME_HTTP);
     $("rtWs").value = loadStrLS(LS_RT_WS, DEFAULTS.REALTIME_WS);
+    updateEndpointSummaryUi();
   }
 function loadVoiceSettingsIntoInputs() {
   const rate = normalizeRealtimeRate(loadStrLS(LS_REALTIME_RATE, DEFAULT_REALTIME_RATE));
@@ -304,6 +363,8 @@ function normalizePlaybackVolume(value) {
 function updatePlaybackVolumeUi() {
   if (playbackVolumeEl) playbackVolumeEl.value = String(playbackVolume);
   if (playbackVolumeValueEl) playbackVolumeValueEl.textContent = playbackVolume.toFixed(2);
+  if (bottomVolumeMirrorEl) bottomVolumeMirrorEl.value = String(playbackVolume);
+  if (bottomVolumeValueEl) bottomVolumeValueEl.textContent = playbackVolume.toFixed(2);
 }
 
 function applyPlaybackVolume(value) {
@@ -357,10 +418,37 @@ function loadInstructionsTargetIntoInputs() {
     return (providerActiveEl?.value || "azure-openai-realtime").toString();
   }
 
+  function selectedOptionText(selectEl) {
+    if (!selectEl) return "";
+    return (selectEl.options?.[selectEl.selectedIndex]?.textContent || selectEl.value || "").toString().trim();
+  }
+
+  function providerDisplayName(providerId) {
+    const caps = providerCapabilitiesState?.providers?.[providerId];
+    if (!caps) return "";
+    return (caps.label || caps.name || providerId || "").toString().trim();
+  }
+
+  function updateProviderSummaryUi() {
+    const activeProvider = getSelectedProviderId();
+    const providerName = providerDisplayName(activeProvider) || "Not loaded";
+    const model = (providerModelEl?.value || "").toString().trim() || "Not loaded";
+    const voice = selectedOptionText(providerVoiceEl) || "Not loaded";
+    const outgoing = selectedOptionText(providerOutgoingLanguageEl) || "Not loaded";
+    if (headerProviderSummaryEl) headerProviderSummaryEl.textContent = providerName;
+    if (voiceStatusProviderEl) voiceStatusProviderEl.textContent = providerName;
+    if (voiceStatusModelEl) voiceStatusModelEl.textContent = model;
+    if (voiceStatusVoiceEl) voiceStatusVoiceEl.textContent = voice;
+    if (voiceStatusOutputLanguageEl) voiceStatusOutputLanguageEl.textContent = outgoing;
+  }
+
   function applyProviderUi(providerId) {
     const caps = providerCapabilitiesState?.providers?.[providerId];
     const cfgProvider = providerConfigState?.providers?.[providerId] || {};
-    if (!caps) return;
+    if (!caps) {
+      updateProviderSummaryUi();
+      return;
+    }
 
     if (providerRegionRow) providerRegionRow.style.display = caps.requiresRegion ? "" : "none";
     if (providerEndpointRow) providerEndpointRow.style.display = caps.requiresEndpoint ? "" : "none";
@@ -376,6 +464,7 @@ function loadInstructionsTargetIntoInputs() {
     fillSelectOptions(providerVoiceEl, caps.supportedVoices || [], cfgProvider.voice || caps.defaultVoice);
     fillSelectOptions(providerIncomingLanguageEl, caps.supportedIncomingLanguages || [], cfgProvider.incomingLanguage || caps.defaultIncomingLanguage || "en");
     fillSelectOptions(providerOutgoingLanguageEl, caps.supportedOutgoingLanguages || [], cfgProvider.outgoingLanguage || caps.defaultOutgoingLanguage || "en");
+    updateProviderSummaryUi();
   }
   function buildProviderConfigFromUi() {
 
@@ -421,6 +510,7 @@ function loadInstructionsTargetIntoInputs() {
       setProviderStatus("Provider config loaded");
     } catch (e) {
       setProviderStatus(`Provider config load failed: ${e?.message || e}`);
+      updateProviderSummaryUi();
     }
   }
 function normalizeRealtimeRate(rate) {
@@ -1569,6 +1659,17 @@ if (btnInstrRefresh) {
       if (label) localStorage.setItem(LS_RT_DEVICE_PREFERRED_LABEL, label);
     } catch {}
   }
+  function currentOutputLabel() {
+    const selected = rtDeviceSel?.options?.[rtDeviceSel.selectedIndex]?.textContent || "";
+    const saved = (() => {
+      try { return (localStorage.getItem(LS_RT_DEVICE_LABEL) || "").trim(); } catch { return ""; }
+    })();
+    const label = (selected && selected !== "(auto)") ? selected : saved;
+    return label || "Not selected";
+  }
+  function updateOutputSummaryUi() {
+    if (bottomOutputEl) bottomOutputEl.textContent = currentOutputLabel();
+  }
   async function refreshOutputDevicesUI() {
     const outputs = await enumerateAudioOutputs();
     const current = (rtDeviceSel.value || "").trim();
@@ -1591,6 +1692,7 @@ if (btnInstrRefresh) {
     } else {
       rtDeviceSel.value = "";
     }
+    updateOutputSummaryUi();
     push(`Audio outputs detected: ${outputs.length}`);
   }
   // Tracks last applied sink so we can "hold" it if headphones disappear.
@@ -1612,6 +1714,7 @@ if (btnInstrRefresh) {
   async function applyRealtimeSink() {
     if (typeof rtOutEl.setSinkId !== "function") {
       push("ERROR: rtOut.setSinkId is not supported in this Electron build. Direct Realtime requires headphones output.");
+      updateOutputSummaryUi();
       return false;
     }
     const outputs = await enumerateAudioOutputs();
@@ -1657,13 +1760,18 @@ if (btnInstrRefresh) {
     if (!candidateId) {
       if (REALTIME_HEADPHONES_ONLY) {
         push("ERROR: Realtime sink: no headphones device available. Direct Realtime will not start.");
+        updateOutputSummaryUi();
         return false;
       }
       push("WARN: No suitable output device found. Realtime will stay on current sink.");
+      updateOutputSummaryUi();
       return false;
     }
     // If candidate is unchanged, skip
-    if (candidateId === lastAppliedSinkId) return true;
+    if (candidateId === lastAppliedSinkId) {
+      updateOutputSummaryUi();
+      return true;
+    }
     try {
       await rtOutEl.setSinkId(candidateId);
       // Update UI selection if possible
@@ -1673,11 +1781,13 @@ if (btnInstrRefresh) {
       const label = getOutputLabelById(outputs, candidateId) || candidateId;
       saveRtDeviceSelection(candidateId, label);
       lastAppliedSinkId = candidateId;
+      updateOutputSummaryUi();
       push(`Realtime output sink set to: ${label}`);
       return true;
     } catch (e) {
       const msg = e?.message || e;
       push(`ERROR: setSinkId failed: ${msg}`);
+      updateOutputSummaryUi();
       return false;
     }
   }
@@ -2354,6 +2464,7 @@ if (btnInstrRefresh) {
     saveStrLS(LS_IDLE_GUARD_MINUTES, (idleGuardMinutesEl?.value || "0").toString());
     saveStrLS(LS_IDLE_GUARD_WARN, idleGuardWarnEl?.checked ? "1" : "0");
     saveStrLS(LS_MAX_SESSION_MINUTES, (maxSessionMinutesEl?.value || "0").toString());
+    updateEndpointSummaryUi();
     markSettingsSaved("Saved");
   }
   function resetSettingsToDefaults() {
@@ -2371,6 +2482,7 @@ if (btnInstrRefresh) {
   function applyLocalBackendPreset() {
     $("rtHttp").value = LOCAL_BACKEND_PRESET.REALTIME_HTTP;
     $("rtWs").value = LOCAL_BACKEND_PRESET.REALTIME_WS;
+    updateEndpointSummaryUi();
     push("Local backend endpoint preset applied. Click Save settings.");
   }
   if (btnUseLocalBackend) btnUseLocalBackend.addEventListener("click", () => {
@@ -2395,8 +2507,15 @@ if (btnInstrRefresh) {
       }
 
       applyProviderUi(getSelectedProviderId());
+      updateProviderSummaryUi();
       setProviderStatus("Provider changed. Save provider to persist.");
     });
+  }
+
+  for (const el of [providerModelEl, providerVoiceEl, providerOutgoingLanguageEl]) {
+    if (!el) continue;
+    el.addEventListener("change", updateProviderSummaryUi);
+    el.addEventListener("input", updateProviderSummaryUi);
   }
 
   if (btnProviderSave) {

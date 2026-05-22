@@ -17,171 +17,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CHATT Direct – Realtime Voice</title>
 
-    <style>
-      body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; }
-      h2 { margin: 0 0 8px 0; }
-      h3 { margin: 16px 0 8px 0; }
-      .row { display:flex; align-items:center; gap:12px; margin: 10px 0; flex-wrap: wrap; }
-      label { min-width: 160px; color:#333; }
-      input { width: 920px; max-width: 100%; padding: 8px 10px; }
-      select { width: 520px; max-width: 100%; padding: 8px 10px; }
-      textarea { width: 100%; padding: 10px; }
-      button { padding: 10px 14px; }
-      .pill { display:inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; border:1px solid #ccc; }
-      .ok { background:#e7f6ea; border-color:#b6e2bf; color:#175f2c; }
-      .bad { background:#fdeaea; border-color:#f1b5b5; color:#7a1a1a; }
-      .warn { background:#fff4e5; border-color:#ffd8a8; color:#7a4a00; }
-      .costGuardNotice { display:none; margin: 10px 0 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid #ffd8a8; background:#fff4e5; color:#7a4a00; font-size: 13px; }
-      .costGuardNotice.active { display:block; }
-      .costGuardNotice.bad { border-color:#f1b5b5; background:#fdeaea; color:#7a1a1a; }
-      .small { font-size: 12px; color:#555; }
-      pre#log { margin-top: 10px; padding: 12px; border: 1px solid #ddd; height: 320px; overflow:auto; white-space: pre-wrap; }
-      code { background:#f6f6f6; padding:2px 6px; border-radius:6px; }
-      .box { border:1px solid #eee; padding:12px; border-radius:10px; }
-      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-      .hidden { display:none; }
-      .check { display:flex; align-items:center; gap:10px; }
-      .check input { width:auto; }
 
-      .nav { display:flex; gap:10px; margin: 14px 0 18px 0; }
-      .nav button { padding: 8px 12px; }
-      .nav button.active { border: 2px solid #333; }
-      .view { display:none; }
-      .view.active { display:block; }
-
-      .voiceLayout {
-        display: grid;
-        grid-template-columns: minmax(520px, 760px) 220px;
-        gap: 16px;
-        align-items: start;
-      }
-
-      @media (max-width: 1000px) {
-        .voiceLayout {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .voiceActionsPanel {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        align-items: stretch;
-      }
-
-      .voiceActionsPanel button {
-        width: 100%;
-        text-align: center;
-      }
-
-      .card { border:1px solid #ddd; padding:10px; border-radius:10px; margin: 10px 0; }
-      .card strong { display:block; }
-      .card textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-
-      .scenarioCards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 8px;
-        margin: 12px 0 14px 0;
-      }
-
-      .scenarioCard {
-        position: relative;
-        width: 100%;
-        min-height: 72px;
-        text-align: left;
-        background: #ffffff;
-        border: 1px solid #cfd7e3;
-        border-radius: 10px;
-        padding: 10px 11px;
-        cursor: pointer;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      }
-
-      .scenarioCard:hover {
-        border-color: #4f7cff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-      }
-
-      .scenarioCard.active {
-        border: 2px solid #2457ff;
-        background: #f3f6ff;
-      }
-
-      .scenarioCard strong {
-        margin-bottom: 6px;
-        font-size: 13px;
-        line-height: 1.25;
-      }
-
-      .scenarioCard::after {
-        content: "Click to select";
-        display: block;
-        margin-top: 6px;
-        font-size: 11px;
-        color: #2457ff;
-        font-weight: 600;
-      }
-
-      .scenarioCard.active::after {
-        content: "Selected";
-        color: #175f2c;
-      }
-
-      .scenarioTooltip {
-        display: none;
-        position: absolute;
-        z-index: 50;
-        left: 0;
-        top: calc(100% + 8px);
-        width: min(360px, 80vw);
-        background: #ffffff;
-        border: 1px solid #cfd7e3;
-        border-radius: 12px;
-        padding: 12px;
-        box-shadow: 0 10px 28px rgba(0,0,0,0.18);
-        color: #1f2937;
-      }
-
-      .scenarioCard:hover .scenarioTooltip,
-      .scenarioCard:focus-within .scenarioTooltip {
-        display: block;
-      }
-
-      .scenarioTooltipTitle {
-        font-weight: 700;
-        margin-bottom: 6px;
-      }
-
-      .scenarioTooltipMeta {
-        font-size: 12px;
-        color: #4b5563;
-        margin-bottom: 8px;
-      }
-
-      .scenarioTooltipText {
-        font-size: 12px;
-        line-height: 1.4;
-        margin-top: 6px;
-      }
-
-      .logbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin: 8px 0 10px 0; }
-      .logbar label { min-width: auto; }
-      .logbar input[type="text"] { width: 420px; max-width: 100%; padding: 6px 10px; }
-      .logbar .spacer { flex: 1 1 auto; }
-      .logbar button { padding: 8px 12px; }
-      .logbar .check { display:flex; align-items:center; gap:8px; }
-    </style>
-
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https: wss: http://127.0.0.1:50505 ws://127.0.0.1:50505 http://localhost:50505 ws://localhost:50505;"
-    />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
 
   <body>
-    <h2>CHATT Direct – Realtime Voice</h2>
-
+    <div class="appShell">
+      <header class="appHeader">
+        <div class="brandBlock">
+          <div class="brandMark" aria-hidden="true"></div>
+          <div>
+            <h1 class="brandTitle">CHATT Direct</h1>
+            <div class="brandSubtitle">Realtime Voice</div>
+          </div>
+        </div>
+        <div class="headerCards" aria-label="Current runtime summary">
+          <div class="headerCard">
+            <span class="eyebrow">Backend</span>
+            <strong><span class="statusDot" aria-hidden="true"></span><span id="headerBackendStatus">127.0.0.1:50505</span></strong>
+          </div>
+          <div class="headerCard">
+            <span class="eyebrow" id="headerProviderEyebrow">Provider</span>
+            <strong id="headerProviderSummary">Not loaded</strong>
+          </div>
+        </div>
+      </header>
     <div class="nav">
       <button id="navVoice" type="button" class="active">Voice</button>
       <button id="navSettings" type="button">Settings</button>
@@ -191,61 +51,129 @@
     <!-- ===========================
          VOICE VIEW
          =========================== -->
-<div id="viewVoice" class="view active">
-  <div class="voiceLayout">
-    <div class="box">
-      <div class="row">
-        <span id="sid" class="hidden mono"></span>
-        <span id="sessionStatus" class="pill bad">Session: OFF</span>
-        <span id="activityStatus" class="pill warn">Activity: Idle</span>
-        <span id="sttStatus" class="pill bad hidden">DIRECT: OFF</span>
-        <span id="controlStatus" class="pill bad hidden">CONTROL: OFF</span>
-        <span id="rtStatus" class="pill bad hidden">REALTIME: OFF</span>
-        <span id="listenStatus" class="pill bad hidden">LISTENING</span>
-        <span id="speakStatus" class="pill bad hidden">SPEAKING</span>
+      <div id="viewVoice" class="view active">
+        <div class="voiceDashboard">
+          <section class="glassPanel voiceMainCard" aria-label="Voice session">
+            <div class="panelHeader">
+              <div class="panelIcon" aria-hidden="true"></div>
+              <div>
+                <h2>Voice Session</h2>
+                <div class="panelSub">Control your realtime voice session</div>
+              </div>
+            </div>
+
+            <div class="scenarioSummary">
+              <div class="scenarioLabel">Selected Scenario</div>
+              <div id="voiceScenarioName" class="scenarioName">Not loaded</div>
+              <div id="voiceScenarioDescription" class="scenarioDescription">Scenario behavior is loaded from the Scenarios tab.</div>
+            </div>
+
+            <div class="statusPillRow">
+              <span id="sid" class="hidden mono"></span>
+              <span id="sessionStatus" class="pill bad">Session: OFF</span>
+              <span id="activityStatus" class="pill warn">Activity: Idle</span>
+              <span id="sttStatus" class="pill bad hidden">DIRECT: OFF</span>
+              <span id="controlStatus" class="pill bad hidden">CONTROL: OFF</span>
+              <span id="rtStatus" class="pill bad hidden">REALTIME: OFF</span>
+              <span id="listenStatus" class="pill bad hidden">LISTENING</span>
+              <span id="speakStatus" class="pill bad hidden">SPEAKING</span>
+            </div>
+            <div id="costGuardNotice" class="costGuardNotice" role="status" aria-live="polite"></div>
+
+            <div id="aiVisual" class="aiVisual" aria-hidden="true">
+              <div class="waveform"></div>
+              <div class="aiCore"></div>
+            </div>
+
+            <div class="voiceControls">
+              <div class="controlRow">
+                <label for="realtimeRateVoice">Realtime rate</label>
+                <select id="realtimeRateVoice" class="rateSelect">
+                  <option value="1">1.0</option>
+                  <option value="0.9">0.9</option>
+                  <option value="0.8">0.8</option>
+                </select>
+                <span class="controlHint">Applies to the next connection.</span>
+              </div>
+
+              <div class="controlRow">
+                <label for="playbackVolume">Realtime volume</label>
+                <input id="playbackVolume" type="range" min="0" max="2" step="0.05" value="1" />
+                <span id="playbackVolumeValue" class="mono volumeValue">1.00</span>
+              </div>
+
+              <div class="controlRow">
+                <label for="rtDevice">Output device</label>
+                <div class="outputControl">
+                  <select id="rtDevice">
+                    <option value="">(auto)</option>
+                  </select>
+                  <button id="btnRefreshDevices" type="button">Refresh</button>
+                </div>
+                <span class="controlHint">Realtime playback output.</span>
+              </div>
+            </div>
+
+            <div class="quickControls">
+              <div class="quickControlsHeader">Quick controls</div>
+              <div class="quickControlsGrid">
+                <button id="btnStart" class="primaryAction" type="button" disabled>Start Direct Realtime</button>
+                <button id="btnStop" class="dangerAction" type="button" disabled>Stop Direct Realtime</button>
+                <button id="btnInstrRefresh" type="button">Refresh Instructions</button>
+                <button id="btnResetSession" type="button" title="Generate a new sessionId and reset local state (Ready state, no auto-connect).">Reset Session</button>
+                <button id="btnRepeatLastAnswer" type="button">Repeat Last Answer</button>
+              </div>
+            </div>
+
+            <audio id="rtOut" class="hidden" autoplay></audio>
+            <audio id="loopMonitor" class="hidden" muted></audio>
+          </section>
+
+          <aside class="voiceSide">
+            <section class="glassPanel sideCard" aria-label="Realtime status">
+              <div class="panelHeader">
+                <div class="panelIcon" aria-hidden="true"></div>
+                <div>
+                  <h3>Realtime Status</h3>
+                  <div class="panelSub">Live connection and session information</div>
+                </div>
+              </div>
+              <div class="statusTable">
+                <div class="statusRow"><span class="statusLabel">Session</span><span id="voiceStatusSession" class="statusValue">OFF</span></div>
+                <div class="statusRow"><span class="statusLabel">Activity</span><span id="voiceStatusActivity" class="statusValue">Idle</span></div>
+                <div class="statusRow"><span class="statusLabel">Provider</span><span id="voiceStatusProvider" class="statusValue">Not loaded</span></div>
+                <div class="statusRow"><span class="statusLabel">Model</span><span id="voiceStatusModel" class="statusValue">Not loaded</span></div>
+                <div class="statusRow"><span class="statusLabel">Voice</span><span id="voiceStatusVoice" class="statusValue">Not loaded</span></div>
+                <div class="statusRow"><span class="statusLabel">Output Language</span><span id="voiceStatusOutputLanguage" class="statusValue">Not loaded</span></div>
+                <div class="statusRow"><span class="statusLabel">Sample Rate</span><span class="statusValue">24 kHz</span></div>
+                <div class="statusRow"><span class="statusLabel">Channels</span><span class="statusValue">1 mono</span></div>
+                <div class="statusRow"><span class="statusLabel">Latency</span><span class="statusValue">Not measured</span></div>
+              </div>
+            </section>
+
+            <section class="glassPanel sideCard activityCard" aria-label="Activity">
+              <div class="panelHeader">
+                <div class="panelIcon" aria-hidden="true"></div>
+                <div>
+                  <h3>Activity</h3>
+                  <div class="panelSub">Current session activity</div>
+                </div>
+              </div>
+              <div id="voiceActivityList" class="activityList">
+                <div class="activityItem">Ready. No session activity yet.</div>
+              </div>
+            </section>
+          </aside>
+        </div>
+
+        <footer class="glassPanel appBottomBar" aria-label="Runtime status">
+          <div class="bottomItem"><span class="bottomDot" aria-hidden="true"></span><span><span class="bottomLabel">Backend</span><span id="bottomBackend" class="bottomValue">127.0.0.1:50505</span></span></div>
+          <div class="bottomItem"><span class="bottomDot" aria-hidden="true"></span><span><span class="bottomLabel">WS</span><span id="bottomWs" class="bottomValue">/voice/ws</span></span></div>
+          <div class="bottomItem"><span><span class="bottomLabel">Audio Input</span><span id="bottomAudioInput" class="bottomValue">System loopback</span></span></div>
+          <div class="bottomItem"><span><span class="bottomLabel">Output</span><span id="bottomOutput" class="bottomValue">Not selected</span></span></div>
+          <div class="bottomVolume"><input id="bottomVolumeMirror" type="range" min="0" max="2" step="0.05" value="1" disabled /><span id="bottomVolumeValue" class="mono">1.00</span></div>
+        </footer>
       </div>
-      <div id="costGuardNotice" class="costGuardNotice" role="status" aria-live="polite"></div>
-
-      <div class="row">
-        <label style="min-width:120px;">Selected Scenario</label>
-        <span id="voiceScenarioName">Not loaded</span>
-      </div>
-
-      <div class="row">
-        <label style="min-width:140px;">Scenario behavior</label>
-        <span id="voiceScenarioDescription" class="small">Scenario behavior is loaded from the Scenarios tab.</span>
-      </div>
-
-      <div class="row">
-        <label style="min-width:120px;">Realtime rate</label>
-        <select id="realtimeRateVoice" style="width:140px;">
-          <option value="1">1.0</option>
-          <option value="0.9">0.9</option>
-          <option value="0.8">0.8</option>
-        </select>
-        <span class="small">Rate applies to the next Realtime connection.</span>
-      </div>
-
-      <div class="row">
-        <label style="min-width:140px;">Realtime volume</label>
-        <input id="playbackVolume" type="range" min="0" max="2" step="0.05" value="1" style="width:220px;" />
-        <span id="playbackVolumeValue" class="mono">1.00</span>
-      </div>
-
-      <audio id="rtOut" class="hidden" autoplay></audio>
-    </div>
-
-    <div class="voiceActionsPanel">
-      <button id="btnStart" type="button" disabled>Start Direct Realtime</button>
-      <button id="btnStop" type="button" disabled>Stop Direct Realtime</button>
-      <button id="btnInstrRefresh" type="button">Refresh Instructions</button>
-      <button id="btnRepeatLastAnswer" type="button">Repeat Last Answer</button>
-      <button id="btnResetSession" type="button" title="Generate a new sessionId and reset local state (Ready state, no auto-connect).">
-        Reset session
-      </button>
-    </div>
-  </div>
-</div>
     <!-- ===========================
          SETTINGS VIEW
          =========================== -->
@@ -270,14 +198,6 @@
             <option value="0.9">0.9</option>
             <option value="0.8">0.8</option>
           </select>
-        </div>
-
-        <div class="row">
-          <label>Realtime output</label>
-          <select id="rtDevice">
-            <option value="">(auto)</option>
-          </select>
-          <button id="btnRefreshDevices" type="button">Refresh devices</button>
         </div>
 
         <div class="row" style="margin-top:14px;">
@@ -392,11 +312,6 @@
             <div class="box" style="margin-top:14px;">
         <h3>Diagnostics</h3>
 
-        <div class="row">
-          <label class="small">Loopback monitor (muted)</label>
-          <audio id="loopMonitor" controls muted></audio>
-        </div>
-
         <div class="row small">
           Direct mode streams loopback/system audio as <b>PCM16 24k mono</b> to <code>/voice/ws</code>.
           Microphone is not used. Output is routed to the selected headphones/output device.
@@ -478,15 +393,7 @@
       </div>
     </div>
 
-    <div class="hidden" aria-hidden="true">
-  <input id="logFilter" type="text" />
-  <input id="logAutoscroll" type="checkbox" checked />
-  <button id="btnLogCopy" type="button">Copy</button>
-  <button id="btnLogClear" type="button">Clear</button>
-  <button id="btnLogDownload" type="button">Download</button>
-  <pre id="log"></pre>
-</div>
-
+    </div>
     <script src="./renderer.js"></script>
   </body>
 </html>
