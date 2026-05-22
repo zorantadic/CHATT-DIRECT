@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-22
+Last updated: 2026-05-21
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -37,7 +37,6 @@ scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
-scenario displayDetails metadata for product-facing explanations
 Voice page selected scenario visibility
 ```
 
@@ -206,14 +205,12 @@ instruction UI
 scenario selection/display
 compact clickable scenario cards
 scenario hover details popup
-scenario displayDetails metadata for product-facing explanations
 Realtime rate selection
 playback pipeline
 playback volume
 output device routing
 listening/speaking indicators
 reset-session guard behavior
-non-blocking Session Cost Guard notice display
 ```
 
 ---
@@ -375,7 +372,6 @@ Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
 Barge-in/interruption behavior
-Non-blocking Session Cost Guard notice on Voice page
 ```
 
 Reset behavior:
@@ -484,15 +480,10 @@ Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
 Desktop UI renders compact clickable backend scenario cards: OK
 Desktop scenario hover details popup: OK
-Desktop scenario hover popup uses displayDetails human-readable text: OK
-Scenario displayDetails metadata in backend/scenario_presets.json: OK
 Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
-Session Cost Guard non-blocking notice on Voice page: OK
-Session Cost Guard idle auto-stop leaves visible stop reason notice after stop: OK
-Session Cost Guard notice clears on next Start Direct Realtime: OK
 ```
 
 Before committing runtime changes, always run at minimum:
@@ -536,9 +527,8 @@ Selected provider voice is passed into Realtime session.update and works for Ope
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
-Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details from scenario.displayDetails, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
+Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
-Voice page displays non-blocking Session Cost Guard warning/stop notices
 ```
 
 Recent provider integration commits:
@@ -556,7 +546,6 @@ Update direct realtime idle timestamp on speech start
 Add session cost guard settings
 Add session cost guard warning timer
 Stop direct realtime on session cost guard limits
-Add non-blocking session cost guard notice
 ```
 
 Before continuing in a new session, run:
@@ -801,8 +790,7 @@ Scenarios tab loads GET /v1/scenarios.
 Scenario cards display backend scenario presets when available.
 Scenario cards are compact and show only the scenario name plus Selected / Click to select state.
 Hovering over a scenario card shows a human-readable details popup.
-The hover popup shows scenario name, category, displayDetails, and recommendedUse.
-The hover popup may fall back to shortDescription if displayDetails is missing.
+The hover popup shows scenario name, category, shortDescription, and recommendedUse.
 The hover popup does not show the model-facing instruction prompt.
 The hover popup is informational only and does not select or modify the scenario.
 Scenario dropdown displays backend scenario presets when available.
@@ -833,22 +821,6 @@ scenario.userInstruction
 
 scenario.userInstructionUpdatedAt
 = timestamp for the userInstruction override
-```
-
-Scenario display metadata:
-
-```text
-scenario.displayDetails
-= human-readable product/UX explanation for the scenario hover popup
-= explains what the user should expect from the scenario
-= not sent to the Realtime model as instructions
-= separate from scenario.instruction and scenario.userInstruction
-
-scenario.shortDescription
-= short UI summary and fallback for displayDetails
-
-scenario.recommendedUse
-= concise explanation of when to use the scenario
 ```
 
 Runtime instruction selection rule:
@@ -904,8 +876,7 @@ Scenario UX rule:
 ```text
 Scenario card content is intentionally compact.
 Scenario card hover details use human-readable metadata, not the model-facing instruction prompt.
-scenario.displayDetails separates product-facing explanation from model-facing instructions.
-Do not derive human-facing popup text from scenario.instruction.
+Future scenario_presets.json may add displayDetails to separate product-facing explanation from model-facing instructions.
 ```
 
 Final packaged app direction:
@@ -1087,7 +1058,6 @@ directLastSpeechStartedAt
 costGuardTimer
 costGuardLastIdleWarnAt
 costGuardLastMaxWarnAt
-costGuardNoticeEl
 ```
 
 Runtime behavior:
@@ -1099,11 +1069,8 @@ Cost Guard timer starts after Direct Realtime successfully starts.
 Cost Guard timer stops inside the existing stopDirectRealtime flow.
 checkCostGuard runs periodically and evaluates idle and hard max limits.
 Warning logs are emitted only when Warn before auto-stop is enabled.
-Warning notices are also shown in the Voice page costGuardNotice area when Warn before auto-stop is enabled.
 Idle limit reached calls stopDirectRealtime({ closeRealtime: true }).
-Idle limit reached writes `Session stopped by Cost Guard: idle limit reached (<n> min).` to the log and leaves the same message visible as a red non-blocking Voice page notice after stop.
 Hard max session duration reached calls stopDirectRealtime({ closeRealtime: true }).
-Hard max session duration reached writes `Session stopped by Cost Guard: max session duration reached (<n> min).` to the log and leaves the same message visible as a red non-blocking Voice page notice after stop.
 ```
 
 Confirmed runtime test:
@@ -1111,11 +1078,9 @@ Confirmed runtime test:
 ```text
 Idle warning appeared approximately 30 seconds before a 5-minute idle limit.
 Idle limit reached logged the stop reason.
-Idle limit reached displayed a visible non-blocking red stop reason notice on the Voice page after stop.
 Audio stopped immediately.
 Direct Realtime stopped.
 Realtime WebSocket closed cleanly with reason direct-realtime-stop.
-Cost Guard stop reason notice remained visible after auto-stop and cleared on the next Start Direct Realtime.
 ```
 
 Design boundaries:
@@ -1125,9 +1090,6 @@ Idle is based only on input_audio_buffer.speech_started.
 Do not use audio chunk/frame activity as idle signal.
 Do not add microphone input.
 Do not change AudioWorklet, PCM format, sample rate, WebSocket audio append, provider adapter payloads, or backend app_realtime.py for Cost Guard.
-Do not use window.alert() for Cost Guard UX because it blocks the renderer/event loop.
-Cost Guard warnings and stop reasons must use non-blocking UI such as the Voice page notice/banner.
-Cost Guard stop reason notices must not be cleared by stopCostGuardTimer(); they clear on the next Start Direct Realtime.
 Cost Guard belongs to Connection + Audio Settings, not Provider Configuration.
 ```
 
@@ -1137,6 +1099,7 @@ Next candidate improvements:
 Cost Guard UX improvement:
 - countdown/status in UI
 - remaining time display
+- toast/modal warning instead of log-only warning
 
 Stability and cost improvement:
 - protection when app is minimized/inactive
@@ -1189,8 +1152,6 @@ Plan second
 Change code third
 No broad cleanup without reference checks
 No commit before diff review and runtime validation
-For project code changes, user does not manually edit code; inspect first, then use Codex scripted/code patch workflow, verify one file at a time, runtime-test, then commit
-Codex prompts must be written in English even when chat discussion is Serbian
 Always specify exact folder/path for commands
 Use one or two tasks at a time
 ```
@@ -1203,3 +1164,122 @@ Run git status --short after Codex
 Inspect git diff --name-status and git diff --stat
 Do not commit unreviewed runtime-generated changes
 Restore accidental runtime changes before commit
+
+
+---
+
+## 22. Simplified Voice Status Indicators Runtime Baseline
+
+Commit:
+
+```text
+d94ee70 Simplify voice status indicators
+```
+
+The Voice page now exposes simplified user-facing runtime status:
+
+```text
+Session: OFF / STARTING / ON / RECONNECTING
+Activity: Idle / Listening / Speaking
+```
+
+Visible DOM elements:
+
+```text
+sessionStatus
+activityStatus
+```
+
+Hidden technical DOM elements preserved:
+
+```text
+sttStatus
+rtStatus
+listenStatus
+speakStatus
+```
+
+Runtime mapping:
+
+```text
+setDirectStatusOn(false)
+  -> hidden sttStatus = DIRECT: OFF
+  -> visible sessionStatus = Session: OFF
+
+setDirectStatusOn(false, "DIRECT: STARTING")
+  -> hidden sttStatus = DIRECT: STARTING
+  -> visible sessionStatus = Session: STARTING
+
+setDirectStatusOn(true)
+  -> hidden sttStatus = DIRECT: ON
+  -> visible sessionStatus = Session: ON
+
+setRealtimeStatus("ON")
+  -> hidden rtStatus = REALTIME: ON
+  -> visible sessionStatus = Session: ON
+
+setRealtimeStatus("RECONNECTING")
+  -> hidden rtStatus = REALTIME: RECONNECTING
+  -> visible sessionStatus = Session: RECONNECTING
+
+setRealtimeStatus("OFF")
+  -> hidden rtStatus = REALTIME: OFF
+  -> visible sessionStatus = Session: OFF only when Direct Realtime is not active/starting
+```
+
+Activity mapping:
+
+```text
+setListeningIndicator(true)
+  -> hidden listenStatus = active/ok
+  -> visible activityStatus = Activity: Listening unless assistant speaking is active
+
+setListeningIndicator(false)
+  -> hidden listenStatus = inactive/bad
+  -> visible activityStatus = Activity: Idle unless assistant speaking is active
+
+setSpeakingIndicator(true)
+  -> hidden speakStatus = active/ok
+  -> visible activityStatus = Activity: Speaking
+
+setSpeakingIndicator(false)
+  -> hidden speakStatus = inactive/bad
+  -> visible activityStatus = Activity: Idle unless listening is active
+```
+
+Current UI rule:
+
+```text
+The normal Voice page UI should show only Session and Activity.
+The older DIRECT / REALTIME / LISTENING / SPEAKING pills are hidden but intentionally retained.
+```
+
+Diagnostic compatibility rule:
+
+```text
+Do not remove sttStatus, rtStatus, listenStatus, or speakStatus from the DOM or renderer logic without a separate diagnostics/debug UI decision.
+They remain useful for troubleshooting Direct Realtime capture, websocket connectivity, input speech detection, and assistant playback state.
+```
+
+Validation:
+
+```text
+node --check Desktop/renderer/renderer.js: OK
+Runtime test: OK
+Initial state shows Session: OFF and Activity: Idle.
+Start Direct Realtime shows Session: STARTING then Session: ON.
+Incoming audio/speech detection shows Activity: Listening.
+Assistant output playback shows Activity: Speaking.
+Stop Direct Realtime returns to Session: OFF and Activity: Idle.
+```
+
+Boundaries:
+
+```text
+This change is UI status simplification only.
+It does not change loopback/system audio capture.
+It does not change Realtime websocket behavior.
+It does not change provider adapters or session.update payloads.
+It does not change Cost Guard behavior.
+It does not change scenario/instruction behavior.
+```

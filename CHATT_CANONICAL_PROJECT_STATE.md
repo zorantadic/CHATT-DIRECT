@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-22
+Last updated: 2026-05-21
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -39,7 +39,6 @@ scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
-scenario displayDetails metadata for product-facing explanations
 Voice page selected scenario visibility
 ```
 ---
@@ -273,7 +272,6 @@ Realtime rate
 Playback volume
 Output device
 Session Cost Guard controls
-non-blocking Session Cost Guard notice on Voice page
 Scenario & Instructions controls
 ```
 There are no active Desktop settings for:
@@ -321,7 +319,6 @@ Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
 Barge-in/interruption behavior
-Non-blocking Session Cost Guard notice on Voice page
 ```
 Reset behavior:
 ```text
@@ -413,15 +410,10 @@ Scenario first-run local seed from default template: OK
 Desktop Scenarios tab loads backend scenario presets: OK
 Desktop UI renders compact clickable backend scenario cards: OK
 Desktop scenario hover details popup: OK
-Desktop scenario hover popup uses displayDetails human-readable text: OK
-Scenario displayDetails metadata in backend/scenario_presets.json: OK
 Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
-Session Cost Guard non-blocking notice on Voice page: OK
-Session Cost Guard idle auto-stop leaves visible stop reason notice after stop: OK
-Session Cost Guard notice clears on next Start Direct Realtime: OK
 ```
 ---
 12. Current Known Good State
@@ -442,9 +434,8 @@ Selected provider voice is passed into Realtime session.update and works for Ope
 Azure provider uses OpenAI-compatible voices such as alloy with gpt-realtime-2
 Outgoing language is added to final Realtime instructions and works as language steering
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
-Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details from scenario.displayDetails, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
+Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
-Voice page displays non-blocking Session Cost Guard warning/stop notices
 ```
 ---
 13. Remaining Cleanup Work
@@ -598,7 +589,6 @@ Update direct realtime idle timestamp on speech start
 Add session cost guard settings
 Add session cost guard warning timer
 Stop direct realtime on session cost guard limits
-Add non-blocking session cost guard notice
 ```
 
 ---
@@ -697,7 +687,6 @@ Backend does not overwrite the local scenario file once it exists.
 Desktop Scenarios UI loads backend scenarios from GET /v1/scenarios.
 Desktop Scenarios UI renders compact clickable backend scenario cards.
 Hovering over a scenario card shows a human-readable details popup built from scenario metadata.
-The hover popup uses scenario.displayDetails as the primary product-facing explanation, with shortDescription as fallback.
 The hover popup is informational only and does not select or modify the scenario.
 Selecting a scenario card or dropdown item loads the selected scenario instruction into the existing instruction editor.
 If a scenario has userInstruction, Desktop loads userInstruction as Current Instructions.
@@ -726,22 +715,6 @@ userInstructionUpdatedAt
 = timestamp for the userInstruction override
 ```
 
-Scenario display metadata in scenario_presets.json:
-
-```text
-displayDetails
-= human-readable product/UX explanation for the scenario hover popup
-= explains what the user should expect from the scenario
-= not sent to the Realtime model as instructions
-= separate from instruction and userInstruction
-
-shortDescription
-= short UI summary and fallback for displayDetails
-
-recommendedUse
-= concise explanation of when to use the scenario
-```
-
 Implemented default scenarios include:
 
 ```text
@@ -768,14 +741,13 @@ Existing instruction editor remains the editing surface.
 Scenario cards are populated from backend scenarios when available.
 Scenario cards are compact and display only the scenario name plus Selected / Click to select state.
 Hovering over a scenario card opens a small human-readable details popup.
-Scenario hover popup shows name, category, displayDetails, and recommendedUse.
-Scenario hover popup may fall back to shortDescription if displayDetails is missing.
+Scenario hover popup shows name, category, shortDescription, and recommendedUse.
 Scenario hover popup does not show the technical instruction prompt.
 Scenario hover popup is informational only; clicking the card remains the only selection action.
 Scenario preset dropdown is populated from backend scenarios when available.
 Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
 Voice page shows Selected Scenario and Scenario behavior.
-Scenario displayDetails is the canonical field for richer human-readable popup text while keeping instruction as the model-facing prompt.
+Future scenario metadata should add displayDetails for richer human-readable popup text while keeping instruction as the model-facing prompt.
 ```
 
 Final packaged app direction:
@@ -813,8 +785,7 @@ Scenario UX rule:
 ```text
 Scenario card content is intentionally compact.
 Scenario card hover details use human-readable metadata, not the model-facing instruction prompt.
-scenario.displayDetails separates product-facing explanation from model-facing instructions.
-Do not derive human-facing popup text from scenario.instruction.
+Future scenario_presets.json may add displayDetails to separate product-facing explanation from model-facing instructions.
 ```
 
 ---
@@ -979,11 +950,8 @@ directSessionStartedAt records successful Start Direct Realtime time.
 directLastSpeechStartedAt records the latest provider/server VAD input_audio_buffer.speech_started event.
 A lightweight renderer setInterval checks limits every 5 seconds.
 Warning messages are written to the Desktop log through push(...).
-Warning messages are also shown in a non-blocking Voice page notice area.
 Idle auto-stop triggers when now - directLastSpeechStartedAt >= selected idle limit.
-Idle auto-stop writes a clear stop reason to the log and leaves a visible red notice on the Voice page after stop.
 Hard max auto-stop triggers when now - directSessionStartedAt >= selected max duration.
-Hard max auto-stop writes a clear stop reason to the log and leaves a visible red notice on the Voice page after stop.
 Both stop paths call the existing stopDirectRealtime({ closeRealtime: true }) flow.
 ```
 
@@ -992,12 +960,10 @@ Confirmed behavior:
 ```text
 Idle warning appears approximately 30 seconds before the idle limit.
 Idle limit reached logs a clear message and stops Direct Realtime.
-Idle limit reached leaves a visible non-blocking stop reason notice on the Voice page.
 Local audio playback stops immediately.
 Realtime WebSocket closes cleanly with direct-realtime-stop.
 New speech_started activity resets the idle timer.
 Hard max session duration does not reset on speech activity.
-Cost Guard stop reason notice remains visible after auto-stop and clears on the next Start Direct Realtime.
 ```
 
 Design boundaries:
@@ -1006,15 +972,13 @@ Design boundaries:
 Do not use audio frame/chunk activity as the idle signal.
 Do not add microphone input.
 Do not change AudioWorklet, sample rate, PCM format, WebSocket audio append, provider adapter payloads, or backend app_realtime.py for Cost Guard.
-Do not use window.alert() for Cost Guard UX because it blocks the renderer/event loop.
-Cost Guard warnings and stop reasons must use non-blocking UI such as the Voice page notice/banner.
 Cost Guard belongs to Connection + Audio Settings, not Provider Configuration.
 ```
 
 Next candidate improvements:
 
 ```text
-Cost Guard UX: countdown/status in UI and remaining time display.
+Cost Guard UX: countdown/status in UI, remaining time display, toast/modal warning instead of log-only warning.
 Stability and cost: auto-stop or protection when app is minimized/inactive, pause/resume behavior, reconnect policy review.
 ```
 
@@ -1043,8 +1007,6 @@ Plan second
 Change code third
 No broad cleanup without reference checks
 No commit before diff review and runtime validation
-For project code changes, user does not manually edit code; inspect first, then use Codex scripted/code patch workflow, verify one file at a time, runtime-test, then commit
-Codex prompts must be written in English even when chat discussion is Serbian
 Always specify exact folder/path for commands
 Use one or two tasks at a time
 ```
@@ -1056,3 +1018,101 @@ Inspect git diff --name-status and git diff --stat
 Do not commit unreviewed runtime-generated changes
 Restore accidental runtime changes before commit
 ``````
+
+
+---
+
+21. Simplified Voice Status Indicators Baseline
+
+Commit:
+
+```text
+d94ee70 Simplify voice status indicators
+```
+
+Current Voice page status model:
+
+```text
+The Voice page now uses two user-facing status indicators:
+- Session
+- Activity
+```
+
+User-facing Session states:
+
+```text
+Session: OFF
+Session: STARTING
+Session: ON
+Session: RECONNECTING
+```
+
+User-facing Activity states:
+
+```text
+Activity: Idle
+Activity: Listening
+Activity: Speaking
+```
+
+Implementation rule:
+
+```text
+The old technical indicators remain in the DOM as hidden compatibility/diagnostic elements.
+They must continue to be updated by the renderer logic.
+```
+
+Hidden technical indicators preserved:
+
+```text
+sttStatus     = DIRECT technical status
+rtStatus      = REALTIME websocket technical status
+listenStatus  = low-level listening/speech-detected activity
+speakStatus   = low-level assistant speaking activity
+```
+
+Current UX behavior:
+
+```text
+Normal users see Session and Activity only.
+DIRECT, REALTIME, LISTENING, and SPEAKING are hidden from the normal Voice page UI.
+The hidden technical indicators remain available for troubleshooting/debug compatibility.
+```
+
+Session state behavior:
+
+```text
+Direct Realtime starting shows Session: STARTING.
+Direct Realtime active / Realtime connected shows Session: ON.
+Realtime websocket reconnecting shows Session: RECONNECTING.
+Stopped or inactive Direct Realtime shows Session: OFF.
+```
+
+Activity state behavior:
+
+```text
+No current input/output activity shows Activity: Idle.
+Detected incoming speech shows Activity: Listening.
+Assistant audio playback shows Activity: Speaking.
+Speaking has priority over Listening when both internal signals overlap.
+```
+
+Validation:
+
+```text
+node --check Desktop/renderer/renderer.js: OK
+Runtime test: OK
+Voice page displays Session and Activity correctly.
+Start Direct Realtime: Session STARTING -> ON.
+Incoming speech: Activity Listening.
+Assistant response playback: Activity Speaking.
+Stop Direct Realtime: Session OFF and Activity Idle.
+Git clean after commit.
+```
+
+Design boundary:
+
+```text
+Do not remove hidden technical status elements without a separate diagnostics design.
+Do not change audio capture/playback, Realtime websocket flow, provider logic, scenario logic, or Cost Guard logic for this UI simplification.
+```
