@@ -21,6 +21,7 @@ const LS_REALTIME_RATE = "chatt.realtime.rate";
 const LS_PLAYBACK_VOLUME = "chatt.realtime.playbackVolume";
 const LS_INSTR_TARGET = "chatt.instructions.target"; // Direct Instructions target; always "realtime"
 const LS_INSTRUCTION_PRESET = "chatt.instructions.preset";
+const LS_DISPLAY_LANGUAGE = "chatt.displayLanguage";
 const LS_IDLE_GUARD_MINUTES = "chatt.costGuard.idleMinutes";
 const LS_IDLE_GUARD_WARN = "chatt.costGuard.warnBeforeStop";
 const LS_MAX_SESSION_MINUTES = "chatt.costGuard.maxSessionMinutes";
@@ -114,20 +115,20 @@ Do not introduce new topics.`;
     if (bottomBackendEl) bottomBackendEl.textContent = httpHost;
     if (bottomWsEl) bottomWsEl.textContent = wsPath;
     if (settingsDiagBackendEl) settingsDiagBackendEl.textContent = httpHost;
-    if (settingsConnectionBadgeEl) setSettingsBadge(settingsConnectionBadgeEl, "ok", "Ready");
+    if (settingsConnectionBadgeEl) setSettingsBadge(settingsConnectionBadgeEl, "ok", t("common.ready", "Ready"));
     if (headerBackendStatusEl && (!document.body.dataset.session || document.body.dataset.session === "off")) {
       headerBackendStatusEl.textContent = httpHost;
     }
   }
   function updateSettingsWsStatus(state) {
     if (!settingsDiagWsEl) return;
-    if (state === "ON") settingsDiagWsEl.textContent = "Connected";
-    else if (state === "RECONNECTING") settingsDiagWsEl.textContent = "Reconnecting";
-    else settingsDiagWsEl.textContent = "Ready";
+    if (state === "ON") settingsDiagWsEl.textContent = t("common.connected", "Connected");
+    else if (state === "RECONNECTING") settingsDiagWsEl.textContent = t("common.reconnecting", "Reconnecting");
+    else settingsDiagWsEl.textContent = t("common.ready", "Ready");
   }
   function setSessionStatus(state) {
     const normalized = state === "ON" || state === "STARTING" || state === "RECONNECTING" ? state : "OFF";
-    const text = `Session: ${normalized}`;
+    const text = `${t("status.sessionPrefix", "Session")}: ${normalized}`;
     const pillState = normalized === "ON" ? "ok" : normalized === "OFF" ? "bad" : "warn";
     setPillElement(sessionStatusEl, pillState, text);
     if (voiceStatusSessionEl) voiceStatusSessionEl.textContent = normalized;
@@ -143,8 +144,12 @@ Do not introduce new topics.`;
   }
   function updateActivityStatus() {
     const activity = activitySpeakingActive ? "Speaking" : activityListeningActive ? "Listening" : "Idle";
-    setPillElement(activityStatusEl, activity === "Idle" ? "warn" : "ok", `Activity: ${activity}`);
-    if (voiceStatusActivityEl) voiceStatusActivityEl.textContent = activity;
+    const activityText =
+      activity === "Speaking" ? t("status.activitySpeaking", "Speaking") :
+      activity === "Listening" ? t("status.activityListening", "Listening") :
+      t("status.activityIdle", "Idle");
+    setPillElement(activityStatusEl, activity === "Idle" ? "warn" : "ok", `${t("status.activityPrefix", "Activity")}: ${activityText}`);
+    if (voiceStatusActivityEl) voiceStatusActivityEl.textContent = activityText;
     try { document.body.dataset.activity = activity.toLowerCase(); } catch {}
   }
   function setListeningIndicator(active) {
@@ -312,6 +317,7 @@ Do not introduce new topics.`;
   const btnProviderSave = $("btnProviderSave");
   const btnProviderReset = $("btnProviderReset");
   const providerStatusEl = $("providerStatus");
+  const displayLanguageEl = $("displayLanguage");
   const idleGuardMinutesEl = $("idleGuardMinutes");
   const idleGuardWarnEl = $("idleGuardWarn");
   const maxSessionMinutesEl = $("maxSessionMinutes");
@@ -349,6 +355,174 @@ Do not introduce new topics.`;
   const btnInstrRefresh = $("btnInstrRefresh");
   const btnRepeatLastAnswer = $("btnRepeatLastAnswer");
   const instrTargetEl = $("instrTarget");
+
+  const SUPPORTED_DISPLAY_LANGUAGES = ["en", "es", "de", "sr"];
+  const DEFAULT_DISPLAY_LANGUAGE = "en";
+  let localeCatalogs = { ui: {}, scenarios: {} };
+  let localeCatalogLoadPromise = null;
+  let localeScenarioUiReady = false;
+
+  function normalizeDisplayLanguage(lang) {
+    const code = (lang || "").toString().trim().toLowerCase();
+    return SUPPORTED_DISPLAY_LANGUAGES.includes(code) ? code : DEFAULT_DISPLAY_LANGUAGE;
+  }
+
+  function getDisplayLanguage() {
+    return normalizeDisplayLanguage(loadStrLS(LS_DISPLAY_LANGUAGE, DEFAULT_DISPLAY_LANGUAGE));
+  }
+
+  function loadJsonAsset(path) {
+    return fetch(path, { cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .catch(() => new Promise((resolve, reject) => {
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open("GET", path, true);
+          xhr.overrideMimeType("application/json");
+          xhr.onload = () => {
+            try {
+              if (xhr.status && xhr.status >= 400) throw new Error(`HTTP ${xhr.status}`);
+              resolve(JSON.parse(xhr.responseText || "{}"));
+            } catch (e) {
+              reject(e);
+            }
+          };
+          xhr.onerror = () => reject(new Error("locale load failed"));
+          xhr.send();
+        } catch (e) {
+          reject(e);
+        }
+      }));
+  }
+
+  function loadLocaleCatalogs() {
+    if (localeCatalogLoadPromise) return localeCatalogLoadPromise;
+    localeCatalogLoadPromise = Promise.all([
+      loadJsonAsset("./locales/ui.json"),
+      loadJsonAsset("./locales/scenarios.json"),
+    ])
+      .then(([ui, scenarios]) => {
+        localeCatalogs = {
+          ui: ui && typeof ui === "object" ? ui : {},
+          scenarios: scenarios && typeof scenarios === "object" ? scenarios : {},
+        };
+        return localeCatalogs;
+      })
+      .catch((e) => {
+        push(`WARN: locale catalog load failed: ${e?.message || e}`);
+        localeCatalogs = { ui: {}, scenarios: {} };
+        return localeCatalogs;
+      });
+    return localeCatalogLoadPromise;
+  }
+
+  function readUiText(lang, key) {
+    const value = localeCatalogs?.ui?.[lang]?.[key];
+    return typeof value === "string" && value.trim() ? value : "";
+  }
+
+  function t(key, fallback) {
+    const k = (key || "").toString().trim();
+    const fb = fallback == null ? "" : fallback.toString();
+    if (!k) return fb;
+    const lang = getDisplayLanguage();
+    return readUiText(lang, k) || readUiText(DEFAULT_DISPLAY_LANGUAGE, k) || fb;
+  }
+
+  function applyTranslatedText(el, attr, fallbackAttr, setter) {
+    const key = (el.getAttribute(attr) || "").toString().trim();
+    if (!key) return;
+    let fallback = el.getAttribute(fallbackAttr);
+    if (fallback == null) {
+      fallback = setter === "textContent"
+        ? (el.textContent || "").toString()
+        : (el.getAttribute(setter) || "").toString();
+      el.setAttribute(fallbackAttr, fallback);
+    }
+    const value = t(key, fallback);
+    if (setter === "textContent") el.textContent = value;
+    else el.setAttribute(setter, value);
+  }
+
+  function applyLocale() {
+    const lang = getDisplayLanguage();
+    try { document.documentElement.lang = lang; } catch {}
+    if (displayLanguageEl) displayLanguageEl.value = lang;
+    document.title = `CHATT Direct - ${t("app.subtitle", "Realtime Voice")}`;
+
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      applyTranslatedText(el, "data-i18n", "data-i18n-fallback", "textContent");
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      applyTranslatedText(el, "data-i18n-placeholder", "data-i18n-placeholder-fallback", "placeholder");
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      applyTranslatedText(el, "data-i18n-title", "data-i18n-title-fallback", "title");
+    });
+    document.querySelectorAll("[data-i18n-aria-label]").forEach((el) => {
+      applyTranslatedText(el, "data-i18n-aria-label", "data-i18n-aria-label-fallback", "aria-label");
+    });
+
+    if (localeScenarioUiReady) {
+      try { renderScenarioPresetDropdown(); } catch {}
+      try { updateVoiceScenarioUI(); } catch {}
+      try { updateProviderSummaryUi(); } catch {}
+      try { updateEndpointSummaryUi(); } catch {}
+      try { updateCostGuardSummaryUi(); } catch {}
+    }
+  }
+
+  function setDisplayLanguage(lang) {
+    const next = normalizeDisplayLanguage(lang);
+    saveStrLS(LS_DISPLAY_LANGUAGE, next);
+    if (displayLanguageEl) displayLanguageEl.value = next;
+    applyLocale();
+    loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
+    return next;
+  }
+
+  function readScenarioText(lang, scenarioId, field) {
+    const value = localeCatalogs?.scenarios?.[lang]?.[scenarioId]?.[field];
+    return typeof value === "string" && value.trim() ? value : "";
+  }
+
+  function scenarioT(scenarioId, field, fallback) {
+    const id = (scenarioId || "").toString().trim();
+    const f = (field || "").toString().trim();
+    const fb = fallback == null ? "" : fallback.toString();
+    if (!id || !f) return fb;
+    const lang = getDisplayLanguage();
+    return readScenarioText(lang, id, f) || readScenarioText(DEFAULT_DISPLAY_LANGUAGE, id, f) || fb;
+  }
+
+  function localizeScenario(rawScenario) {
+    if (!rawScenario) return null;
+    const id = (rawScenario.id || "").toString().trim();
+    const missing = t("common.notProvided", "Not provided");
+    return {
+      ...rawScenario,
+      name: scenarioT(id, "name", rawScenario.name || id || missing),
+      category: scenarioT(id, "category", rawScenario.category || missing),
+      shortDescription: scenarioT(id, "shortDescription", rawScenario.shortDescription || missing),
+      recommendedUse: scenarioT(id, "recommendedUse", rawScenario.recommendedUse || missing),
+      displayDetails: scenarioT(id, "displayDetails", rawScenario.displayDetails || rawScenario.shortDescription || missing),
+      instruction: (rawScenario.instruction || "").toString(),
+      userInstruction: (rawScenario.userInstruction || "").toString(),
+      userInstructionUpdatedAt: (rawScenario.userInstructionUpdatedAt || "").toString(),
+    };
+  }
+
+  function getInstructionDefaultVariants(presetKey) {
+    const key = normalizeInstructionPresetKey(presetKey);
+    const values = [];
+    const scenario = getScenarioPresetById(key);
+    if (scenario?.instruction) values.push(scenario.instruction.toString());
+    if (Object.prototype.hasOwnProperty.call(INSTRUCTION_PRESETS, key)) values.push(INSTRUCTION_PRESETS[key]);
+    return Array.from(new Set(values.filter((value) => (value || "").toString().trim())));
+  }
 
   // Playback pipeline (Realtime) routed to rtOutEl via MediaStreamDestination
   let playbackCtx = null;
@@ -396,7 +570,7 @@ function updateCostGuardSummaryUi() {
   const max = (maxSessionMinutesEl?.value || "0").toString();
   const enabled = idle !== "0" || max !== "0";
   if (settingsCostGuardBadgeEl) {
-    setSettingsBadge(settingsCostGuardBadgeEl, enabled ? "warn" : "ok", enabled ? "Cost Guard Ready" : "Off");
+    setSettingsBadge(settingsCostGuardBadgeEl, enabled ? "warn" : "ok", enabled ? t("settings.costGuard.ready", "Cost Guard Ready") : t("common.off", "Off"));
   }
 }
 
@@ -432,7 +606,7 @@ function loadInstructionsTargetIntoInputs() {
   function initAuthUi() {
     const token = getAuthToken();
     if (authTokenEl) authTokenEl.value = token ? token : "";
-    setSettingsBadge(authStatusEl, token ? "ok" : "warn", token ? "Token set" : "No token");
+    setSettingsBadge(authStatusEl, token ? "ok" : "warn", token ? t("common.tokenSet", "Token set") : t("common.noToken", "No token"));
   }
   let providerCapabilitiesState = null;
   let providerConfigState = null;
@@ -443,23 +617,26 @@ function loadInstructionsTargetIntoInputs() {
   loadCostGuardSettingsIntoInputs();
   applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
   loadInstructionsTargetIntoInputs();
+  if (displayLanguageEl) displayLanguageEl.value = getDisplayLanguage();
+  applyLocale();
+  loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   loadProviderUi().catch(() => {});
 
   function setProviderStatus(message) {
     if (providerStatusEl) providerStatusEl.textContent = message || "";
     const m = (message || "").toLowerCase();
     if (m.includes("test passed")) {
-      setSettingsBadge(settingsProviderBadgeEl, "ok", "Provider Validated");
-      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Success";
+      setSettingsBadge(settingsProviderBadgeEl, "ok", t("settings.provider.validated", "Provider Validated"));
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = t("common.success", "Success");
     } else if (m.includes("test failed")) {
-      setSettingsBadge(settingsProviderBadgeEl, "bad", "Test Failed");
-      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Failed";
+      setSettingsBadge(settingsProviderBadgeEl, "bad", t("settings.provider.testFailed", "Test Failed"));
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = t("common.failed", "Failed");
     } else if (m.includes("incomplete") || m.includes("missing") || m.includes("load failed")) {
-      setSettingsBadge(settingsProviderBadgeEl, "warn", "Needs Attention");
-      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Not tested";
+      setSettingsBadge(settingsProviderBadgeEl, "warn", t("settings.provider.needsAttention", "Needs Attention"));
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = t("common.notTested", "Not tested");
     } else {
-      setSettingsBadge(settingsProviderBadgeEl, "warn", "Not tested");
-      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Not tested";
+      setSettingsBadge(settingsProviderBadgeEl, "warn", t("common.notTested", "Not tested"));
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = t("common.notTested", "Not tested");
     }
   }
 
@@ -492,10 +669,11 @@ function loadInstructionsTargetIntoInputs() {
 
   function updateProviderSummaryUi() {
     const activeProvider = getSelectedProviderId();
-    const providerName = providerDisplayName(activeProvider) || "Not loaded";
-    const model = (providerModelEl?.value || "").toString().trim() || "Not loaded";
-    const voice = selectedOptionText(providerVoiceEl) || "Not loaded";
-    const outgoing = selectedOptionText(providerOutgoingLanguageEl) || "Not loaded";
+    const notLoaded = t("common.notLoaded", "Not loaded");
+    const providerName = providerDisplayName(activeProvider) || notLoaded;
+    const model = (providerModelEl?.value || "").toString().trim() || notLoaded;
+    const voice = selectedOptionText(providerVoiceEl) || notLoaded;
+    const outgoing = selectedOptionText(providerOutgoingLanguageEl) || notLoaded;
     if (headerProviderSummaryEl) headerProviderSummaryEl.textContent = providerName;
     if (voiceStatusProviderEl) voiceStatusProviderEl.textContent = providerName;
     if (voiceStatusModelEl) voiceStatusModelEl.textContent = model;
@@ -880,10 +1058,10 @@ function normalizeStoredInstructionPresetKey(presetKey) {
 function findInstructionPresetForText(text) {
   const t = (text || "").toString();
   for (const scenario of scenarioPresetStore.scenarios || []) {
-    if (t === (scenario.instruction || "").toString()) return scenario.id;
+    if (getInstructionDefaultVariants(scenario.id).some((value) => t === value)) return scenario.id;
   }
   for (const [key, value] of Object.entries(INSTRUCTION_PRESETS)) {
-    if (t === value) return key;
+    if (t === value || getInstructionDefaultVariants(key).some((candidate) => t === candidate)) return key;
   }
   return "";
 }
@@ -1069,20 +1247,21 @@ function appendScenarioPreviewLine(parent, className, label, value) {
 }
 function renderScenarioLibraryPreview(scenario) {
   if (!scenarioLibraryPreviewEl) return;
+  const localized = scenario ? localizeScenario(scenario) : null;
 
   scenarioLibraryPreviewEl.replaceChildren();
-  if (!scenario) {
-    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewTitle", "", "Scenario Preview");
-    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewMeta", "Category", "");
-    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Details", "Hover a scenario card to preview metadata.");
-    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Recommended use", "");
+  if (!localized) {
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewTitle", "", t("scenarios.preview.title", "Scenario Preview"));
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewMeta", t("scenarios.preview.category", "Category"), "");
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", t("scenarios.preview.details", "Details"), t("scenarios.preview.emptyDetails", "Hover a scenario card to preview metadata."));
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", t("scenarios.preview.recommendedUse", "Recommended use"), "");
     return;
   }
 
-  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewTitle", "", scenario.name || scenario.id);
-  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewMeta", "Category", scenario.category);
-  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Details", scenario.displayDetails || scenario.shortDescription);
-  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Recommended use", scenario.recommendedUse);
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewTitle", "", localized.name || localized.id);
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewMeta", t("scenarios.preview.category", "Category"), localized.category);
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", t("scenarios.preview.details", "Details"), localized.displayDetails || localized.shortDescription);
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", t("scenarios.preview.recommendedUse", "Recommended use"), localized.recommendedUse);
 }
 function resetScenarioLibraryPreview() {
   renderScenarioLibraryPreview(getScenarioPresetById(getInstructionPreset()));
@@ -1099,7 +1278,7 @@ function renderScenarioCards() {
   if (!scenarios.length) {
     const empty = document.createElement("div");
     empty.className = "small";
-    empty.textContent = "Scenario cards will load from the backend.";
+    empty.textContent = t("scenarios.library.empty", "Scenario cards will load from the backend.");
     scenarioCardsEl.appendChild(empty);
     resetScenarioLibraryPreview();
     updateScenarioInstructionsUI();
@@ -1111,6 +1290,7 @@ function renderScenarioCards() {
   for (const scenario of scenarios) {
     const id = (scenario?.id || "").toString().trim();
     if (!id) continue;
+    const localized = localizeScenario(scenario);
 
     const card = document.createElement("button");
     card.type = "button";
@@ -1123,11 +1303,11 @@ function renderScenarioCards() {
 
     const title = document.createElement("strong");
     title.className = "scenarioCardTitle";
-    title.textContent = scenario.name || id;
+    title.textContent = localized?.name || id;
 
     const state = document.createElement("span");
     state.className = "scenarioCardState";
-    state.textContent = id === selectedId ? "Selected" : "Click to select";
+    state.textContent = id === selectedId ? t("scenarios.card.selected", "Selected") : t("scenarios.card.clickToSelect", "Click to select");
 
     card.appendChild(icon);
     card.appendChild(title);
@@ -1163,15 +1343,16 @@ function renderScenarioPresetDropdown() {
 
   if ((scenarioPresetStore.scenarios || []).length) {
     const scenarioGroup = document.createElement("optgroup");
-    scenarioGroup.label = "Scenarios";
+    scenarioGroup.label = t("nav.scenarios", "Scenarios");
     for (const scenario of scenarioPresetStore.scenarios) {
-      appendPresetOption(scenarioGroup, scenario.id, scenario.name || scenario.id);
+      const localized = localizeScenario(scenario);
+      appendPresetOption(scenarioGroup, scenario.id, localized?.name || scenario.id);
     }
     instructionPresetEl.appendChild(scenarioGroup);
 
   } else {
     for (const key of Object.keys(INSTRUCTION_PRESETS)) {
-      appendPresetOption(instructionPresetEl, key, INSTRUCTION_PRESET_LABELS[key] || key);
+      appendPresetOption(instructionPresetEl, key, scenarioT(key, "name", INSTRUCTION_PRESET_LABELS[key] || key));
     }
   }
 
@@ -1184,21 +1365,22 @@ function updateVoiceScenarioUI() {
 
   const id = getInstructionPreset();
   const scenario = getScenarioPresetById(id);
+  const localized = scenario ? localizeScenario(scenario) : null;
 
-  let name = "Not loaded";
-  let description = "Scenario behavior is loaded from the Scenarios tab.";
+  let name = t("common.notLoaded", "Not loaded");
+  let description = t("voice.scenarioFallback", "Scenario behavior is loaded from the Scenarios tab.");
 
-  if (scenario) {
-    name = scenario.name || scenario.id || name;
-    description = scenario.shortDescription || scenario.recommendedUse || description;
+  if (localized) {
+    name = localized.name || localized.id || name;
+    description = localized.shortDescription || localized.recommendedUse || description;
   } else if (id === "neutral_conversation") {
-    name = "Neutral Conversation";
+    name = scenarioT(id, "name", "Neutral Conversation");
     description = "General realtime conversation mode.";
   } else if (id === "cloud_solution_architect") {
-    name = "Cloud Solution Architect";
+    name = scenarioT(id, "name", "Cloud Solution Architect");
     description = "Cloud architecture guidance for live technical conversations.";
   } else if (id === "interview_candidate") {
-    name = "Interview Candidate";
+    name = scenarioT(id, "name", "Interview Candidate");
     description = "Interview answer coaching for candidate-style responses.";
   }
 
@@ -1208,7 +1390,7 @@ function updateVoiceScenarioUI() {
 }
 function scenarioDisplayValue(value) {
   const text = (value || "").toString().trim();
-  return text || "Not provided";
+  return text || t("common.notProvided", "Not provided");
 }
 function setScenarioBadge(el, text, tone) {
   if (!el) return;
@@ -1221,46 +1403,47 @@ function getInstructionOverrideState(scenario, current, defaultText) {
   const currentText = (current || "").toString();
   const baseText = (defaultText || "").toString();
 
-  if (scenarioOverride) return { text: "Custom override loaded", tone: "scenarioBadgeAmber" };
+  if (scenarioOverride) return { text: t("scenarios.customOverrideLoaded", "Custom override loaded"), tone: "scenarioBadgeAmber" };
   if (currentText.trim() && baseText.trim() && currentText !== baseText) {
-    return { text: "Edited override", tone: "scenarioBadgeAmber" };
+    return { text: t("scenarios.editedOverride", "Edited override"), tone: "scenarioBadgeAmber" };
   }
-  if (scenario) return { text: "Scenario default", tone: "scenarioBadgeGreen" };
-  return { text: "Not provided", tone: "scenarioBadgeAmber" };
+  if (scenario) return { text: t("scenarios.defaultState", "Scenario default"), tone: "scenarioBadgeGreen" };
+  return { text: t("common.notProvided", "Not provided"), tone: "scenarioBadgeAmber" };
 }
 function updateScenarioInstructionsUI() {
   const id = getInstructionPreset();
   const scenario = getScenarioPresetById(id);
+  const localized = scenario ? localizeScenario(scenario) : null;
   const target = getInstrTarget();
   const doc = instructionStore?.[target] || emptyInstrDoc();
-  const name = scenario ? (scenario.name || scenario.id) : scenarioDisplayValue(id);
-  const description = scenario
-    ? scenarioDisplayValue(scenario.shortDescription || scenario.recommendedUse)
-    : "Not provided";
+  const name = localized ? (localized.name || localized.id) : scenarioDisplayValue(id);
+  const description = localized
+    ? scenarioDisplayValue(localized.shortDescription || localized.recommendedUse)
+    : t("common.notProvided", "Not provided");
   const defaultText = (instrDefaultEl?.value || doc.default || getInstructionPresetDefaultText(id) || "").toString();
   const currentText = (instrCurrentEl?.value || doc.current || "").toString();
   const override = getInstructionOverrideState(scenario, currentText, defaultText);
   const refreshState =
     rtWs && rtWs.readyState === WebSocket.OPEN
-      ? "Realtime session connected"
+      ? t("scenarios.refreshConnected", "Realtime session connected")
       : rtWs && rtWs.readyState === WebSocket.CONNECTING
-        ? "Realtime session connecting"
-        : "Requires active realtime session";
+        ? t("scenarios.refreshConnecting", "Realtime session connecting")
+        : t("scenarios.refreshRequiresSession", "Requires active realtime session");
 
   if (scenarioSelectedNameEl) scenarioSelectedNameEl.textContent = name;
   if (scenarioSelectedDescriptionEl) scenarioSelectedDescriptionEl.textContent = description;
-  setScenarioBadge(scenarioSelectedBadgeEl, scenario ? "Active scenario" : "Not loaded", "scenarioBadgeBlue");
+  setScenarioBadge(scenarioSelectedBadgeEl, scenario ? t("scenarios.activeScenario", "Active scenario") : t("common.notLoaded", "Not loaded"), "scenarioBadgeBlue");
   setScenarioBadge(scenarioOverrideBadgeEl, override.text, override.tone);
-  setScenarioBadge(scenarioActiveStateEl, scenario ? "Selected / Active" : "Not loaded", "scenarioBadgeBlue");
+  setScenarioBadge(scenarioActiveStateEl, scenario ? t("scenarios.selectedActive", "Selected / Active") : t("common.notLoaded", "Not loaded"), "scenarioBadgeBlue");
   setScenarioBadge(scenarioCustomStateEl, override.text, override.tone);
 
-  if (scenarioDetailsCategoryEl) scenarioDetailsCategoryEl.textContent = scenarioDisplayValue(scenario?.category);
-  if (scenarioDetailsShortEl) scenarioDetailsShortEl.textContent = scenarioDisplayValue(scenario?.shortDescription);
-  if (scenarioDetailsUseEl) scenarioDetailsUseEl.textContent = scenarioDisplayValue(scenario?.recommendedUse);
+  if (scenarioDetailsCategoryEl) scenarioDetailsCategoryEl.textContent = scenarioDisplayValue(localized?.category);
+  if (scenarioDetailsShortEl) scenarioDetailsShortEl.textContent = scenarioDisplayValue(localized?.shortDescription);
+  if (scenarioDetailsUseEl) scenarioDetailsUseEl.textContent = scenarioDisplayValue(localized?.recommendedUse);
   if (instrSourceEl) instrSourceEl.textContent = scenarioDisplayValue(doc.source);
   if (instrUpdatedAtEl) instrUpdatedAtEl.textContent = scenarioDisplayValue(doc.updatedAt);
   if (instrBackendEl) instrBackendEl.textContent = getBackendLabelForTarget(target);
-  if (scenarioStateActiveEl) scenarioStateActiveEl.textContent = scenario ? `${name} (${scenario.id})` : "Not provided";
+  if (scenarioStateActiveEl) scenarioStateActiveEl.textContent = scenario ? `${name} (${scenario.id})` : t("common.notProvided", "Not provided");
   if (scenarioStateOverrideEl) scenarioStateOverrideEl.textContent = override.text;
   if (scenarioStateRefreshEl) scenarioStateRefreshEl.textContent = refreshState;
 }
@@ -1344,10 +1527,10 @@ function updateVoiceInstructionsUI() {
   updateVoiceScenarioUI();
   if (!voiceInstrTextEl) return;
   const eff = getEffectiveInstructionsForEngine().trim();
-  voiceInstrTextEl.textContent = eff ? eff : "(nije učitano)";
+  voiceInstrTextEl.textContent = eff ? eff : t("common.notLoaded", "Not loaded");
   if (voiceInstrUpdatedAtEl) {
     const ua = (instructionStore?.realtime?.updatedAt || "").toString();
-    voiceInstrUpdatedAtEl.textContent = ua ? ua : "(nije učitano)";
+    voiceInstrUpdatedAtEl.textContent = ua ? ua : t("common.notLoaded", "Not loaded");
   }
 }
 
@@ -1752,13 +1935,14 @@ if (btnRepeatLastAnswer) {
 }
 
 if (btnInstrRefresh) {
-  btnInstrRefresh.addEventListener("click", () => {
+  btnInstrRefresh.addEventListener("click", async () => {
     if (!rtWs || rtWs.readyState !== WebSocket.OPEN) {
       push("WARN: Realtime WS not connected; cannot refresh instructions.");
       return;
     }
 
     try {
+      await syncInstructionsToBackend("realtime", (instrCurrentEl?.value || "").toString(), { silent: true });
       rtWs.send(JSON.stringify({
         type: "refresh_instructions"
       }));
@@ -1776,6 +1960,10 @@ if (btnInstrRefreshProxyEls && btnInstrRefreshProxyEls.length) {
     });
   }
 }
+
+localeScenarioUiReady = true;
+applyLocale();
+loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
 
   // ------------------------------
   // Realtime output device selection (persisted) + Auto re-bind
@@ -1813,14 +2001,15 @@ if (btnInstrRefreshProxyEls && btnInstrRefreshProxyEls.length) {
       try { return (localStorage.getItem(LS_RT_DEVICE_LABEL) || "").trim(); } catch { return ""; }
     })();
     const label = (selected && selected !== "(auto)") ? selected : saved;
-    return label || "Not selected";
+    return label || t("common.notSelected", "Not selected");
   }
   function updateOutputSummaryUi() {
     const label = currentOutputLabel();
+    const notSelected = t("common.notSelected", "Not selected");
     if (bottomOutputEl) bottomOutputEl.textContent = label;
     if (settingsOutputDeviceTextEl) settingsOutputDeviceTextEl.textContent = label;
-    if (settingsDiagOutputEl) settingsDiagOutputEl.textContent = label === "Not selected" ? "Not selected" : "Ready";
-    if (settingsOutputBadgeEl) setSettingsBadge(settingsOutputBadgeEl, label === "Not selected" ? "warn" : "ok", label === "Not selected" ? "Not selected" : "Output Ready");
+    if (settingsDiagOutputEl) settingsDiagOutputEl.textContent = label === notSelected ? notSelected : t("common.ready", "Ready");
+    if (settingsOutputBadgeEl) setSettingsBadge(settingsOutputBadgeEl, label === notSelected ? "warn" : "ok", label === notSelected ? notSelected : t("common.outputReady", "Output Ready"));
   }
   async function refreshOutputDevicesUI() {
     const outputs = await enumerateAudioOutputs();
@@ -2604,7 +2793,7 @@ if (btnInstrRefreshProxyEls && btnInstrRefreshProxyEls.length) {
   // ------------------------------
   function markSettingsSaved(msg) {
     if (!settingsSaved) return;
-    settingsSaved.textContent = msg || "Saved";
+    settingsSaved.textContent = msg || t("common.saved", "Saved");
     window.setTimeout(() => {
       try { settingsSaved.textContent = ""; } catch {}
     }, 1500);
@@ -2616,9 +2805,10 @@ if (btnInstrRefreshProxyEls && btnInstrRefreshProxyEls.length) {
     saveStrLS(LS_IDLE_GUARD_MINUTES, (idleGuardMinutesEl?.value || "0").toString());
     saveStrLS(LS_IDLE_GUARD_WARN, idleGuardWarnEl?.checked ? "1" : "0");
     saveStrLS(LS_MAX_SESSION_MINUTES, (maxSessionMinutesEl?.value || "0").toString());
+    saveStrLS(LS_DISPLAY_LANGUAGE, getDisplayLanguage());
     updateEndpointSummaryUi();
     updateCostGuardSummaryUi();
-    markSettingsSaved("Saved");
+    markSettingsSaved(t("common.saved", "Saved"));
   }
   function resetSettingsToDefaults() {
     saveStrLS(LS_RT_HTTP, "");
@@ -2630,7 +2820,7 @@ if (btnInstrRefreshProxyEls && btnInstrRefreshProxyEls.length) {
     loadEndpointSettingsIntoInputs();
     loadVoiceSettingsIntoInputs();
     loadCostGuardSettingsIntoInputs();
-    markSettingsSaved("Reset to defaults");
+    markSettingsSaved(t("common.resetToDefaults", "Reset to defaults"));
   }
   function applyLocalBackendPreset() {
     $("rtHttp").value = LOCAL_BACKEND_PRESET.REALTIME_HTTP;
@@ -2650,6 +2840,11 @@ if (btnInstrRefreshProxyEls && btnInstrRefreshProxyEls.length) {
     resetSettingsToDefaults();
     try { refreshInstructionsPage().catch(() => {}); } catch {}
   });
+  if (displayLanguageEl) {
+    displayLanguageEl.addEventListener("change", () => {
+      setDisplayLanguage(displayLanguageEl.value);
+    });
+  }
   for (const el of [idleGuardMinutesEl, idleGuardWarnEl, maxSessionMinutesEl]) {
     if (!el) continue;
     el.addEventListener("change", updateCostGuardSummaryUi);
@@ -2781,7 +2976,7 @@ if (playbackVolumeEl) {
   // Auth token UI
   function setAuthStatus() {
     const token = getAuthToken();
-    setSettingsBadge(authStatusEl, token ? "ok" : "warn", token ? "Token set" : "No token");
+    setSettingsBadge(authStatusEl, token ? "ok" : "warn", token ? t("common.tokenSet", "Token set") : t("common.noToken", "No token"));
   }
   if (btnSaveToken) btnSaveToken.addEventListener("click", () => {
     const token = (authTokenEl?.value || "").trim();
