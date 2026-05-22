@@ -217,6 +217,7 @@ Do not introduce new topics.`;
   const idleGuardMinutesEl = $("idleGuardMinutes");
   const idleGuardWarnEl = $("idleGuardWarn");
   const maxSessionMinutesEl = $("maxSessionMinutes");
+  const costGuardNoticeEl = $("costGuardNotice");
   const authTokenEl = $("authToken");
   const btnSaveToken = $("btnSaveToken");
   const btnClearToken = $("btnClearToken");
@@ -1990,6 +1991,20 @@ if (btnInstrRefresh) {
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  function showCostGuardNotice(message, level) {
+    if (!costGuardNoticeEl) return;
+    costGuardNoticeEl.textContent = message || "";
+    costGuardNoticeEl.classList.remove("bad");
+    if (level === "bad") costGuardNoticeEl.classList.add("bad");
+    costGuardNoticeEl.classList.add("active");
+  }
+
+  function clearCostGuardNotice() {
+    if (!costGuardNoticeEl) return;
+    costGuardNoticeEl.textContent = "";
+    costGuardNoticeEl.classList.remove("active", "bad");
+  }
+
   function stopCostGuardTimer() {
     try { if (costGuardTimer) window.clearInterval(costGuardTimer); } catch {}
     costGuardTimer = null;
@@ -2010,13 +2025,17 @@ if (btnInstrRefresh) {
       const idleLimitMs = idleMinutes * 60 * 1000;
 
       if (idleMs >= idleLimitMs) {
-        push(`Session Cost Guard: idle limit reached (${idleMinutes} min). Stopping Direct Realtime.`);
+        const message = `Session stopped by Cost Guard: idle limit reached (${idleMinutes} min).`;
+        push(message);
+        showCostGuardNotice(message, "bad");
         stopDirectRealtime({ closeRealtime: true }).catch((e) => push(`ERROR(Session Cost Guard stop): ${e?.message || e}`));
         return;
       }
       if (warnEnabled && idleMs >= Math.max(0, idleLimitMs - 30000) && now - costGuardLastIdleWarnAt > 30000) {
         costGuardLastIdleWarnAt = now;
-        push(`Session Cost Guard: idle limit approaching (${idleMinutes} min).`);
+        const message = `Session Cost Guard: idle limit approaching (${idleMinutes} min).`;
+        push(message);
+        showCostGuardNotice(message, "warn");
       }
     }
 
@@ -2025,13 +2044,17 @@ if (btnInstrRefresh) {
       const maxLimitMs = maxMinutes * 60 * 1000;
 
       if (sessionMs >= maxLimitMs) {
-        push(`Session Cost Guard: max session duration reached (${maxMinutes} min). Stopping Direct Realtime.`);
+        const message = `Session stopped by Cost Guard: max session duration reached (${maxMinutes} min).`;
+        push(message);
+        showCostGuardNotice(message, "bad");
         stopDirectRealtime({ closeRealtime: true }).catch((e) => push(`ERROR(Session Cost Guard stop): ${e?.message || e}`));
         return;
       }
       if (warnEnabled && sessionMs >= Math.max(0, maxLimitMs - 30000) && now - costGuardLastMaxWarnAt > 30000) {
         costGuardLastMaxWarnAt = now;
-        push(`Session Cost Guard: max session limit approaching (${maxMinutes} min).`);
+        const message = `Session Cost Guard: max session limit approaching (${maxMinutes} min).`;
+        push(message);
+        showCostGuardNotice(message, "warn");
       }
     }
   }
@@ -2145,6 +2168,7 @@ if (btnInstrRefresh) {
     }
 
     directRealtimeStarting = true;
+    clearCostGuardNotice();
     directSessionStartedAt = Date.now();
     directLastSpeechStartedAt = directSessionStartedAt;
     setDirectStatusOn(false, "DIRECT: STARTING");
