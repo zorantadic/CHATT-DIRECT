@@ -750,10 +750,336 @@ body[data-activity="speaking"] .waveform {
 }
 
 .bottomVolume {
+  display: none;
+}
+
+.settingsDashboard {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settingsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.settingsCard {
+  padding: 16px;
+}
+
+.providerSettingsCard {
+  border-color: rgba(45, 125, 255, 0.32);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 125, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(18, 31, 50, 0.9), rgba(9, 17, 30, 0.94));
+}
+
+.costGuardCard {
+  border-color: rgba(248, 193, 74, 0.28);
+}
+
+.settingsCardHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
+  margin-bottom: 14px;
+}
+
+.settingsCardHeader.compact {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 12px;
+}
+
+.settingsCardHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.settingsIcon {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(45, 125, 255, 0.12);
+  box-shadow: inset 0 0 18px rgba(45, 125, 255, 0.16), 0 0 18px rgba(45, 125, 255, 0.12);
+}
+
+.settingsIcon::before,
+.settingsIcon::after {
+  content: "";
+  position: absolute;
+}
+
+.settingsIconLink::before {
+  inset: 12px;
+  border: 3px solid #75adff;
+  border-left-color: transparent;
+  border-radius: 999px;
+  transform: rotate(-35deg);
+}
+
+.settingsIconAudio::before {
+  left: 12px;
+  top: 13px;
+  width: 18px;
+  height: 16px;
+  border: 3px solid #75adff;
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+}
+
+.settingsIconAudio::after {
+  left: 9px;
+  top: 25px;
+  width: 5px;
+  height: 10px;
+  border: 2px solid #75adff;
+  border-radius: 4px;
+  box-shadow: 20px 0 0 -1px transparent, 20px 0 0 0 #75adff;
+}
+
+.settingsIconShield {
+  background: rgba(248, 193, 74, 0.12);
+}
+
+.settingsIconShield::before {
+  left: 12px;
+  top: 9px;
+  width: 18px;
+  height: 22px;
+  border: 3px solid var(--amber);
+  border-radius: 12px 12px 16px 16px;
+  clip-path: polygon(50% 0, 100% 18%, 86% 82%, 50% 100%, 14% 82%, 0 18%);
+}
+
+.settingsIconProvider::before {
+  left: 12px;
+  top: 11px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #75adff;
+  transform: rotate(30deg);
+}
+
+.settingsIconDiag::before {
+  left: 9px;
+  top: 18px;
+  width: 24px;
+  height: 4px;
+  background: #75adff;
+  box-shadow: 0 0 12px rgba(117, 173, 255, 0.6);
+}
+
+.settingsIconDiag::after {
+  left: 18px;
+  top: 10px;
+  width: 4px;
+  height: 22px;
+  background: #75adff;
+  box-shadow: 0 0 12px rgba(117, 173, 255, 0.6);
+}
+
+.settingsBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settingsBadge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.providerGrid {
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.settingsGridRow {
+  display: contents;
+}
+
+.settingsGrid label,
+.settingsLabel {
+  min-width: 0;
+  color: #c8d6ed;
+  font-size: 13px;
+}
+
+.settingsReadonly {
+  display: grid;
+  gap: 4px;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(8, 16, 28, 0.62);
+}
+
+.settingsMuted {
+  color: var(--muted-2);
+  font-size: 12px;
+}
+
+.settingsActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.twoActions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settingsStatusText {
+  min-height: 18px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.switchControl {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  width: 54px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.switchControl input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switchControl span {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 26px;
+  border: 1px solid rgba(45, 125, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(8, 16, 28, 0.86);
+}
+
+.switchControl span::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.switchControl input:checked + span {
+  background: rgba(45, 125, 255, 0.72);
+}
+
+.switchControl input:checked + span::before {
+  transform: translateX(22px);
+  background: #ffffff;
+}
+
+.settingsInfoLine {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(152, 181, 220, 0.12);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(5, 11, 21, 0.34);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.audioRouteVisual {
+  display: grid;
+  grid-template-columns: 56px minmax(80px, 1fr) 56px;
+  gap: 14px;
+  align-items: center;
+  margin: 14px 10px 0;
+}
+
+.routeHeadphones,
+.routeTarget {
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(45, 125, 255, 0.62);
+  border-radius: 50%;
+  background: rgba(45, 125, 255, 0.08);
+  box-shadow: 0 0 22px rgba(45, 125, 255, 0.22), inset 0 0 14px rgba(45, 125, 255, 0.12);
+}
+
+.routeLine {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--blue), var(--green));
+  box-shadow: 0 0 12px rgba(45, 125, 255, 0.5);
+}
+
+.routeTarget {
+  border-color: rgba(51, 209, 122, 0.62);
+  box-shadow: 0 0 22px rgba(51, 209, 122, 0.2), inset 0 0 14px rgba(51, 209, 122, 0.12);
+}
+
+.authInlinePanel,
+.settingsLogPanel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(152, 181, 220, 0.12);
+}
+
+.diagnosticsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  gap: 18px;
+  align-items: center;
+}
+
+.settingsStatusTable {
+  margin-top: 0;
+}
+
+.diagnosticSeal {
+  width: 112px;
+  height: 112px;
+  margin: 0 auto;
+  border: 2px solid rgba(51, 209, 122, 0.75);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(51, 209, 122, 0.14), transparent 58%),
+    rgba(5, 11, 21, 0.5);
+  box-shadow: 0 0 34px rgba(51, 209, 122, 0.28), inset 0 0 24px rgba(51, 209, 122, 0.12);
+}
+
+body[data-session="off"] #settingsDiagWs {
+  color: var(--muted);
 }
 
 .box {
@@ -933,6 +1259,10 @@ pre#log {
   .appBottomBar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .settingsDashboard {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 860px) {
@@ -961,5 +1291,19 @@ pre#log {
 
   .statusValue {
     text-align: left;
+  }
+
+  .settingsCardHeader,
+  .settingsGrid,
+  .providerGrid,
+  .settingsActions,
+  .providerActions,
+  .twoActions,
+  .diagnosticsLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .settingsBadge {
+    justify-self: start;
   }
 }

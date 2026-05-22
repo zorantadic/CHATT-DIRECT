@@ -95,6 +95,9 @@ Do not introduce new topics.`;
   function setPill(id, state, text) {
     setPillElement($(id), state, text);
   }
+  function setSettingsBadge(el, state, text) {
+    setPillElement(el, state, text);
+  }
   function getRealtimeHttpHost() {
     const raw = ($("rtHttp")?.value || DEFAULTS.REALTIME_HTTP).toString().trim();
     try {
@@ -110,9 +113,17 @@ Do not introduce new topics.`;
     try { wsPath = new URL(wsRaw).pathname || "/voice/ws"; } catch {}
     if (bottomBackendEl) bottomBackendEl.textContent = httpHost;
     if (bottomWsEl) bottomWsEl.textContent = wsPath;
+    if (settingsDiagBackendEl) settingsDiagBackendEl.textContent = httpHost;
+    if (settingsConnectionBadgeEl) setSettingsBadge(settingsConnectionBadgeEl, "ok", "Ready");
     if (headerBackendStatusEl && (!document.body.dataset.session || document.body.dataset.session === "off")) {
       headerBackendStatusEl.textContent = httpHost;
     }
+  }
+  function updateSettingsWsStatus(state) {
+    if (!settingsDiagWsEl) return;
+    if (state === "ON") settingsDiagWsEl.textContent = "Connected";
+    else if (state === "RECONNECTING") settingsDiagWsEl.textContent = "Reconnecting";
+    else settingsDiagWsEl.textContent = "Ready";
   }
   function setSessionStatus(state) {
     const normalized = state === "ON" || state === "STARTING" || state === "RECONNECTING" ? state : "OFF";
@@ -185,6 +196,16 @@ Do not introduce new topics.`;
   const bottomOutputEl = $("bottomOutput");
   const bottomVolumeMirrorEl = $("bottomVolumeMirror");
   const bottomVolumeValueEl = $("bottomVolumeValue");
+  const settingsConnectionBadgeEl = $("settingsConnectionBadge");
+  const settingsOutputBadgeEl = $("settingsOutputBadge");
+  const settingsCostGuardBadgeEl = $("settingsCostGuardBadge");
+  const settingsProviderBadgeEl = $("settingsProviderBadge");
+  const settingsPlaybackVolumeTextEl = $("settingsPlaybackVolumeText");
+  const settingsOutputDeviceTextEl = $("settingsOutputDeviceText");
+  const settingsDiagBackendEl = $("settingsDiagBackend");
+  const settingsDiagWsEl = $("settingsDiagWs");
+  const settingsDiagOutputEl = $("settingsDiagOutput");
+  const settingsDiagProviderTestEl = $("settingsDiagProviderTest");
   const btnVoiceCopyInstr = $("btnVoiceCopyInstr");
   const btnVoiceOpenInstr = $("btnVoiceOpenInstr");
   function setActiveNav(btn) {
@@ -352,6 +373,16 @@ function loadCostGuardSettingsIntoInputs() {
   if (maxSessionMinutesEl) {
     maxSessionMinutesEl.value = loadStrLS(LS_MAX_SESSION_MINUTES, "0");
   }
+  updateCostGuardSummaryUi();
+}
+
+function updateCostGuardSummaryUi() {
+  const idle = (idleGuardMinutesEl?.value || "0").toString();
+  const max = (maxSessionMinutesEl?.value || "0").toString();
+  const enabled = idle !== "0" || max !== "0";
+  if (settingsCostGuardBadgeEl) {
+    setSettingsBadge(settingsCostGuardBadgeEl, enabled ? "warn" : "ok", enabled ? "Cost Guard Ready" : "Off");
+  }
 }
 
 function normalizePlaybackVolume(value) {
@@ -365,6 +396,7 @@ function updatePlaybackVolumeUi() {
   if (playbackVolumeValueEl) playbackVolumeValueEl.textContent = playbackVolume.toFixed(2);
   if (bottomVolumeMirrorEl) bottomVolumeMirrorEl.value = String(playbackVolume);
   if (bottomVolumeValueEl) bottomVolumeValueEl.textContent = playbackVolume.toFixed(2);
+  if (settingsPlaybackVolumeTextEl) settingsPlaybackVolumeTextEl.textContent = playbackVolume.toFixed(2);
 }
 
 function applyPlaybackVolume(value) {
@@ -385,7 +417,7 @@ function loadInstructionsTargetIntoInputs() {
   function initAuthUi() {
     const token = getAuthToken();
     if (authTokenEl) authTokenEl.value = token ? token : "";
-    if (authStatusEl) authStatusEl.textContent = token ? "Token set" : "No token";
+    setSettingsBadge(authStatusEl, token ? "ok" : "warn", token ? "Token set" : "No token");
   }
   let providerCapabilitiesState = null;
   let providerConfigState = null;
@@ -400,6 +432,20 @@ function loadInstructionsTargetIntoInputs() {
 
   function setProviderStatus(message) {
     if (providerStatusEl) providerStatusEl.textContent = message || "";
+    const m = (message || "").toLowerCase();
+    if (m.includes("test passed")) {
+      setSettingsBadge(settingsProviderBadgeEl, "ok", "Provider Validated");
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Success";
+    } else if (m.includes("test failed")) {
+      setSettingsBadge(settingsProviderBadgeEl, "bad", "Test Failed");
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Failed";
+    } else if (m.includes("incomplete") || m.includes("missing") || m.includes("load failed")) {
+      setSettingsBadge(settingsProviderBadgeEl, "warn", "Needs Attention");
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Not tested";
+    } else {
+      setSettingsBadge(settingsProviderBadgeEl, "warn", "Not tested");
+      if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = "Not tested";
+    }
   }
 
   function fillSelectOptions(selectEl, items, selectedValue) {
@@ -580,6 +626,7 @@ function directRealtimeCfg() {
     return Math.min(WS_MAX_BACKOFF_MS, base + jitter);
   }
   function setRealtimeStatus(state) {
+    updateSettingsWsStatus(state);
     if (state === "ON") {
       setPill("rtStatus", "ok", "REALTIME: ON");
       setSessionStatus("ON");
@@ -1668,7 +1715,11 @@ if (btnInstrRefresh) {
     return label || "Not selected";
   }
   function updateOutputSummaryUi() {
-    if (bottomOutputEl) bottomOutputEl.textContent = currentOutputLabel();
+    const label = currentOutputLabel();
+    if (bottomOutputEl) bottomOutputEl.textContent = label;
+    if (settingsOutputDeviceTextEl) settingsOutputDeviceTextEl.textContent = label;
+    if (settingsDiagOutputEl) settingsDiagOutputEl.textContent = label === "Not selected" ? "Not selected" : "Ready";
+    if (settingsOutputBadgeEl) setSettingsBadge(settingsOutputBadgeEl, label === "Not selected" ? "warn" : "ok", label === "Not selected" ? "Not selected" : "Output Ready");
   }
   async function refreshOutputDevicesUI() {
     const outputs = await enumerateAudioOutputs();
@@ -2465,6 +2516,7 @@ if (btnInstrRefresh) {
     saveStrLS(LS_IDLE_GUARD_WARN, idleGuardWarnEl?.checked ? "1" : "0");
     saveStrLS(LS_MAX_SESSION_MINUTES, (maxSessionMinutesEl?.value || "0").toString());
     updateEndpointSummaryUi();
+    updateCostGuardSummaryUi();
     markSettingsSaved("Saved");
   }
   function resetSettingsToDefaults() {
@@ -2497,6 +2549,10 @@ if (btnInstrRefresh) {
     resetSettingsToDefaults();
     try { refreshInstructionsPage().catch(() => {}); } catch {}
   });
+  for (const el of [idleGuardMinutesEl, idleGuardWarnEl, maxSessionMinutesEl]) {
+    if (!el) continue;
+    el.addEventListener("change", updateCostGuardSummaryUi);
+  }
   if (providerActiveEl) {
     providerActiveEl.addEventListener("change", () => {
       if (directRealtimeActive || directRealtimeStarting) {
@@ -2623,9 +2679,8 @@ if (playbackVolumeEl) {
 
   // Auth token UI
   function setAuthStatus() {
-    if (!authStatusEl) return;
     const token = getAuthToken();
-    authStatusEl.textContent = token ? "Token set" : "No token";
+    setSettingsBadge(authStatusEl, token ? "ok" : "warn", token ? "Token set" : "No token");
   }
   if (btnSaveToken) btnSaveToken.addEventListener("click", () => {
     const token = (authTokenEl?.value || "").trim();

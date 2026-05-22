@@ -166,180 +166,241 @@
           </aside>
         </div>
 
-        <footer class="glassPanel appBottomBar" aria-label="Runtime status">
-          <div class="bottomItem"><span class="bottomDot" aria-hidden="true"></span><span><span class="bottomLabel">Backend</span><span id="bottomBackend" class="bottomValue">127.0.0.1:50505</span></span></div>
-          <div class="bottomItem"><span class="bottomDot" aria-hidden="true"></span><span><span class="bottomLabel">WS</span><span id="bottomWs" class="bottomValue">/voice/ws</span></span></div>
-          <div class="bottomItem"><span><span class="bottomLabel">Audio Input</span><span id="bottomAudioInput" class="bottomValue">System loopback</span></span></div>
-          <div class="bottomItem"><span><span class="bottomLabel">Output</span><span id="bottomOutput" class="bottomValue">Not selected</span></span></div>
-          <div class="bottomVolume"><input id="bottomVolumeMirror" type="range" min="0" max="2" step="0.05" value="1" disabled /><span id="bottomVolumeValue" class="mono">1.00</span></div>
-        </footer>
       </div>
     <!-- ===========================
          SETTINGS VIEW
          =========================== -->
     <div id="viewSettings" class="view">
-      <div class="box">
-        <h3>Connection + Audio Settings</h3>
+      <div class="settingsDashboard">
+        <div class="settingsColumn">
+          <section class="glassPanel settingsCard">
+            <div class="settingsCardHeader">
+              <div class="settingsIcon settingsIconLink" aria-hidden="true"></div>
+              <div>
+                <h3>Connection</h3>
+                <div class="panelSub">Configure and manage backend connectivity</div>
+              </div>
+              <span id="settingsConnectionBadge" class="settingsBadge warn">Ready</span>
+            </div>
 
-        <div class="row">
-          <label>Realtime HTTP</label>
-          <input id="rtHttp" type="text" />
+            <div class="settingsGrid">
+              <label for="rtHttp">Realtime HTTP</label>
+              <input id="rtHttp" type="text" />
+
+              <label for="rtWs">Realtime WS</label>
+              <input id="rtWs" type="text" />
+            </div>
+
+            <div class="settingsActions">
+              <button id="btnUseLocalBackend" type="button">Use Local Backend</button>
+              <button id="btnSaveSettings" type="button">Save Settings</button>
+              <button id="btnResetSettings" class="dangerAction" type="button">Reset Settings</button>
+            </div>
+            <div id="settingsSaved" class="settingsStatusText"></div>
+          </section>
+
+          <section class="glassPanel settingsCard">
+            <div class="settingsCardHeader">
+              <div class="settingsIcon settingsIconAudio" aria-hidden="true"></div>
+              <div>
+                <h3>Audio Output</h3>
+                <div class="panelSub">Configure realtime audio playback</div>
+              </div>
+              <span id="settingsOutputBadge" class="settingsBadge warn">Not selected</span>
+            </div>
+
+            <div class="settingsGrid">
+              <label for="realtimeRate">Realtime Rate</label>
+              <select id="realtimeRate">
+                <option value="1">1.0</option>
+                <option value="0.9">0.9</option>
+                <option value="0.8">0.8</option>
+              </select>
+
+              <span class="settingsLabel">Playback Volume</span>
+              <div class="settingsReadonly">
+                <span id="settingsPlaybackVolumeText" class="mono">1.00</span>
+                <span class="settingsMuted">Live control is on the Voice page.</span>
+              </div>
+
+              <span class="settingsLabel">Output Device</span>
+              <div class="settingsReadonly">
+                <span id="settingsOutputDeviceText">Not selected</span>
+                <span class="settingsMuted">Device selection is shared with Direct Realtime.</span>
+              </div>
+            </div>
+
+            <div class="audioRouteVisual" aria-hidden="true">
+              <div class="routeHeadphones"></div>
+              <div class="routeLine"></div>
+              <div class="routeTarget"></div>
+            </div>
+          </section>
+
+          <section class="glassPanel settingsCard costGuardCard">
+            <div class="settingsCardHeader">
+              <div class="settingsIcon settingsIconShield" aria-hidden="true"></div>
+              <div>
+                <h3>Session Cost Guard</h3>
+                <div class="panelSub">Protect against unexpected session costs</div>
+              </div>
+              <span id="settingsCostGuardBadge" class="settingsBadge warn">Ready</span>
+            </div>
+
+            <div class="settingsGrid">
+              <label for="idleGuardMinutes">Auto-stop if idle</label>
+              <select id="idleGuardMinutes">
+                <option value="0">Off</option>
+                <option value="5">5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="15">15 minutes</option>
+              </select>
+
+              <label for="idleGuardWarn">Warn before auto-stop</label>
+              <label class="switchControl">
+                <input id="idleGuardWarn" type="checkbox" checked />
+                <span></span>
+              </label>
+
+              <label for="maxSessionMinutes">Hard max session duration</label>
+              <select id="maxSessionMinutes">
+                <option value="0">Off</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">60 minutes</option>
+              </select>
+            </div>
+
+            <div class="settingsInfoLine">You will be warned before the session is auto-stopped when warnings are enabled.</div>
+          </section>
         </div>
 
-        <div class="row">
-          <label>Realtime WS</label>
-          <input id="rtWs" type="text" />
-        </div>
+        <div class="settingsColumn">
+          <section class="glassPanel settingsCard providerSettingsCard">
+            <div class="settingsCardHeader">
+              <div class="settingsIcon settingsIconProvider" aria-hidden="true"></div>
+              <div>
+                <h3>Provider Configuration</h3>
+                <div class="panelSub">Configure your realtime provider settings</div>
+              </div>
+              <span id="settingsProviderBadge" class="settingsBadge warn">Not tested</span>
+            </div>
 
-        <div class="row">
-          <label>Realtime rate</label>
-          <select id="realtimeRate">
-            <option value="1">1.0</option>
-            <option value="0.9">0.9</option>
-            <option value="0.8">0.8</option>
-          </select>
-        </div>
+            <div class="settingsGrid providerGrid">
+              <label for="providerActive">Active Provider</label>
+              <select id="providerActive">
+                <option value="azure-openai-realtime">Azure OpenAI Realtime</option>
+                <option value="openai-realtime">OpenAI Realtime</option>
+              </select>
 
-        <div class="row" style="margin-top:14px;">
-          <label>Auto-stop if idle</label>
-          <select id="idleGuardMinutes">
-            <option value="0">Off</option>
-            <option value="5">5 minutes</option>
-            <option value="10">10 minutes</option>
-            <option value="15">15 minutes</option>
-          </select>
-        </div>
+              <div class="settingsGridRow" id="providerRegionRow">
+                <label for="providerRegion">Region</label>
+                <select id="providerRegion"></select>
+              </div>
 
-        <div class="row">
-          <label>Warn before auto-stop</label>
-          <input id="idleGuardWarn" type="checkbox" checked />
-        </div>
+              <div class="settingsGridRow" id="providerEndpointRow">
+                <label for="providerEndpoint">Endpoint</label>
+                <input id="providerEndpoint" type="text" placeholder="https://your-resource-name.cognitiveservices.azure.com" />
+              </div>
 
-        <div class="row">
-          <label>Hard max session duration</label>
-          <select id="maxSessionMinutes">
-            <option value="0">Off</option>
-            <option value="15">15 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="60">60 minutes</option>
-          </select>
-        </div>
+              <div class="settingsGridRow" id="providerApiVersionRow">
+                <label for="providerApiVersion">API Version</label>
+                <input id="providerApiVersion" type="text" placeholder="2025-05-01-preview" />
+              </div>
 
-        <div class="row small">
-          Automatically stops Direct Realtime sessions after inactivity or maximum session duration to reduce accidental usage cost.
-        </div>
+              <label id="providerModelLabel" for="providerModel">Deployment / Model</label>
+              <input id="providerModel" type="text" />
 
-        <div class="row">
-          <button id="btnUseLocalBackend" type="button">Use Local Backend</button>
-          <button id="btnSaveSettings" type="button">Save settings</button>
-          <button id="btnResetSettings" type="button">Reset settings to defaults</button>
-          <span id="settingsSaved" class="small"></span>
-        </div>
-      </div>
-      <div class="box" style="margin-top:14px;">
-        <h3>Provider Configuration</h3>
+              <label for="providerVoice">Voice</label>
+              <select id="providerVoice"></select>
 
-        <div class="row">
-          <label>Active provider</label>
-          <select id="providerActive">
-            <option value="azure-openai-realtime">Azure OpenAI Realtime</option>
-            <option value="openai-realtime">OpenAI Realtime</option>
-          </select>
-        </div>
+              <label for="providerIncomingLanguage">Incoming Language</label>
+              <select id="providerIncomingLanguage"></select>
 
-        <div class="row" id="providerRegionRow">
-          <label>Region</label>
-          <select id="providerRegion"></select>
-        </div>
+              <label for="providerOutgoingLanguage">Outgoing Language</label>
+              <select id="providerOutgoingLanguage"></select>
 
-        <div class="row" id="providerEndpointRow">
-          <label>Endpoint</label>
-          <input id="providerEndpoint" type="text" placeholder="https://your-resource-name.cognitiveservices.azure.com" />
-        </div>
+              <label for="providerApiKey">API Key</label>
+              <input id="providerApiKey" type="password" placeholder="Stored locally in provider_config.local.json" />
+            </div>
 
-        <div class="row" id="providerApiVersionRow">
-          <label>API version</label>
-          <input id="providerApiVersion" type="text" placeholder="2025-05-01-preview" />
-        </div>
+            <div class="settingsActions providerActions">
+              <button id="btnProviderTest" type="button">Test Connection</button>
+              <button id="btnProviderSave" class="primaryAction" type="button">Save Provider</button>
+              <button id="btnProviderReset" class="dangerAction" type="button">Reset Provider</button>
+            </div>
+            <div id="providerStatus" class="settingsStatusText">Not tested</div>
 
-        <div class="row">
-          <label id="providerModelLabel">Model</label>
-          <input id="providerModel" type="text" />
-        </div>
+            <div class="authInlinePanel">
+              <div class="settingsCardHeader compact">
+                <div>
+                  <h3>Backend Auth</h3>
+                  <div class="panelSub">Optional bearer token for local API calls</div>
+                </div>
+                <span id="authStatus" class="settingsBadge warn">No token</span>
+              </div>
+              <div class="settingsGrid">
+                <label for="authToken">Bearer Token</label>
+                <input id="authToken" type="password" placeholder="Optional. Stored locally. Used as Authorization: Bearer &lt;token&gt;." />
+              </div>
+              <div class="settingsActions twoActions">
+                <button id="btnSaveToken" type="button">Save Token</button>
+                <button id="btnClearToken" class="dangerAction" type="button">Clear Token</button>
+              </div>
+            </div>
+          </section>
 
-        <div class="row">
-          <label>Voice</label>
-          <select id="providerVoice"></select>
-        </div>
+          <section class="glassPanel settingsCard diagnosticsCard">
+            <div class="settingsCardHeader">
+              <div class="settingsIcon settingsIconDiag" aria-hidden="true"></div>
+              <div>
+                <h3>Diagnostics</h3>
+                <div class="panelSub">System health and connectivity overview</div>
+              </div>
+            </div>
 
-        <div class="row">
-          <label>Incoming language</label>
-          <select id="providerIncomingLanguage"></select>
-        </div>
+            <div class="diagnosticsLayout">
+              <div class="statusTable settingsStatusTable">
+                <div class="statusRow"><span class="statusLabel">Backend</span><span id="settingsDiagBackend" class="statusValue">Configured</span></div>
+                <div class="statusRow"><span class="statusLabel">WebSocket</span><span id="settingsDiagWs" class="statusValue">Ready</span></div>
+                <div class="statusRow"><span class="statusLabel">Output Route</span><span id="settingsDiagOutput" class="statusValue">Not selected</span></div>
+                <div class="statusRow"><span class="statusLabel">Last Provider Test</span><span id="settingsDiagProviderTest" class="statusValue">Not tested</span></div>
+              </div>
+              <div class="diagnosticSeal" aria-hidden="true"></div>
+            </div>
 
-        <div class="row">
-          <label>Outgoing language</label>
-          <select id="providerOutgoingLanguage"></select>
-        </div>
+            <div class="settingsInfoLine">
+              Direct mode streams loopback/system audio as <b>PCM16 24k mono</b> to <code>/voice/ws</code>. Microphone is not used.
+            </div>
 
-        <div class="row">
-          <label>API key</label>
-          <input id="providerApiKey" type="password" placeholder="Stored locally in provider_config.local.json" />
-        </div>
+            <div class="settingsInfoLine">
+              Windows rule: keep Electron on Default in Volume Mixer; route Realtime output inside CHATT Direct.
+            </div>
 
-        <div class="row">
-          <button id="btnProviderTest" type="button">Test connection</button>
-          <button id="btnProviderSave" type="button">Save provider</button>
-          <button id="btnProviderReset" type="button">Reset provider settings</button>
-          <span id="providerStatus" class="small"></span>
+            <div class="settingsLogPanel">
+              <div class="settingsCardHeader compact">
+                <div>
+                  <h3>Log</h3>
+                  <div class="panelSub">Current renderer activity</div>
+                </div>
+              </div>
+              <div class="logbar">
+                <input id="logFilter" type="text" placeholder="Filter log (contains)..." />
+                <div class="check" title="When ON, the log view follows new messages.">
+                  <input id="logAutoscroll" type="checkbox" checked />
+                  <span>Auto-scroll</span>
+                </div>
+                <div class="spacer"></div>
+                <button id="btnLogCopy" type="button">Copy</button>
+                <button id="btnLogClear" type="button">Clear</button>
+                <button id="btnLogDownload" type="button">Download</button>
+              </div>
+              <pre id="log"></pre>
+            </div>
+          </section>
         </div>
-      </div>
-      <div class="box" style="margin-top:14px;">
-        <h3>Login / Auth (optional)</h3>
-
-        <div class="row">
-          <label>Bearer token</label>
-          <input id="authToken" type="password" placeholder="Optional. Stored locally. Used for API calls as Authorization: Bearer &lt;token&gt;." />
-        </div>
-
-        <div class="row">
-          <button id="btnSaveToken" type="button">Save token</button>
-          <button id="btnClearToken" type="button">Clear token</button>
-          <span id="authStatus" class="small"></span>
-        </div>
-      </div>
-
-            <div class="box" style="margin-top:14px;">
-        <h3>Diagnostics</h3>
-
-        <div class="row small">
-          Direct mode streams loopback/system audio as <b>PCM16 24k mono</b> to <code>/voice/ws</code>.
-          Microphone is not used. Output is routed to the selected headphones/output device.
-        </div>
-
-        <div class="row small">
-          Pravilo za Windows: <b>NE postavljati Electron u Volume Mixer na Headphones</b>.
-          Electron ostaje <b>Default</b>, a mi Realtime rutujemo na slušalice iz aplikacije (Settings → Realtime output).
-        </div>
-      </div>
-
-      <div class="box" style="margin-top:14px;">
-        <h3>Log</h3>
-        <div class="logbar">
-          <input id="logFilter" type="text" placeholder="Filter log (contains)..." />
-          <div class="check" title="When ON, the log view follows new messages.">
-            <input id="logAutoscroll" type="checkbox" checked />
-            <span>Auto-scroll</span>
-          </div>
-          <div class="spacer"></div>
-          <button id="btnLogCopy" type="button">Copy</button>
-          <button id="btnLogClear" type="button">Clear</button>
-          <button id="btnLogDownload" type="button">Download</button>
-        </div>
-        <pre id="log"></pre>
       </div>
     </div>
-
     <!-- ===========================
          INSTRUCTIONS VIEW
          =========================== -->
@@ -393,6 +454,13 @@
       </div>
     </div>
 
+      <footer class="glassPanel appBottomBar" aria-label="Runtime status">
+        <div class="bottomItem"><span class="bottomDot" aria-hidden="true"></span><span><span class="bottomLabel">Backend</span><span id="bottomBackend" class="bottomValue">127.0.0.1:50505</span></span></div>
+        <div class="bottomItem"><span class="bottomDot" aria-hidden="true"></span><span><span class="bottomLabel">WS</span><span id="bottomWs" class="bottomValue">/voice/ws</span></span></div>
+        <div class="bottomItem"><span><span class="bottomLabel">Audio Input</span><span id="bottomAudioInput" class="bottomValue">System loopback</span></span></div>
+        <div class="bottomItem"><span><span class="bottomLabel">Output</span><span id="bottomOutput" class="bottomValue">Not selected</span></span></div>
+        <div class="bottomVolume"><input id="bottomVolumeMirror" type="range" min="0" max="2" step="0.05" value="1" disabled /><span id="bottomVolumeValue" class="mono">1.00</span></div>
+      </footer>
     </div>
     <script src="./renderer.js"></script>
   </body>
