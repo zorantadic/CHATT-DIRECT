@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-21
+Last updated: 2026-05-22
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -273,6 +273,7 @@ Realtime rate
 Playback volume
 Output device
 Session Cost Guard controls
+non-blocking Session Cost Guard notice on Voice page
 Scenario & Instructions controls
 ```
 There are no active Desktop settings for:
@@ -320,6 +321,7 @@ Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
 Barge-in/interruption behavior
+Non-blocking Session Cost Guard notice on Voice page
 ```
 Reset behavior:
 ```text
@@ -417,6 +419,9 @@ Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
+Session Cost Guard non-blocking notice on Voice page: OK
+Session Cost Guard idle auto-stop leaves visible stop reason notice after stop: OK
+Session Cost Guard notice clears on next Start Direct Realtime: OK
 ```
 ---
 12. Current Known Good State
@@ -439,6 +444,7 @@ Outgoing language is added to final Realtime instructions and works as language 
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
 Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details from scenario.displayDetails, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
+Voice page displays non-blocking Session Cost Guard warning/stop notices
 ```
 ---
 13. Remaining Cleanup Work
@@ -592,6 +598,7 @@ Update direct realtime idle timestamp on speech start
 Add session cost guard settings
 Add session cost guard warning timer
 Stop direct realtime on session cost guard limits
+Add non-blocking session cost guard notice
 ```
 
 ---
@@ -972,8 +979,11 @@ directSessionStartedAt records successful Start Direct Realtime time.
 directLastSpeechStartedAt records the latest provider/server VAD input_audio_buffer.speech_started event.
 A lightweight renderer setInterval checks limits every 5 seconds.
 Warning messages are written to the Desktop log through push(...).
+Warning messages are also shown in a non-blocking Voice page notice area.
 Idle auto-stop triggers when now - directLastSpeechStartedAt >= selected idle limit.
+Idle auto-stop writes a clear stop reason to the log and leaves a visible red notice on the Voice page after stop.
 Hard max auto-stop triggers when now - directSessionStartedAt >= selected max duration.
+Hard max auto-stop writes a clear stop reason to the log and leaves a visible red notice on the Voice page after stop.
 Both stop paths call the existing stopDirectRealtime({ closeRealtime: true }) flow.
 ```
 
@@ -982,10 +992,12 @@ Confirmed behavior:
 ```text
 Idle warning appears approximately 30 seconds before the idle limit.
 Idle limit reached logs a clear message and stops Direct Realtime.
+Idle limit reached leaves a visible non-blocking stop reason notice on the Voice page.
 Local audio playback stops immediately.
 Realtime WebSocket closes cleanly with direct-realtime-stop.
 New speech_started activity resets the idle timer.
 Hard max session duration does not reset on speech activity.
+Cost Guard stop reason notice remains visible after auto-stop and clears on the next Start Direct Realtime.
 ```
 
 Design boundaries:
@@ -994,13 +1006,15 @@ Design boundaries:
 Do not use audio frame/chunk activity as the idle signal.
 Do not add microphone input.
 Do not change AudioWorklet, sample rate, PCM format, WebSocket audio append, provider adapter payloads, or backend app_realtime.py for Cost Guard.
+Do not use window.alert() for Cost Guard UX because it blocks the renderer/event loop.
+Cost Guard warnings and stop reasons must use non-blocking UI such as the Voice page notice/banner.
 Cost Guard belongs to Connection + Audio Settings, not Provider Configuration.
 ```
 
 Next candidate improvements:
 
 ```text
-Cost Guard UX: countdown/status in UI, remaining time display, toast/modal warning instead of log-only warning.
+Cost Guard UX: countdown/status in UI and remaining time display.
 Stability and cost: auto-stop or protection when app is minimized/inactive, pause/resume behavior, reconnect policy review.
 ```
 
@@ -1029,6 +1043,8 @@ Plan second
 Change code third
 No broad cleanup without reference checks
 No commit before diff review and runtime validation
+For project code changes, user does not manually edit code; inspect first, then use Codex scripted/code patch workflow, verify one file at a time, runtime-test, then commit
+Codex prompts must be written in English even when chat discussion is Serbian
 Always specify exact folder/path for commands
 Use one or two tasks at a time
 ```
