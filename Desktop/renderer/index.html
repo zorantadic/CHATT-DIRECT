@@ -405,52 +405,141 @@
          INSTRUCTIONS VIEW
          =========================== -->
     <div id="viewInstructions" class="view">
-      <div class="box">
-        <h3>Scenario & Instructions</h3>
-
-        <div class="small">
-          Choose what the assistant should do in this live Direct Realtime session.
+      <div class="scenarioPage">
+        <div class="scenarioPageHeader">
+          <div>
+            <h2>Scenario & Instructions</h2>
+            <div class="panelSub">Choose the assistant behavior and manage custom instruction overrides.</div>
+          </div>
+          <div class="scenarioHeaderBadges" aria-label="Scenario state">
+            <span id="scenarioSelectedBadge" class="scenarioBadge scenarioBadgeBlue">Not loaded</span>
+            <span id="scenarioOverrideBadge" class="scenarioBadge scenarioBadgeAmber">Override unknown</span>
+          </div>
         </div>
 
-        <div id="scenarioCards" class="scenarioCards" style="margin-top:12px;">
-          <div class="small">Scenario cards will load from the backend.</div>
-        </div>
+        <div class="scenarioLayout">
+          <section class="scenarioColumn scenarioLeftColumn" aria-label="Scenario selection">
+            <section class="glassPanel scenarioPanel selectedScenarioPanel">
+              <div class="scenarioPanelHeader">
+                <div>
+                  <div class="scenarioKicker">Selected Scenario</div>
+                  <h3 id="scenarioSelectedName">Not loaded</h3>
+                </div>
+                <div class="scenarioOrbIcon" aria-hidden="true"></div>
+              </div>
+              <p id="scenarioSelectedDescription" class="scenarioDescriptionText">Scenario behavior is loaded from the backend.</p>
+              <div class="scenarioBadgeRow">
+                <span id="scenarioActiveState" class="scenarioBadge scenarioBadgeBlue">Not loaded</span>
+                <span id="scenarioCustomState" class="scenarioBadge scenarioBadgeAmber">Override unknown</span>
+              </div>
+            </section>
 
-        <div class="row" style="margin-top:14px;">
-          <label>Scenario Preset</label>
-          <select id="instructionPreset">
-            <option value="neutral_conversation">Neutral Conversation</option>
-            <option value="cloud_solution_architect">Cloud Solution Architect</option>
-            <option value="interview_candidate">Interview Candidate</option>
-          </select>
-        </div>
+            <section class="glassPanel scenarioPanel scenarioLibraryPanel">
+              <div class="scenarioPanelHeader compact">
+                <div>
+                  <h3>Scenario Library</h3>
+                  <div class="scenarioHint">Hover a card for details</div>
+                </div>
+              </div>
+              <select id="instructionPreset" class="hidden" aria-hidden="true" tabindex="-1">
+                <option value="neutral_conversation">Neutral Conversation</option>
+                <option value="cloud_solution_architect">Cloud Solution Architect</option>
+                <option value="interview_candidate">Interview Candidate</option>
+              </select>
+              <div id="scenarioCards" class="scenarioCards">
+                <div class="small">Scenario cards will load from the backend.</div>
+              </div>
+              <div id="scenarioLibraryTooltip" class="scenarioLibraryPreview" aria-live="polite"></div>
+            </section>
 
-        <div class="small">
-          Selected scenario defines the assistant role and behavior for the Direct Realtime session.
-        </div>
+            <section class="glassPanel scenarioPanel scenarioDetailsPanel">
+              <div class="scenarioPanelHeader compact">
+                <div>
+                  <h3>Scenario Details</h3>
+                  <div class="scenarioHint">Human-readable metadata</div>
+                </div>
+              </div>
+              <div class="scenarioDetailRows">
+                <div class="scenarioDetailRow">
+                  <span>Category</span>
+                  <strong id="scenarioDetailsCategory">Not provided</strong>
+                </div>
+                <div class="scenarioDetailRow">
+                  <span>Description</span>
+                  <strong id="scenarioDetailsShort">Not provided</strong>
+                </div>
+                <div class="scenarioDetailRow">
+                  <span>Recommended Use</span>
+                  <strong id="scenarioDetailsUse">Not provided</strong>
+                </div>
+              </div>
+            </section>
+          </section>
 
-        <div class="small" style="margin-top:6px;">
-          Backend: <span id="instrBackend" class="mono"></span>
-        </div>
+          <section class="scenarioColumn scenarioRightColumn" aria-label="Scenario instructions">
+            <section class="glassPanel scenarioPanel currentInstructionsPanel">
+              <div class="scenarioPanelHeader">
+                <div>
+                  <h3>Current Instructions</h3>
+                  <div class="scenarioHint">Editable override for the selected scenario</div>
+                </div>
+                <span class="scenarioBadge scenarioBadgeGreen">Editor ready</span>
+              </div>
 
-        <h3>Edit Instructions</h3>
-        <div class="small">
-          Edit the active instruction text for the selected scenario. Click Save to keep manual changes.
-        </div>
-        <textarea id="instrCurrent" rows="18" class="mono"></textarea>
+              <textarea id="instrCurrent" rows="18" class="mono" spellcheck="false"></textarea>
 
-        <div class="row small">
-          updatedAt: <span id="instrUpdatedAt" class="mono"></span>
-        </div>
+              <div class="instructionMetaLine">
+                <span>Source: <strong id="instrSource">Not provided</strong></span>
+                <span>Last updated: <strong id="instrUpdatedAt" class="mono">Not provided</strong></span>
+              </div>
 
-        <div class="row">
-          <button id="btnInstrSave" type="button">Save</button>
-          <button id="btnInstrReset" type="button">Reset to scenario default</button>
-          <span id="instrStatus" class="small"></span>
-        </div>
+              <div class="instructionActions">
+                <button id="btnInstrSave" class="scenarioPrimaryAction" type="button">Save Instructions</button>
+                <button class="scenarioRefreshAction" type="button" data-instr-refresh-proxy>Refresh Instructions</button>
+                <button id="btnInstrReset" class="scenarioDangerAction" type="button">Reset to Scenario Default</button>
+              </div>
+              <div id="instrStatus" class="instructionStatus small" role="status" aria-live="polite"></div>
+            </section>
 
-        <h3>Scenario Default Instructions</h3>
-        <textarea id="instrDefault" rows="14" class="mono" readonly></textarea>
+            <section class="glassPanel scenarioPanel defaultInstructionsPanel">
+              <div class="scenarioPanelHeader">
+                <div>
+                  <h3>Scenario Default Instructions</h3>
+                  <div class="scenarioHint">Base template from the selected scenario</div>
+                </div>
+                <span class="scenarioBadge scenarioBadgeBlue">Read-only template</span>
+              </div>
+              <textarea id="instrDefault" rows="10" class="mono" readonly spellcheck="false"></textarea>
+            </section>
+
+            <section class="glassPanel scenarioPanel instructionStatePanel">
+              <div class="scenarioPanelHeader compact">
+                <div>
+                  <h3>Instruction State</h3>
+                  <div class="scenarioHint">Passive runtime summary</div>
+                </div>
+              </div>
+              <div class="scenarioDetailRows stateRows">
+                <div class="scenarioDetailRow">
+                  <span>Backend</span>
+                  <strong id="instrBackend" class="mono">Not provided</strong>
+                </div>
+                <div class="scenarioDetailRow">
+                  <span>Active Scenario</span>
+                  <strong id="scenarioStateActive">Not provided</strong>
+                </div>
+                <div class="scenarioDetailRow">
+                  <span>Override</span>
+                  <strong id="scenarioStateOverride">Not provided</strong>
+                </div>
+                <div class="scenarioDetailRow">
+                  <span>Refresh</span>
+                  <strong id="scenarioStateRefresh">Not provided</strong>
+                </div>
+              </div>
+            </section>
+          </section>
+        </div>
       </div>
     </div>
 

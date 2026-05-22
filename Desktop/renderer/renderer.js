@@ -325,9 +325,24 @@ Do not introduce new topics.`;
   const instrCurrentEl = $("instrCurrent");
   const instrDefaultEl = $("instrDefault");
   const instrUpdatedAtEl = $("instrUpdatedAt");
+  const instrSourceEl = $("instrSource");
   const instrStatusEl = $("instrStatus");
   const instructionPresetEl = $("instructionPreset");
   const scenarioCardsEl = $("scenarioCards");
+  const scenarioLibraryPreviewEl = $("scenarioLibraryTooltip");
+  const scenarioSelectedBadgeEl = $("scenarioSelectedBadge");
+  const scenarioOverrideBadgeEl = $("scenarioOverrideBadge");
+  const scenarioSelectedNameEl = $("scenarioSelectedName");
+  const scenarioSelectedDescriptionEl = $("scenarioSelectedDescription");
+  const scenarioActiveStateEl = $("scenarioActiveState");
+  const scenarioCustomStateEl = $("scenarioCustomState");
+  const scenarioDetailsCategoryEl = $("scenarioDetailsCategory");
+  const scenarioDetailsShortEl = $("scenarioDetailsShort");
+  const scenarioDetailsUseEl = $("scenarioDetailsUse");
+  const scenarioStateActiveEl = $("scenarioStateActive");
+  const scenarioStateOverrideEl = $("scenarioStateOverride");
+  const scenarioStateRefreshEl = $("scenarioStateRefresh");
+  const btnInstrRefreshProxyEls = document.querySelectorAll("[data-instr-refresh-proxy]");
   const btnInstrLoad = $("btnInstrLoad");
   const btnInstrSave = $("btnInstrSave");
   const btnInstrReset = $("btnInstrReset");
@@ -1046,6 +1061,32 @@ function appendPresetOption(parent, value, label) {
   opt.textContent = label;
   parent.appendChild(opt);
 }
+function appendScenarioPreviewLine(parent, className, label, value) {
+  const line = document.createElement("div");
+  line.className = className;
+  line.textContent = label ? `${label}: ${scenarioDisplayValue(value)}` : scenarioDisplayValue(value);
+  parent.appendChild(line);
+}
+function renderScenarioLibraryPreview(scenario) {
+  if (!scenarioLibraryPreviewEl) return;
+
+  scenarioLibraryPreviewEl.replaceChildren();
+  if (!scenario) {
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewTitle", "", "Scenario Preview");
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewMeta", "Category", "");
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Details", "Hover a scenario card to preview metadata.");
+    appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Recommended use", "");
+    return;
+  }
+
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewTitle", "", scenario.name || scenario.id);
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewMeta", "Category", scenario.category);
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Details", scenario.displayDetails || scenario.shortDescription);
+  appendScenarioPreviewLine(scenarioLibraryPreviewEl, "scenarioPreviewText", "Recommended use", scenario.recommendedUse);
+}
+function resetScenarioLibraryPreview() {
+  renderScenarioLibraryPreview(getScenarioPresetById(getInstructionPreset()));
+}
 function renderScenarioCards() {
   if (!scenarioCardsEl) return;
 
@@ -1060,6 +1101,8 @@ function renderScenarioCards() {
     empty.className = "small";
     empty.textContent = "Scenario cards will load from the backend.";
     scenarioCardsEl.appendChild(empty);
+    resetScenarioLibraryPreview();
+    updateScenarioInstructionsUI();
     return;
   }
 
@@ -1073,40 +1116,27 @@ function renderScenarioCards() {
     card.type = "button";
     card.className = id === selectedId ? "card scenarioCard active" : "card scenarioCard";
     card.dataset.scenarioId = id;
+    card.setAttribute("aria-pressed", id === selectedId ? "true" : "false");
+
+    const icon = document.createElement("span");
+    icon.className = "scenarioCardIcon";
 
     const title = document.createElement("strong");
+    title.className = "scenarioCardTitle";
     title.textContent = scenario.name || id;
 
-    const tooltip = document.createElement("div");
-    tooltip.className = "scenarioTooltip";
+    const state = document.createElement("span");
+    state.className = "scenarioCardState";
+    state.textContent = id === selectedId ? "Selected" : "Click to select";
 
-    const tooltipTitle = document.createElement("div");
-    tooltipTitle.className = "scenarioTooltipTitle";
-    tooltipTitle.textContent = scenario.name || id;
-
-    const tooltipMeta = document.createElement("div");
-    tooltipMeta.className = "scenarioTooltipMeta";
-    tooltipMeta.textContent = scenario.category ? `Category: ${scenario.category}` : "Scenario details";
-
-    const tooltipDescription = document.createElement("div");
-    tooltipDescription.className = "scenarioTooltipText";
-    tooltipDescription.textContent =
-      scenario.displayDetails ||
-      scenario.shortDescription ||
-      "This scenario changes how the assistant responds during the live session.";
-
-    const tooltipUse = document.createElement("div");
-    tooltipUse.className = "scenarioTooltipText";
-    tooltipUse.textContent = scenario.recommendedUse
-      ? `Best for: ${scenario.recommendedUse}`
-      : "Best for: realtime assistance during live conversations.";
-
+    card.appendChild(icon);
     card.appendChild(title);
-    tooltip.appendChild(tooltipTitle);
-    tooltip.appendChild(tooltipMeta);
-    tooltip.appendChild(tooltipDescription);
-    tooltip.appendChild(tooltipUse);
-    card.appendChild(tooltip);
+    card.appendChild(state);
+
+    card.addEventListener("mouseenter", () => renderScenarioLibraryPreview(scenario));
+    card.addEventListener("focus", () => renderScenarioLibraryPreview(scenario));
+    card.addEventListener("mouseleave", resetScenarioLibraryPreview);
+    card.addEventListener("blur", resetScenarioLibraryPreview);
 
     card.addEventListener("click", () => {
       applyInstructionPresetToEditor(id).catch((e) => {
@@ -1116,6 +1146,8 @@ function renderScenarioCards() {
 
     scenarioCardsEl.appendChild(card);
   }
+  resetScenarioLibraryPreview();
+  updateScenarioInstructionsUI();
 }
 function renderScenarioPresetDropdown() {
   if (!instructionPresetEl) return;
@@ -1172,6 +1204,65 @@ function updateVoiceScenarioUI() {
 
   if (voiceScenarioNameEl) voiceScenarioNameEl.textContent = name;
   if (voiceScenarioDescriptionEl) voiceScenarioDescriptionEl.textContent = description;
+  updateScenarioInstructionsUI();
+}
+function scenarioDisplayValue(value) {
+  const text = (value || "").toString().trim();
+  return text || "Not provided";
+}
+function setScenarioBadge(el, text, tone) {
+  if (!el) return;
+  el.classList.remove("scenarioBadgeBlue", "scenarioBadgeGreen", "scenarioBadgeAmber", "scenarioBadgeRed");
+  el.classList.add(tone || "scenarioBadgeBlue");
+  el.textContent = text;
+}
+function getInstructionOverrideState(scenario, current, defaultText) {
+  const scenarioOverride = !!(scenario?.userInstruction || "").toString().trim();
+  const currentText = (current || "").toString();
+  const baseText = (defaultText || "").toString();
+
+  if (scenarioOverride) return { text: "Custom override loaded", tone: "scenarioBadgeAmber" };
+  if (currentText.trim() && baseText.trim() && currentText !== baseText) {
+    return { text: "Edited override", tone: "scenarioBadgeAmber" };
+  }
+  if (scenario) return { text: "Scenario default", tone: "scenarioBadgeGreen" };
+  return { text: "Not provided", tone: "scenarioBadgeAmber" };
+}
+function updateScenarioInstructionsUI() {
+  const id = getInstructionPreset();
+  const scenario = getScenarioPresetById(id);
+  const target = getInstrTarget();
+  const doc = instructionStore?.[target] || emptyInstrDoc();
+  const name = scenario ? (scenario.name || scenario.id) : scenarioDisplayValue(id);
+  const description = scenario
+    ? scenarioDisplayValue(scenario.shortDescription || scenario.recommendedUse)
+    : "Not provided";
+  const defaultText = (instrDefaultEl?.value || doc.default || getInstructionPresetDefaultText(id) || "").toString();
+  const currentText = (instrCurrentEl?.value || doc.current || "").toString();
+  const override = getInstructionOverrideState(scenario, currentText, defaultText);
+  const refreshState =
+    rtWs && rtWs.readyState === WebSocket.OPEN
+      ? "Realtime session connected"
+      : rtWs && rtWs.readyState === WebSocket.CONNECTING
+        ? "Realtime session connecting"
+        : "Requires active realtime session";
+
+  if (scenarioSelectedNameEl) scenarioSelectedNameEl.textContent = name;
+  if (scenarioSelectedDescriptionEl) scenarioSelectedDescriptionEl.textContent = description;
+  setScenarioBadge(scenarioSelectedBadgeEl, scenario ? "Active scenario" : "Not loaded", "scenarioBadgeBlue");
+  setScenarioBadge(scenarioOverrideBadgeEl, override.text, override.tone);
+  setScenarioBadge(scenarioActiveStateEl, scenario ? "Selected / Active" : "Not loaded", "scenarioBadgeBlue");
+  setScenarioBadge(scenarioCustomStateEl, override.text, override.tone);
+
+  if (scenarioDetailsCategoryEl) scenarioDetailsCategoryEl.textContent = scenarioDisplayValue(scenario?.category);
+  if (scenarioDetailsShortEl) scenarioDetailsShortEl.textContent = scenarioDisplayValue(scenario?.shortDescription);
+  if (scenarioDetailsUseEl) scenarioDetailsUseEl.textContent = scenarioDisplayValue(scenario?.recommendedUse);
+  if (instrSourceEl) instrSourceEl.textContent = scenarioDisplayValue(doc.source);
+  if (instrUpdatedAtEl) instrUpdatedAtEl.textContent = scenarioDisplayValue(doc.updatedAt);
+  if (instrBackendEl) instrBackendEl.textContent = getBackendLabelForTarget(target);
+  if (scenarioStateActiveEl) scenarioStateActiveEl.textContent = scenario ? `${name} (${scenario.id})` : "Not provided";
+  if (scenarioStateOverrideEl) scenarioStateOverrideEl.textContent = override.text;
+  if (scenarioStateRefreshEl) scenarioStateRefreshEl.textContent = refreshState;
 }
 function normalizeInstrTarget(_t) {
   return "realtime";
@@ -1265,11 +1356,13 @@ function applyTargetDocToEditor(target, statusText, { silent } = {}) {
   const d = instructionStore?.[t] || emptyInstrDoc();
   if (instrCurrentEl) instrCurrentEl.value = (d.current || "").toString();
   if (instrDefaultEl) instrDefaultEl.value = (d.default || "").toString();
-  if (instrUpdatedAtEl) instrUpdatedAtEl.textContent = (d.updatedAt || "").toString();
+  if (instrUpdatedAtEl) instrUpdatedAtEl.textContent = scenarioDisplayValue(d.updatedAt);
+  if (instrSourceEl) instrSourceEl.textContent = scenarioDisplayValue(d.source);
   if (instrBackendEl) instrBackendEl.textContent = getBackendLabelForTarget(t);
   if (instrStatusEl && statusText) instrStatusEl.textContent = statusText;
 
   updateVoiceInstructionsUI();
+  updateScenarioInstructionsUI();
 
   if (!silent && d.updatedAt) push(`Instructions loaded (target=${t}) (${statusText || "ok"}) (${d.updatedAt})`);
 }
@@ -1432,7 +1525,7 @@ async function loadInstructionsFromBackendExplicit({ silent } = {}) {
     const payload = {
       current: backend.current,
       default: backend.default,
-      updatedAt: backend.updatedAt || new Date().toISOString(),
+      updatedAt: backend.updatedAt || "",
       source: "backend-load",
       preset: normalizeStoredInstructionPresetKey(backend.preset || "") || getInstructionPreset(),
     };
@@ -1638,6 +1731,7 @@ if (instructionPresetEl) {
 }
 if (btnInstrSave) btnInstrSave.addEventListener("click", () => saveInstructionsToBackend().catch(() => {}));
 if (btnInstrReset) btnInstrReset.addEventListener("click", () => resetInstructionsToDefault().catch(() => {}));
+if (instrCurrentEl) instrCurrentEl.addEventListener("input", () => updateScenarioInstructionsUI());
 if (btnRepeatLastAnswer) {
   btnRepeatLastAnswer.addEventListener("click", () => {
     if (!rtWs || rtWs.readyState !== WebSocket.OPEN) {
@@ -1674,6 +1768,13 @@ if (btnInstrRefresh) {
       push(`ERROR: Instruction refresh failed: ${e?.message || e}`);
     }
   });
+}
+if (btnInstrRefreshProxyEls && btnInstrRefreshProxyEls.length) {
+  for (const btn of btnInstrRefreshProxyEls) {
+    btn.addEventListener("click", () => {
+      if (btnInstrRefresh) btnInstrRefresh.click();
+    });
+  }
 }
 
   // ------------------------------

@@ -1131,84 +1131,449 @@ body[data-session="off"] #settingsDiagWs {
   font-size: 13px;
   line-height: 1.45;
 }
-.scenarioCards {
+.scenarioPage {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.scenarioPageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(45, 125, 255, 0.18), transparent 20rem),
+    linear-gradient(180deg, rgba(18, 31, 50, 0.9), rgba(8, 15, 28, 0.92));
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.scenarioPageHeader h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.scenarioHeaderBadges,
+.scenarioBadgeRow {
+  display: flex;
   gap: 8px;
-  margin: 12px 0 14px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.scenarioLayout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(460px, 1.18fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.scenarioColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.scenarioPanel {
+  position: relative;
+  overflow: visible;
+  padding: 15px;
+}
+
+.scenarioPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent 36%, rgba(45, 125, 255, 0.05));
+  mask-image: linear-gradient(#000, transparent 55%);
+}
+
+.selectedScenarioPanel {
+  border-color: rgba(45, 125, 255, 0.34);
+  background:
+    radial-gradient(circle at 88% 10%, rgba(45, 125, 255, 0.2), transparent 12rem),
+    linear-gradient(180deg, rgba(17, 32, 53, 0.92), rgba(7, 15, 28, 0.94));
+}
+
+.currentInstructionsPanel {
+  border-color: rgba(45, 125, 255, 0.42);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(33, 212, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(18, 31, 50, 0.94), rgba(6, 13, 25, 0.96));
+}
+
+.defaultInstructionsPanel {
+  border-color: rgba(119, 164, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(14, 26, 44, 0.86), rgba(7, 14, 26, 0.92));
+}
+
+.instructionStatePanel {
+  border-color: rgba(51, 209, 122, 0.22);
+}
+
+.scenarioPanelHeader {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scenarioPanelHeader.compact {
+  margin-bottom: 10px;
+}
+
+.scenarioPanelHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.scenarioKicker,
+.scenarioHint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scenarioKicker {
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.scenarioOrbIcon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(45, 125, 255, 0.55);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(33, 212, 255, 0.2), transparent 58%),
+    rgba(6, 14, 27, 0.88);
+  box-shadow: 0 0 28px rgba(45, 125, 255, 0.28), inset 0 0 20px rgba(33, 212, 255, 0.12);
+}
+
+.scenarioOrbIcon::before,
+.scenarioOrbIcon::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  height: 3px;
+  border-radius: 999px;
+  background: #8fc4ff;
+  box-shadow: 0 0 12px rgba(45, 125, 255, 0.75);
+}
+
+.scenarioOrbIcon::before {
+  top: 17px;
+}
+
+.scenarioOrbIcon::after {
+  top: 28px;
+}
+
+.scenarioDescriptionText {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 12px;
+  color: #c8d7ee;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scenarioBadge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.scenarioBadge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.scenarioBadgeBlue {
+  color: #8fc4ff;
+  border-color: rgba(45, 125, 255, 0.38);
+  background: rgba(45, 125, 255, 0.14);
+}
+
+.scenarioBadgeGreen {
+  color: #72f3a6;
+  border-color: rgba(51, 209, 122, 0.34);
+  background: rgba(51, 209, 122, 0.13);
+}
+
+.scenarioBadgeAmber {
+  color: #ffd779;
+  border-color: rgba(248, 193, 74, 0.36);
+  background: rgba(168, 116, 21, 0.16);
+}
+
+.scenarioBadgeRed {
+  color: #ff9aa4;
+  border-color: rgba(255, 92, 108, 0.36);
+  background: rgba(151, 32, 45, 0.16);
+}
+
+.scenarioCards {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.scenarioCard.card {
+  margin: 0;
 }
 
 .scenarioCard {
   position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 5px 9px;
   width: 100%;
-  min-height: 72px;
+  min-height: 78px;
+  padding: 10px;
   text-align: left;
-  background: rgba(8, 16, 28, 0.82);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(152, 181, 220, 0.15);
   border-radius: 8px;
-  padding: 10px 11px;
+  background:
+    linear-gradient(180deg, rgba(17, 30, 49, 0.82), rgba(7, 14, 26, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 24px rgba(0,0,0,0.2);
   cursor: pointer;
 }
 
 .scenarioCard:hover {
-  border-color: var(--line-strong);
+  border-color: rgba(119, 164, 255, 0.42);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 14px 28px rgba(0,0,0,0.24);
 }
 
 .scenarioCard.active {
-  border: 2px solid var(--blue);
-  background: rgba(45, 125, 255, 0.14);
+  border-color: rgba(45, 125, 255, 0.9);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(33, 212, 255, 0.16), transparent 7rem),
+    linear-gradient(180deg, rgba(31, 65, 116, 0.58), rgba(9, 21, 41, 0.94));
+  box-shadow: 0 0 0 1px rgba(45, 125, 255, 0.28), 0 14px 34px rgba(45, 125, 255, 0.18), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-.scenarioCard strong {
-  margin-bottom: 6px;
+.scenarioCardIcon {
+  grid-row: 1 / span 2;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(143, 196, 255, 0.4);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.32), rgba(33, 212, 255, 0.08)),
+    rgba(5, 11, 21, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.scenarioCard.active .scenarioCardIcon {
+  border-color: rgba(51, 209, 122, 0.52);
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.42), rgba(51, 209, 122, 0.16)),
+    rgba(5, 11, 21, 0.64);
+}
+
+.scenarioCardTitle {
+  min-width: 0;
+  color: #eef5ff;
   font-size: 13px;
+  font-weight: 700;
   line-height: 1.25;
 }
 
-.scenarioCard::after {
-  content: "Click to select";
-  display: block;
-  margin-top: 6px;
-  color: #7fb1ff;
+.scenarioCardState {
+  color: #83b7ff;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.scenarioCard.active::after {
-  content: "Selected";
-  color: #70f0a1;
+.scenarioCard.active .scenarioCardState {
+  color: #72f3a6;
 }
 
-.scenarioTooltip {
-  display: none;
-  position: absolute;
-  z-index: 50;
-  left: 0;
-  top: calc(100% + 8px);
-  width: min(360px, 80vw);
+.scenarioLibraryPanel {
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.scenarioLibraryPreview {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 114px;
+  margin-top: 12px;
   padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid rgba(119, 164, 255, 0.5);
+  border-radius: 10px;
   color: var(--text);
-  background: #0d1828;
-  box-shadow: var(--shadow);
+  background: #07111f;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 12px 30px rgba(0,0,0,0.26);
+  backdrop-filter: none;
 }
 
-.scenarioCard:hover .scenarioTooltip,
-.scenarioCard:focus-within .scenarioTooltip {
-  display: block;
-}
-
-.scenarioTooltipTitle {
-  margin-bottom: 6px;
+.scenarioPreviewTitle {
+  margin-bottom: 7px;
+  color: #f3f8ff;
+  font-size: 13px;
   font-weight: 700;
 }
 
-.scenarioTooltipMeta,
-.scenarioTooltipText {
+.scenarioPreviewMeta,
+.scenarioPreviewText {
+  color: #b7c7de;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scenarioPreviewText {
+  margin-top: 6px;
+}
+
+.scenarioDetailRows {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+}
+
+.scenarioDetailRow {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid rgba(152, 181, 220, 0.11);
+  border-radius: 8px;
+  background: rgba(5, 11, 21, 0.38);
+}
+
+.scenarioDetailRow span {
   color: var(--muted);
   font-size: 12px;
+}
+
+.scenarioDetailRow strong {
+  min-width: 0;
+  color: #dce9fb;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.currentInstructionsPanel textarea,
+.defaultInstructionsPanel textarea {
+  position: relative;
+  z-index: 1;
+  border-color: rgba(119, 164, 255, 0.24);
+  color: #dbe9ff;
+  background:
+    linear-gradient(180deg, rgba(4, 10, 20, 0.92), rgba(3, 8, 16, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 0 24px rgba(45, 125, 255, 0.05);
+  font-size: 12px;
+  line-height: 1.46;
+  resize: vertical;
+}
+
+.currentInstructionsPanel textarea {
+  min-height: 230px;
+  height: clamp(230px, 30vh, 315px);
+}
+
+.defaultInstructionsPanel textarea {
+  min-height: 132px;
+  height: clamp(132px, 18vh, 190px);
+  color: #aebed4;
+  background:
+    linear-gradient(180deg, rgba(4, 10, 20, 0.78), rgba(3, 8, 16, 0.88));
+}
+
+.instructionMetaLine {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  margin: 10px 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.instructionMetaLine strong {
+  color: #cfe0f7;
+  font-weight: 650;
+}
+
+.instructionActions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.instructionActions button {
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 10px;
+  white-space: normal;
+}
+
+.scenarioPrimaryAction {
+  border-color: rgba(45, 125, 255, 0.52);
+  background: linear-gradient(180deg, rgba(45, 125, 255, 0.44), rgba(17, 49, 96, 0.88));
+}
+
+.scenarioRefreshAction {
+  border-color: rgba(51, 209, 122, 0.32);
+  background: linear-gradient(180deg, rgba(34, 70, 61, 0.82), rgba(10, 31, 31, 0.92));
+}
+
+.scenarioDangerAction {
+  border-color: rgba(255, 92, 108, 0.42);
+  background: linear-gradient(180deg, rgba(92, 31, 44, 0.82), rgba(39, 12, 21, 0.94));
+}
+
+.instructionStatus {
+  position: relative;
+  z-index: 1;
+  min-height: 18px;
+  margin-top: 10px;
 }
 
 .logbar {
@@ -1263,6 +1628,14 @@ pre#log {
   .settingsDashboard {
     grid-template-columns: 1fr;
   }
+
+  .scenarioLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .scenarioRightColumn {
+    order: 2;
+  }
 }
 
 @media (max-width: 860px) {
@@ -1276,7 +1649,27 @@ pre#log {
 
   .controlRow,
   .quickControlsGrid,
+  .instructionActions,
   .appBottomBar {
+    grid-template-columns: 1fr;
+  }
+
+  .scenarioPageHeader,
+  .scenarioPanelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .scenarioHeaderBadges,
+  .scenarioBadgeRow {
+    justify-content: flex-start;
+  }
+
+  .scenarioCards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .scenarioDetailRow {
     grid-template-columns: 1fr;
   }
 
@@ -1306,4 +1699,35 @@ pre#log {
   .settingsBadge {
     justify-self: start;
   }
+}
+
+.currentInstructionsPanel textarea,
+.defaultInstructionsPanel textarea {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 149, 230, 0.75) rgba(7, 14, 26, 0.92);
+}
+
+.currentInstructionsPanel textarea::-webkit-scrollbar,
+.defaultInstructionsPanel textarea::-webkit-scrollbar {
+  width: 10px;
+}
+
+.currentInstructionsPanel textarea::-webkit-scrollbar-track,
+.defaultInstructionsPanel textarea::-webkit-scrollbar-track {
+  background: rgba(7, 14, 26, 0.92);
+}
+
+.currentInstructionsPanel textarea::-webkit-scrollbar-thumb,
+.defaultInstructionsPanel textarea::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(92, 149, 230, 0.9), rgba(39, 74, 124, 0.95));
+  border-radius: 999px;
+  border: 2px solid rgba(7, 14, 26, 0.92);
+}
+
+.instructionStatePanel {
+  display: none;
+}
+
+.scenarioDetailsPanel {
+  display: none;
 }
