@@ -69,32 +69,49 @@ Do not introduce new topics.`;
     // Filtered view: re-render
     renderLog();
   }
-  function setPill(id, state, text) {
-    const el = $(id);
+  let activityListeningActive = false;
+  let activitySpeakingActive = false;
+  function setPillElement(el, state, text) {
     if (!el) return;
     el.classList.remove("ok", "warn", "bad");
     el.classList.add(state);
     el.textContent = text;
   }
+  function setPill(id, state, text) {
+    setPillElement($(id), state, text);
+  }
+  function setSessionStatus(state) {
+    if (state === "ON") setPillElement(sessionStatusEl, "ok", "Session: ON");
+    else if (state === "STARTING") setPillElement(sessionStatusEl, "warn", "Session: STARTING");
+    else if (state === "RECONNECTING") setPillElement(sessionStatusEl, "warn", "Session: RECONNECTING");
+    else setPillElement(sessionStatusEl, "bad", "Session: OFF");
+  }
+  function updateActivityStatus() {
+    if (activitySpeakingActive) setPillElement(activityStatusEl, "ok", "Activity: Speaking");
+    else if (activityListeningActive) setPillElement(activityStatusEl, "ok", "Activity: Listening");
+    else setPillElement(activityStatusEl, "warn", "Activity: Idle");
+  }
   function setListeningIndicator(active) {
-    if (!listenStatusEl) return;
-    if (active) {
+    activityListeningActive = !!active;
+    if (listenStatusEl && active) {
       listenStatusEl.classList.remove("bad");
       listenStatusEl.classList.add("ok");
-    } else {
+    } else if (listenStatusEl) {
       listenStatusEl.classList.remove("ok");
       listenStatusEl.classList.add("bad");
     }
+    updateActivityStatus();
   }
   function setSpeakingIndicator(active) {
-    if (!speakStatusEl) return;
-    if (active) {
+    activitySpeakingActive = !!active;
+    if (speakStatusEl && active) {
       speakStatusEl.classList.remove("bad");
       speakStatusEl.classList.add("ok");
-    } else {
+    } else if (speakStatusEl) {
       speakStatusEl.classList.remove("ok");
       speakStatusEl.classList.add("bad");
     }
+    updateActivityStatus();
   }
   // ------------------------------
   // Navigation (Views)
@@ -182,6 +199,8 @@ Do not introduce new topics.`;
   const loopMonitor = $("loopMonitor");
   const rtOutEl = $("rtOut");
   const rtDeviceSel = $("rtDevice");
+  const sessionStatusEl = $("sessionStatus");
+  const activityStatusEl = $("activityStatus");
   const listenStatusEl = $("listenStatus");
   const speakStatusEl = $("speakStatus");
   const realtimeRateEl = $("realtimeRate");
@@ -471,9 +490,16 @@ function directRealtimeCfg() {
     return Math.min(WS_MAX_BACKOFF_MS, base + jitter);
   }
   function setRealtimeStatus(state) {
-    if (state === "ON") setPill("rtStatus", "ok", "REALTIME: ON");
-    else if (state === "RECONNECTING") setPill("rtStatus", "warn", "REALTIME: RECONNECTING");
-    else setPill("rtStatus", "bad", "REALTIME: OFF");
+    if (state === "ON") {
+      setPill("rtStatus", "ok", "REALTIME: ON");
+      setSessionStatus("ON");
+    } else if (state === "RECONNECTING") {
+      setPill("rtStatus", "warn", "REALTIME: RECONNECTING");
+      setSessionStatus("RECONNECTING");
+    } else {
+      setPill("rtStatus", "bad", "REALTIME: OFF");
+      if (!directRealtimeActive && !directRealtimeStarting) setSessionStatus("OFF");
+    }
   }
   function scheduleRealtimeReconnect(reason) {
     if (!desiredConnected) return;
@@ -2081,7 +2107,11 @@ if (btnInstrRefresh) {
     }
   }
   function setDirectStatusOn(on, text) {
-    setPill("sttStatus", on ? "ok" : "bad", text || (on ? "DIRECT: ON" : "DIRECT: OFF"));
+    const label = text || (on ? "DIRECT: ON" : "DIRECT: OFF");
+    setPill("sttStatus", on ? "ok" : "bad", label);
+    if (on) setSessionStatus("ON");
+    else if (label === "DIRECT: STARTING") setSessionStatus("STARTING");
+    else setSessionStatus("OFF");
   }
   function waitForRealtimeOpen(timeoutMs) {
     return new Promise((resolve, reject) => {
