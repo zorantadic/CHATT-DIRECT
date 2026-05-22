@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-21
+Last updated: 2026-05-22
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -284,6 +284,7 @@ Important active Desktop files:
 Desktop/package.json
 Desktop/renderer/index.html
 Desktop/renderer/renderer.js
+Desktop/renderer/styles.css
 Desktop/renderer/stt-worklet-processor.js
 ```
 
@@ -372,6 +373,9 @@ Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
 Barge-in/interruption behavior
+Modern Voice / Settings / Scenarios dark glass UI layout
+Responsive Desktop window behavior at 1120 x 820 default and 860 x 720 minimum
+Scenario Preview slot with displayDetails metadata and no model-facing instruction prompt
 ```
 
 Reset behavior:
@@ -484,6 +488,11 @@ Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
+Modern Desktop UI modernization Phase 1 Voice page: OK
+Modern Desktop UI modernization Phase 2 Settings page: OK
+Modern Desktop UI modernization Phase 3 Scenarios page: OK
+Desktop default window size 1120 x 820 and minimum 860 x 720: OK
+Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
 ```
 
 Before committing runtime changes, always run at minimum:
@@ -529,6 +538,12 @@ Outgoing language is added to final Realtime instructions and works as language 
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
 Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
+Desktop UI is modernized across Voice, Settings, and Scenarios with dark glass/3D design language
+Voice page uses Session and Activity as primary user-facing status indicators
+Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Diagnostics, Auth, and Log cards
+Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
+Scenario Preview displays human-readable metadata using displayDetails when available and never displays scenario.instruction
+Bottom app status bar no longer shows the redundant bottom volume mirror
 ```
 
 Recent provider integration commits:
@@ -789,10 +804,11 @@ Current Desktop behavior:
 Scenarios tab loads GET /v1/scenarios.
 Scenario cards display backend scenario presets when available.
 Scenario cards are compact and show only the scenario name plus Selected / Click to select state.
-Hovering over a scenario card shows a human-readable details popup.
-The hover popup shows scenario name, category, shortDescription, and recommendedUse.
-The hover popup does not show the model-facing instruction prompt.
-The hover popup is informational only and does not select or modify the scenario.
+Hovering over or focusing a scenario card updates the Scenario Preview slot inside the Scenario Library panel.
+Scenario Preview shows scenario name, category, displayDetails when available, and recommendedUse.
+If displayDetails is missing, Scenario Preview falls back to shortDescription.
+Scenario Preview does not show the model-facing instruction prompt.
+Scenario Preview is informational only and does not select or modify the scenario.
 Scenario dropdown displays backend scenario presets when available.
 Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
 Selecting a scenario card or dropdown item loads scenario.userInstruction into Current Instructions when present; otherwise it loads scenario.instruction.
@@ -875,8 +891,9 @@ Scenario UX rule:
 
 ```text
 Scenario card content is intentionally compact.
-Scenario card hover details use human-readable metadata, not the model-facing instruction prompt.
-Future scenario_presets.json may add displayDetails to separate product-facing explanation from model-facing instructions.
+Scenario Preview uses human-readable metadata, not the model-facing instruction prompt.
+displayDetails is the preferred richer human-readable Scenario Preview text.
+shortDescription remains the fallback when displayDetails is missing.
 ```
 
 Final packaged app direction:
@@ -893,7 +910,7 @@ Final packaged app direction:
 
 ---
 
-## 17. Phase 2 AppData / userData Runtime Plan
+## 18. Phase 2 AppData / userData Runtime Plan
 
 Phase 2 objective:
 
@@ -1024,7 +1041,7 @@ Reset session guard still works.
 ```
 
 
-## 18. Session Cost Guard Runtime Baseline
+## 19. Session Cost Guard Runtime Baseline
 
 Session Cost Guard is part of the Desktop renderer runtime layer.
 
@@ -1107,7 +1124,7 @@ Stability and cost improvement:
 - reconnect policy review
 ```
 
-## 19. Remaining Work
+## 20. Remaining Work
 
 Known remaining cleanup is documentation-only unless a new scan proves otherwise:
 
@@ -1120,7 +1137,7 @@ Runtime cleanup is complete for the currently verified Direct Realtime baseline.
 
 ---
 
-## 20. Commercial Direction
+## 21. Commercial Direction
 
 Preferred commercial packaging model:
 
@@ -1142,7 +1159,7 @@ workflow-specific use cases
 
 ---
 
-## 21. Work Rules
+## 22. Work Rules
 
 For all future work:
 
@@ -1168,7 +1185,7 @@ Restore accidental runtime changes before commit
 
 ---
 
-## 22. Simplified Voice Status Indicators Runtime Baseline
+## 23. Simplified Voice Status Indicators Runtime Baseline
 
 Commit:
 

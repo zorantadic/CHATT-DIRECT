@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-21
+Last updated: 2026-05-22
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -40,6 +40,8 @@ Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
+modern dark glass Desktop UI across Voice, Settings, and Scenarios
+responsive default Desktop window size 1120 x 820 with minimum 860 x 720
 ```
 ---
 2. Canonical File Roles
@@ -122,6 +124,7 @@ Important active files:
 Desktop/package.json
 Desktop/renderer/index.html
 Desktop/renderer/renderer.js
+Desktop/renderer/styles.css
 Desktop/renderer/stt-worklet-processor.js
 backend/app_realtime.py
 backend/audio_utils.py
@@ -273,6 +276,7 @@ Playback volume
 Output device
 Session Cost Guard controls
 Scenario & Instructions controls
+modern dark glass Settings control-center layout
 ```
 There are no active Desktop settings for:
 ```text
@@ -319,6 +323,9 @@ Scenarios tab and selected scenario display on Voice page
 Instruction refresh/update flow
 Realtime playback pipeline through selected sink
 Barge-in/interruption behavior
+Modern Voice / Settings / Scenarios dark glass UI layout
+Responsive Desktop window behavior at 1120 x 820 default and 860 x 720 minimum
+Scenario Preview slot with displayDetails metadata and no model-facing instruction prompt
 ```
 Reset behavior:
 ```text
@@ -414,6 +421,11 @@ Desktop Save persists custom instruction overrides per scenario: OK
 Desktop Reset to scenario default removes custom instruction override and restores original scenario prompt: OK
 Voice page displays selected scenario: OK
 Legacy dropdown presets hidden when backend scenarios are available: OK
+Modern Desktop UI modernization Phase 1 Voice page: OK
+Modern Desktop UI modernization Phase 2 Settings page: OK
+Modern Desktop UI modernization Phase 3 Scenarios page: OK
+Desktop default window size 1120 x 820 and minimum 860 x 720: OK
+Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
 ```
 ---
 12. Current Known Good State
@@ -436,6 +448,12 @@ Outgoing language is added to final Realtime instructions and works as language 
 Scenario preset foundation is implemented through backend/scenario_presets.json, GET /v1/scenarios, POST /v1/scenarios/active, POST /v1/scenarios/instruction, and DELETE /v1/scenarios/instruction/{scenario_id}
 Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
+Desktop UI is modernized across Voice, Settings, and Scenarios with dark glass/3D design language
+Voice page uses Session and Activity as primary user-facing status indicators
+Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Diagnostics, Auth, and Log cards
+Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
+Scenario Preview displays human-readable metadata using displayDetails when available and never displays scenario.instruction
+Bottom app status bar no longer shows the redundant bottom volume mirror
 ```
 ---
 13. Remaining Cleanup Work
@@ -740,10 +758,11 @@ Page title is Scenario & Instructions.
 Existing instruction editor remains the editing surface.
 Scenario cards are populated from backend scenarios when available.
 Scenario cards are compact and display only the scenario name plus Selected / Click to select state.
-Hovering over a scenario card opens a small human-readable details popup.
-Scenario hover popup shows name, category, shortDescription, and recommendedUse.
-Scenario hover popup does not show the technical instruction prompt.
-Scenario hover popup is informational only; clicking the card remains the only selection action.
+Hovering over or focusing a scenario card updates the Scenario Preview slot inside the Scenario Library panel.
+Scenario Preview shows name, category, displayDetails when available, and recommendedUse.
+If displayDetails is missing, Scenario Preview falls back to shortDescription.
+Scenario Preview does not show the technical/model-facing instruction prompt.
+Scenario Preview is informational only; clicking the card remains the only selection action.
 Scenario preset dropdown is populated from backend scenarios when available.
 Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
 Voice page shows Selected Scenario and Scenario behavior.
@@ -789,7 +808,100 @@ Future scenario_presets.json may add displayDetails to separate product-facing e
 ```
 
 ---
-17. Phase 2 AppData / userData Runtime Plan
+17. Modern Desktop UI Baseline
+
+Modern Desktop UI modernization is complete across the three active pages.
+
+Completed UI modernization commits:
+
+```text
+Modernize desktop voice UI
+Modernize desktop settings UI
+Modernize desktop scenarios UI
+```
+
+Current Desktop window sizing:
+
+```text
+default width: 1120
+default height: 820
+minimum width: 860
+minimum height: 720
+```
+
+Current visual design direction:
+
+```text
+dark navy / black glassmorphism
+subtle 3D depth
+layered gradients
+soft blue and green glow accents
+rounded glass cards
+premium Windows desktop application look
+professional AI control-console feeling
+responsive dashboard layout
+```
+
+Current Voice page layout:
+
+```text
+modern Voice Session dashboard
+Session and Activity are the main user-facing status indicators
+AI contact visual with mic/core ring and waveform-style decoration
+right-side Realtime Status and Activity cards
+selected scenario visibility
+bottom app status bar
+```
+
+Current Settings page layout:
+
+```text
+modern Settings control center
+Connection card
+Audio Output card
+Session Cost Guard card
+Provider Configuration card as the primary setup area
+Diagnostics card
+Auth and Log cards retained where present
+```
+
+Current Scenarios page layout:
+
+```text
+Scenario & Instructions page
+Selected Scenario card
+Scenario Library with compact scenario cards
+Scenario Preview slot inside the Scenario Library panel
+Current Instructions as the primary editor surface
+Scenario Default Instructions as read-only/template-style preview
+Instruction State and redundant Scenario Details are hidden/removed from visible workflow
+```
+
+Scenario Preview behavior:
+
+```text
+Hovering or focusing a scenario card updates the Scenario Preview slot.
+Mouse leave or blur returns the preview to the selected scenario or neutral state.
+Preview content uses scenario.name, scenario.category, scenario.displayDetails, and scenario.recommendedUse.
+If displayDetails is missing, preview falls back to scenario.shortDescription.
+The preview never shows scenario.instruction because that is the model-facing prompt.
+Scenario card click remains the only scenario selection action.
+```
+
+UI implementation boundaries:
+
+```text
+These UI modernization phases did not change Direct Realtime audio capture/playback.
+They did not change getLoopbackStream.
+They did not change AudioWorklet registration or processor behavior.
+They did not change WebSocket audio send/receive logic.
+They did not change provider adapter behavior.
+They did not change scenario API behavior.
+They did not change Cost Guard runtime logic.
+```
+
+---
+18. Phase 2 AppData / userData Runtime Plan
 
 Phase 2 objective:
 
@@ -921,7 +1033,7 @@ Start Direct Realtime still works with loopback/system audio only.
 ```
 
 ---
-18. Session Cost Guard Baseline
+19. Session Cost Guard Baseline
 
 Session Cost Guard is now part of the Direct Realtime runtime cost-protection layer.
 
@@ -983,7 +1095,7 @@ Stability and cost: auto-stop or protection when app is minimized/inactive, paus
 ```
 
 ---
-19. Commercial Direction
+20. Commercial Direction
 Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
@@ -999,7 +1111,7 @@ BYOK privacy/control
 workflow-specific use cases
 ```
 ---
-20. Work Process Rules
+21. Work Process Rules
 For all future project work:
 ```text
 Analyze first
@@ -1022,7 +1134,7 @@ Restore accidental runtime changes before commit
 
 ---
 
-21. Simplified Voice Status Indicators Baseline
+22. Simplified Voice Status Indicators Baseline
 
 Commit:
 
