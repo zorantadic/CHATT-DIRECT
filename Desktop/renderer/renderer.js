@@ -327,6 +327,13 @@ Do not introduce new topics.`;
   const btnSaveToken = $("btnSaveToken");
   const btnClearToken = $("btnClearToken");
   const authStatusEl = $("authStatus");
+  const settingsUpdateBadgeEl = $("settingsUpdateBadge");
+  const settingsUpdateVersionEl = $("settingsUpdateVersion");
+  const settingsUpdateStatusEl = $("settingsUpdateStatus");
+  const settingsUpdateProgressEl = $("settingsUpdateProgress");
+  const btnUpdateCheck = $("btnUpdateCheck");
+  const btnUpdateDownload = $("btnUpdateDownload");
+  const btnUpdateRestart = $("btnUpdateRestart");
   // Instructions page elements
   const instrBackendEl = $("instrBackend");
   const instrCurrentEl = $("instrCurrent");
@@ -356,6 +363,9 @@ Do not introduce new topics.`;
   const btnInstrRefresh = $("btnInstrRefresh");
   const btnRepeatLastAnswer = $("btnRepeatLastAnswer");
   const instrTargetEl = $("instrTarget");
+
+  let currentUpdateState = null;
+  let lastUpdateProgressLogPercent = null;
 
   const SUPPORTED_DISPLAY_LANGUAGES = ["en", "es", "de", "sr"];
   const DEFAULT_DISPLAY_LANGUAGE = "en";
@@ -481,6 +491,7 @@ Do not introduce new topics.`;
       try { updateEndpointSummaryUi(); } catch {}
       try { updateCostGuardSummaryUi(); } catch {}
     }
+    try { renderUpdateState(currentUpdateState || { status: "idle" }); } catch {}
   }
 
   function setDisplayLanguage(lang) {
@@ -490,6 +501,217 @@ Do not introduce new topics.`;
     applyLocale();
     loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     return next;
+  }
+
+  function getUpdateApi() {
+    const api = window.electronAPI?.updates;
+    if (
+      !api ||
+      typeof api.getState !== "function" ||
+      typeof api.check !== "function" ||
+      typeof api.download !== "function" ||
+      typeof api.quitAndInstall !== "function"
+    ) {
+      return null;
+    }
+    return api;
+  }
+
+  function normalizeUpdateStatus(status, type) {
+    const raw = (status || type || "idle").toString().trim();
+    if (raw === "checking-for-update" || raw === "check-started") return "checking";
+    if (raw === "download-progress" || raw === "download-started") return "downloading";
+    if (raw === "quit-and-install") return "installing";
+    if (raw === "update-available") return "update-available";
+    if (raw === "update-not-available") return "update-not-available";
+    if (raw === "update-downloaded") return "update-downloaded";
+    if (raw === "checking" || raw === "downloading" || raw === "installing" || raw === "error" || raw === "idle") return raw;
+    return "idle";
+  }
+
+  function normalizeUpdateState(input) {
+    const raw = input && typeof input === "object" ? input : {};
+    const source = raw.state && typeof raw.state === "object" ? raw.state : raw;
+    const payload = raw.payload && typeof raw.payload === "object" ? raw.payload : {};
+    const error = source.error || payload.error || raw.error || null;
+    const progress = source.progress || payload.progress || null;
+    const info = source.info || payload.info || null;
+    const status = normalizeUpdateStatus(source.status, raw.type);
+    const downloaded = source.downloaded === true || status === "update-downloaded";
+    const updateAvailable =
+      source.updateAvailable === true ||
+      downloaded ||
+      status === "update-available" ||
+      status === "downloading";
+
+    return {
+      status: error && (raw.ok === false || status === "error") ? "error" : status,
+      checking: source.checking === true || status === "checking",
+      updateAvailable,
+      downloaded,
+      info,
+      progress,
+      error,
+    };
+  }
+
+  function updateVersionText(info) {
+    const version = (
+      info?.version ||
+      info?.tag ||
+      info?.releaseName ||
+      ""
+    ).toString().trim();
+    return version || t("settings.update.unknownVersion", "Unknown version");
+  }
+
+  function updateErrorText(error) {
+    if (!error) return "";
+    if (typeof error === "string") return error;
+    return (error.message || error.code || error.name || String(error)).toString();
+  }
+
+  function updateProgressPercent(progress) {
+    const percent = Number(progress?.percent);
+    if (!Number.isFinite(percent)) return "";
+    return `${Math.max(0, Math.min(100, percent)).toFixed(1)}%`;
+  }
+
+  function renderUpdateState(state) {
+    const api = getUpdateApi();
+    const normalized = normalizeUpdateState(state || { status: "idle" });
+    currentUpdateState = normalized;
+
+    if (!api) {
+      setSettingsBadge(settingsUpdateBadgeEl, "bad", t("settings.update.unavailable", "Update API unavailable"));
+      if (settingsUpdateStatusEl) settingsUpdateStatusEl.textContent = t("settings.update.unavailable", "Update API unavailable");
+      if (settingsUpdateVersionEl) settingsUpdateVersionEl.textContent = t("settings.update.unknownVersion", "Unknown version");
+      if (settingsUpdateProgressEl) settingsUpdateProgressEl.textContent = t("settings.update.noProgress", "No progress yet");
+      if (btnUpdateCheck) btnUpdateCheck.disabled = true;
+      if (btnUpdateDownload) btnUpdateDownload.disabled = true;
+      if (btnUpdateRestart) btnUpdateRestart.disabled = true;
+      return;
+    }
+
+    const status = normalized.status || "idle";
+    const progressText = updateProgressPercent(normalized.progress);
+    let badgeState = "warn";
+    let badgeText = t("settings.update.badgeIdle", "Ready");
+    let statusText = t("settings.update.idle", "Ready. No action taken.");
+
+    if (status === "checking") {
+      badgeState = "warn";
+      badgeText = t("settings.update.badgeChecking", "Checking");
+      statusText = t("settings.update.checking", "Checking for updates...");
+    } else if (status === "update-available") {
+      badgeState = "warn";
+      badgeText = t("settings.update.badgeAvailable", "Available");
+      statusText = t("settings.update.available", "Update available.");
+    } else if (status === "update-not-available") {
+      badgeState = "ok";
+      badgeText = t("settings.update.badgeIdle", "Ready");
+      statusText = t("settings.update.notAvailable", "Up to date.");
+    } else if (status === "downloading") {
+      badgeState = "warn";
+      badgeText = t("settings.update.badgeDownloading", "Downloading");
+      statusText = progressText
+        ? `${t("settings.update.downloading", "Downloading update...")} ${progressText}`
+        : t("settings.update.downloading", "Downloading update...");
+    } else if (status === "update-downloaded") {
+      badgeState = "ok";
+      badgeText = t("settings.update.badgeDownloaded", "Downloaded");
+      statusText = t("settings.update.downloaded", "Update downloaded. Restart to install.");
+    } else if (status === "installing") {
+      badgeState = "warn";
+      badgeText = t("settings.update.badgeDownloaded", "Downloaded");
+      statusText = t("settings.update.installing", "Installing update...");
+    } else if (status === "error") {
+      const message = updateErrorText(normalized.error);
+      badgeState = "bad";
+      badgeText = t("settings.update.badgeError", "Error");
+      statusText = message
+        ? `${t("settings.update.error", "Update error")}: ${message}`
+        : t("settings.update.error", "Update error");
+    }
+
+    const busy = normalized.checking || status === "checking" || status === "downloading" || status === "installing";
+    setSettingsBadge(settingsUpdateBadgeEl, badgeState, badgeText);
+    if (settingsUpdateStatusEl) settingsUpdateStatusEl.textContent = statusText;
+    if (settingsUpdateVersionEl) settingsUpdateVersionEl.textContent = updateVersionText(normalized.info);
+    if (settingsUpdateProgressEl) settingsUpdateProgressEl.textContent = progressText || t("settings.update.noProgress", "No progress yet");
+    if (btnUpdateCheck) btnUpdateCheck.disabled = busy;
+    if (btnUpdateDownload) btnUpdateDownload.disabled = busy || normalized.updateAvailable !== true || normalized.downloaded === true;
+    if (btnUpdateRestart) btnUpdateRestart.disabled = normalized.downloaded !== true || status === "installing";
+  }
+
+  async function refreshUpdateState() {
+    const api = getUpdateApi();
+    if (!api) {
+      renderUpdateState({ status: "idle" });
+      push("WARN(Update): update API unavailable");
+      return null;
+    }
+
+    try {
+      const state = await api.getState();
+      renderUpdateState(state);
+      return state;
+    } catch (e) {
+      const error = { message: e?.message || String(e) };
+      renderUpdateState({ status: "error", error });
+      push(`ERROR(Update state): ${error.message}`);
+      return null;
+    }
+  }
+
+  function handleUpdateStatus(message) {
+    const state = normalizeUpdateState(message);
+    renderUpdateState(state);
+
+    if (state.status === "error") {
+      push(`ERROR(Update): ${updateErrorText(state.error) || t("settings.update.error", "Update error")}`);
+      return;
+    }
+
+    if (state.status === "downloading") {
+      const percent = Number(state.progress?.percent);
+      if (Number.isFinite(percent)) {
+        const rounded = Math.floor(percent);
+        if (lastUpdateProgressLogPercent == null || rounded >= lastUpdateProgressLogPercent + 10 || rounded >= 100) {
+          lastUpdateProgressLogPercent = rounded;
+          push(`Update download progress: ${percent.toFixed(1)}%`);
+        }
+      } else {
+        push("Update status: downloading");
+      }
+      return;
+    }
+
+    lastUpdateProgressLogPercent = null;
+    push(`Update status: ${state.status}`);
+  }
+
+  async function runUpdateAction(actionName, run) {
+    const api = getUpdateApi();
+    if (!api) {
+      renderUpdateState({ status: "idle" });
+      push("ERROR(Update): update API unavailable");
+      return;
+    }
+
+    try {
+      push(`Update ${actionName} requested`);
+      const result = await run(api);
+      const state = normalizeUpdateState(result);
+      renderUpdateState(state);
+      if (result?.ok === false) {
+        push(`ERROR(Update ${actionName}): ${updateErrorText(result.error) || t("settings.update.error", "Update error")}`);
+      }
+    } catch (e) {
+      const error = { message: e?.message || String(e) };
+      renderUpdateState({ status: "error", error });
+      push(`ERROR(Update ${actionName}): ${error.message}`);
+    }
   }
 
   function readScenarioText(lang, scenarioId, field) {
@@ -629,6 +851,15 @@ function loadInstructionsTargetIntoInputs() {
   applyLocale();
   loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   loadProviderUi().catch(() => {});
+  refreshUpdateState().catch(() => {});
+  try {
+    const updates = getUpdateApi();
+    if (updates && typeof updates.onStatus === "function") {
+      updates.onStatus(handleUpdateStatus);
+    }
+  } catch (e) {
+    push(`WARN(Update status subscription): ${e?.message || e}`);
+  }
 
   function setProviderStatus(message) {
     if (providerStatusEl) providerStatusEl.textContent = message || "";
@@ -2836,6 +3067,15 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     updateEndpointSummaryUi();
     push("Local backend endpoint preset applied. Click Save settings.");
   }
+  if (btnUpdateCheck) btnUpdateCheck.addEventListener("click", () => {
+    runUpdateAction("check", (updates) => updates.check());
+  });
+  if (btnUpdateDownload) btnUpdateDownload.addEventListener("click", () => {
+    runUpdateAction("download", (updates) => updates.download());
+  });
+  if (btnUpdateRestart) btnUpdateRestart.addEventListener("click", () => {
+    runUpdateAction("restart", (updates) => updates.quitAndInstall());
+  });
   if (btnUseLocalBackend) btnUseLocalBackend.addEventListener("click", () => {
     applyLocalBackendPreset();
   });

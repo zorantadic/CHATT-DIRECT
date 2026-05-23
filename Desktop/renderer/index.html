@@ -362,6 +362,29 @@
             </div>
           </section>
 
+          <section class="glassPanel settingsCard">
+            <div class="settingsCardHeader">
+              <div class="settingsIcon settingsIconLink" aria-hidden="true"></div>
+              <div>
+                <h3 data-i18n="settings.update.title">Application Update</h3>
+                <div class="panelSub" data-i18n="settings.update.subtitle">Check for and install CHATT Direct updates</div>
+              </div>
+              <span id="settingsUpdateBadge" class="settingsBadge warn">Ready</span>
+            </div>
+
+            <div class="statusTable settingsStatusTable">
+              <div class="statusRow"><span class="statusLabel" data-i18n="settings.update.status">Status</span><span id="settingsUpdateStatus" class="statusValue">Ready. No action taken.</span></div>
+              <div class="statusRow"><span class="statusLabel" data-i18n="settings.update.version">Version</span><span id="settingsUpdateVersion" class="statusValue">Unknown version</span></div>
+              <div class="statusRow"><span class="statusLabel" data-i18n="settings.update.progress">Progress</span><span id="settingsUpdateProgress" class="statusValue">No progress yet</span></div>
+            </div>
+
+            <div class="settingsActions">
+              <button id="btnUpdateCheck" type="button" data-i18n="settings.update.check">Check for Updates</button>
+              <button id="btnUpdateDownload" class="primaryAction" type="button" data-i18n="settings.update.download">Download Update</button>
+              <button id="btnUpdateRestart" type="button" data-i18n="settings.update.restart">Restart and Install</button>
+            </div>
+          </section>
+
           <section class="glassPanel settingsCard diagnosticsCard">
             <div class="settingsCardHeader">
               <div class="settingsIcon settingsIconDiag" aria-hidden="true"></div>
