@@ -19,9 +19,10 @@ const userDataDir = app.isPackaged
   ? defaultUserDataDir
   : path.join(__dirname, "..", ".electron-userdata");
 const cacheDir = path.join(userDataDir, "Cache");
+const logsDir = path.join(userDataDir, "logs");
 
 try {
-  fs.mkdirSync(cacheDir, { recursive: true });
+  ensureRuntimeDirectories();
 } catch (_) {
   // ignore
 }
@@ -66,6 +67,61 @@ function writeJsonAtomic(filePath, obj) {
 
 const instructionsPath = path.join(userDataDir, "instructions.json");
 const legacyInstructionsPath = path.join(userDataDir, "instructions.local.json");
+const providerConfigPath = path.join(userDataDir, "provider_config.local.json");
+const scenarioPresetsLocalPath = path.join(userDataDir, "scenario_presets.local.json");
+const backendInstallDir = app.isPackaged
+  ? path.join(process.resourcesPath, "backend")
+  : path.join(__dirname, "..", "..", "backend");
+const providerCapabilitiesPath = path.join(backendInstallDir, "provider_capabilities.json");
+const providerConfigExamplePath = path.join(backendInstallDir, "provider_config.local.example.json");
+const scenarioPresetsDefaultPath = path.join(backendInstallDir, "scenario_presets.json");
+const backendPort = 50505;
+
+function ensureRuntimeDirectories() {
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.mkdirSync(cacheDir, { recursive: true });
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+function copyFileIfMissing(source, target) {
+  if (fs.existsSync(target)) return true;
+  if (!fs.existsSync(source)) return false;
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(source, target);
+    return true;
+  } catch (err) {
+    console.error(
+      "[main] copyFileIfMissing failed:",
+      source,
+      "->",
+      target,
+      err && err.message ? err.message : err
+    );
+    return false;
+  }
+}
+
+function ensureProviderConfigFile() {
+  copyFileIfMissing(providerConfigExamplePath, providerConfigPath);
+}
+
+function ensureScenarioPresetsFile() {
+  copyFileIfMissing(scenarioPresetsDefaultPath, scenarioPresetsLocalPath);
+}
+
+function buildBackendEnv() {
+  return {
+    ...process.env,
+    PROVIDER_CONFIG_PATH: providerConfigPath,
+    INSTRUCTIONS_PATH: instructionsPath,
+    SCENARIO_PRESETS_PATH: scenarioPresetsLocalPath,
+    PROVIDER_CAPABILITIES_PATH: providerCapabilitiesPath,
+    PROVIDER_CONFIG_EXAMPLE_PATH: providerConfigExamplePath,
+    SCENARIO_PRESETS_DEFAULT_PATH: scenarioPresetsDefaultPath,
+    PORT: String(backendPort),
+  };
+}
 
 // ---- Instructions local-store helpers ----
 function nowIso() {
@@ -251,6 +307,11 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ensureRuntimeDirectories();
+  ensureProviderConfigFile();
+  ensureInstructionsFile();
+  ensureScenarioPresetsFile();
+
   createWindow();
 
   app.on("activate", () => {
