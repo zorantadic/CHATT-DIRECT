@@ -38,6 +38,8 @@ Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
+multilingual UI display support
+header language selector synchronized with Settings language selector
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -544,6 +546,47 @@ Settings page is organized as a dark glass control center with Connection, Audio
 Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
 Scenario Preview displays human-readable metadata using displayDetails when available and never displays scenario.instruction
 Bottom app status bar no longer shows the redundant bottom volume mirror
+Header Backend/Provider cards removed and replaced with compact Select Language control
+Settings Display Language and Header Select Language controls remain synchronized through shared display-language state
+
+Multilingual UI v1 baseline:
+
+```text
+Desktop supports UI-only multilingual display localization.
+Supported display languages:
+- English (EN)
+- Spanish (ES)
+- German (DE)
+- Serbian (SR)
+
+Localization scope:
+- visible static UI labels
+- tabs
+- page titles
+- section titles
+- helper text
+- scenario metadata
+- scenario category
+- scenario shortDescription
+- scenario recommendedUse
+- scenario displayDetails
+```
+
+Instruction localization rule:
+
+```text
+Display language changes must not change model-facing instructions.
+Scenario instruction prompts remain English canonical.
+Current Instructions and Scenario Default Instructions remain English canonical unless user-authored overrides exist.
+Refresh Instructions and Start Direct Realtime continue sending English canonical/runtime instruction text.
+```
+
+Recent multilingual UI commits:
+
+```text
+3c1e67a Add multilingual UI display support
+0260f6e Add header language selector
+```
 ```
 
 Recent provider integration commits:
