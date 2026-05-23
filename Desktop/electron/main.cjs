@@ -134,7 +134,38 @@ function buildBackendEnv() {
   };
 }
 
-function resolveDevBackendCommand() {
+function writeBackendLifecycleLog(stream, message) {
+  const line = `${new Date().toISOString()} ${message}\n`;
+  try { stream?.write(line); } catch (_) {}
+}
+
+function logBackendStartError(message) {
+  if (backendStderrLogStream) {
+    writeBackendLifecycleLog(backendStderrLogStream, message);
+    return;
+  }
+  console.error(message);
+}
+
+function resolveBackendCommand() {
+  if (app.isPackaged) {
+    const backendRuntimeDir = path.join(process.resourcesPath, "backend-runtime");
+    const backendExecutable = path.join(backendRuntimeDir, "chatt-backend.exe");
+
+    if (!fs.existsSync(backendExecutable)) {
+      backendReady = false;
+      backendStartError = `Packaged backend executable not found: ${backendExecutable}`;
+      logBackendStartError(`[main] ${backendStartError}`);
+      return null;
+    }
+
+    return {
+      cwd: backendRuntimeDir,
+      command: backendExecutable,
+      args: [],
+    };
+  }
+
   const venvPython = path.join(backendInstallDir, ".venv", "Scripts", "python.exe");
   return {
     cwd: backendInstallDir,
@@ -151,11 +182,6 @@ function resolveDevBackendCommand() {
       "info",
     ],
   };
-}
-
-function writeBackendLifecycleLog(stream, message) {
-  const line = `${new Date().toISOString()} ${message}\n`;
-  try { stream?.write(line); } catch (_) {}
 }
 
 function closeBackendLogStreams() {
@@ -230,10 +256,6 @@ async function pollBackendReadiness() {
 }
 
 function startBackend() {
-  if (app.isPackaged) {
-    console.log("[main] packaged backend startup is not implemented in this phase");
-    return;
-  }
   if (backendProcess) return;
 
   try {
@@ -242,9 +264,13 @@ function startBackend() {
     ensureInstructionsFile();
     ensureScenarioPresetsFile();
 
-    const resolved = resolveDevBackendCommand();
     backendStdoutLogStream = fs.createWriteStream(backendStdoutLogPath, { flags: "a" });
     backendStderrLogStream = fs.createWriteStream(backendStderrLogPath, { flags: "a" });
+    const resolved = resolveBackendCommand();
+    if (!resolved) {
+      closeBackendLogStreams();
+      return;
+    }
 
     writeBackendLifecycleLog(
       backendStdoutLogStream,
