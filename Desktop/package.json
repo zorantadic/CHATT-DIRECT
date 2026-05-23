@@ -12,7 +12,8 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "electron-audio-loopback": "^1.0.6"
+    "electron-audio-loopback": "^1.0.6",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "electron": "31.7.7",
@@ -65,7 +66,12 @@
       "shortcutName": "CHATT Desktop",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico"
-    }
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.chattdirect.com/win/"
+      }
+    ]
   }
 }
-
