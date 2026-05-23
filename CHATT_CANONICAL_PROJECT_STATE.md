@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-22
+Last updated: 2026-05-23
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -248,9 +248,27 @@ PORT=50505
 DEBUG=false
 ```
 
-Active provider configuration is saved locally in:
+Active provider configuration in the older/manual backend startup path is saved locally in:
 ```text
 backend/provider_config.local.json
+```
+
+Electron-started local/dev runtime now uses the Electron userData runtime file:
+```text
+Desktop/.electron-userdata/provider_config.local.json
+```
+
+Important AppData/userData migration lesson from 2026-05-23:
+```text
+If Desktop/.electron-userdata/provider_config.local.json is missing and is seeded from provider_config.local.example.json, it may contain placeholder values such as:
+https://your-resource-name.cognitiveservices.azure.com
+apiKey: ""
+
+That placeholder provider config causes Direct Realtime startup to fail after local /voice/ws connects, with:
+[Errno 11001] getaddrinfo failed
+
+This is not an audio, WebSocket, or Realtime engine failure. It means the active provider endpoint cannot be resolved.
+After AppData/userData migration, provider settings must be re-entered through Settings -> Provider Configuration or migrated from backend/provider_config.local.json before Direct Realtime validation.
 ```
 
 Provider capability lists are defined in:
@@ -1270,4 +1288,32 @@ Design boundary:
 ```text
 Do not remove hidden technical status elements without a separate diagnostics design.
 Do not change audio capture/playback, Realtime websocket flow, provider logic, scenario logic, or Cost Guard logic for this UI simplification.
+```
+---
+23. Update Workflow / AppData Runtime Notes
+
+Completed update foundation commits:
+```text
+Add updater dependency and publish config
+Add update IPC foundation
+```
+
+Current update workflow status:
+```text
+electron-updater dependency is installed.
+Desktop/package.json includes generic publish provider: https://updates.chattdirect.com/win/
+Electron main/preload update IPC foundation exists.
+No Settings Update UI has been implemented yet.
+No automatic startup update check is enabled.
+autoDownload = false.
+autoInstallOnAppQuit = false.
+Restart/install flow must stop only Electron-owned backend child process before quitAndInstall.
+```
+
+AppData/userData runtime warning:
+```text
+Local/dev Electron runtime can use Desktop/.electron-userdata/provider_config.local.json instead of backend/provider_config.local.json.
+If this runtime file is seeded from provider_config.local.example.json, it contains placeholder endpoint/key values.
+Provider config must be re-entered or migrated before Direct Realtime testing.
+A placeholder endpoint causes [Errno 11001] getaddrinfo failed when backend tries to connect to the upstream Realtime provider.
 ```

@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-22
+Last updated: 2026-05-23
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -726,10 +726,31 @@ Outgoing language is not sent as a separate Realtime API field; it is applied th
 Incoming language is planned as provider-specific transcription language hint.
 ```
 
-Current local config storage:
+Current manual/backend-folder config storage:
 
 ```text
 backend/provider_config.local.json
+```
+
+Current Electron-started local/dev runtime config storage after AppData/userData work:
+
+```text
+Desktop/.electron-userdata/provider_config.local.json
+```
+
+Important runtime lesson from 2026-05-23:
+
+```text
+After AppData/userData runtime migration, Desktop may read provider settings from Desktop/.electron-userdata/provider_config.local.json.
+If this file is created from provider_config.local.example.json instead of migrated from an existing valid backend/provider_config.local.json, it will contain placeholder values such as:
+https://your-resource-name.cognitiveservices.azure.com
+apiKey: ""
+
+Direct Realtime then connects locally to /voice/ws but fails on the upstream provider connection with:
+[Errno 11001] getaddrinfo failed
+
+This error indicates invalid/unresolvable provider endpoint configuration, not an audio capture failure and not a local WebSocket failure.
+Fix by entering valid provider endpoint/API key/model in Settings -> Provider Configuration and saving, or by migrating the old valid provider_config.local.json into the Electron userData runtime file.
 ```
 
 Packaging requirement:
@@ -1342,4 +1363,44 @@ It does not change Realtime websocket behavior.
 It does not change provider adapters or session.update payloads.
 It does not change Cost Guard behavior.
 It does not change scenario/instruction behavior.
+```
+---
+
+## 24. Update IPC Foundation Baseline
+
+Completed commits:
+
+```text
+Add updater dependency and publish config
+Add update IPC foundation
+```
+
+Current update implementation state:
+
+```text
+electron-updater is installed as a Desktop dependency.
+Desktop/package.json contains generic publish URL: https://updates.chattdirect.com/win/
+Desktop/electron/main.cjs imports autoUpdater.
+autoUpdater.autoDownload = false.
+autoUpdater.autoInstallOnAppQuit = false.
+main.cjs owns updateState and forwards app-update:status events.
+main.cjs exposes IPC handlers:
+- app-update:get-state
+- app-update:check
+- app-update:download
+- app-update:quit-and-install
+preload.cjs exposes window.electronAPI.updates.
+quit-and-install sets isQuitting = true, calls stopBackend(), then calls autoUpdater.quitAndInstall(false, true).
+No startup auto-check is enabled.
+No Settings UI has been added yet.
+```
+
+Boundaries:
+
+```text
+Do not enable silent auto-install.
+Do not add private GitHub token.
+Do not auto-check on startup unless explicitly approved.
+Do not change Direct Realtime audio capture/playback for update workflow.
+Do not change provider adapters for update workflow.
 ```
