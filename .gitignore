@@ -1,4 +1,4 @@
-# Ignore everything by default
+﻿# Ignore everything by default
 *
 
 # Allow core project files
@@ -12,6 +12,9 @@
 !stop_all.ps1
 !chatt.code-workspace
 
+# Allow build/release scripts
+!scripts/
+!scripts/*.ps1
 # Allow backend and Desktop app
 !backend/
 !backend/**
@@ -81,3 +84,4 @@ cv.json
 query.json
 Desktop/.electron-userdata/
 backend/scenario_presets.local.json
+
