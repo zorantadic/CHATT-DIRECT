@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const http = require("http");
+const { spawn } = require("child_process");
 const { initMain } = require("electron-audio-loopback");
 
 // Must be called before app is ready
@@ -76,6 +78,15 @@ const providerCapabilitiesPath = path.join(backendInstallDir, "provider_capabili
 const providerConfigExamplePath = path.join(backendInstallDir, "provider_config.local.example.json");
 const scenarioPresetsDefaultPath = path.join(backendInstallDir, "scenario_presets.json");
 const backendPort = 50505;
+const backendStdoutLogPath = path.join(logsDir, "backend.log");
+const backendStderrLogPath = path.join(logsDir, "backend-error.log");
+
+let backendProcess = null;
+let backendReady = false;
+let backendStartError = null;
+let isQuitting = false;
+let backendStdoutLogStream = null;
+let backendStderrLogStream = null;
 
 function ensureRuntimeDirectories() {
   fs.mkdirSync(userDataDir, { recursive: true });
@@ -121,6 +132,195 @@ function buildBackendEnv() {
     SCENARIO_PRESETS_DEFAULT_PATH: scenarioPresetsDefaultPath,
     PORT: String(backendPort),
   };
+}
+
+function resolveDevBackendCommand() {
+  const venvPython = path.join(backendInstallDir, ".venv", "Scripts", "python.exe");
+  return {
+    cwd: backendInstallDir,
+    command: fs.existsSync(venvPython) ? venvPython : "python",
+    args: [
+      "-m",
+      "uvicorn",
+      "app_realtime:app",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(backendPort),
+      "--log-level",
+      "info",
+    ],
+  };
+}
+
+function writeBackendLifecycleLog(stream, message) {
+  const line = `${new Date().toISOString()} ${message}\n`;
+  try { stream?.write(line); } catch (_) {}
+}
+
+function closeBackendLogStreams() {
+  try { backendStdoutLogStream?.end(); } catch (_) {}
+  try { backendStderrLogStream?.end(); } catch (_) {}
+  backendStdoutLogStream = null;
+  backendStderrLogStream = null;
+}
+
+function checkBackendReadiness() {
+  return new Promise((resolve, reject) => {
+    const req = http.get(
+      {
+        hostname: "127.0.0.1",
+        port: backendPort,
+        path: "/",
+        timeout: 1000,
+      },
+      (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => { body += chunk; });
+        res.on("end", () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`HTTP ${res.statusCode}`));
+            return;
+          }
+          try {
+            const data = JSON.parse(body || "{}");
+            resolve(data && data.status === "ok");
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error("backend readiness timeout")));
+    req.on("error", reject);
+  });
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pollBackendReadiness() {
+  const deadline = Date.now() + 15000;
+  let lastError = null;
+
+  while (!isQuitting && Date.now() < deadline) {
+    try {
+      if (await checkBackendReadiness()) {
+        backendReady = true;
+        backendStartError = null;
+        writeBackendLifecycleLog(backendStdoutLogStream, "[main] backend ready");
+        console.log("[main] backend ready");
+        return true;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+    await delay(500);
+  }
+
+  backendReady = false;
+  backendStartError = lastError && lastError.message
+    ? `Backend readiness failed: ${lastError.message}`
+    : "Backend readiness timed out";
+  writeBackendLifecycleLog(backendStderrLogStream, `[main] ${backendStartError}`);
+  console.warn("[main]", backendStartError);
+  return false;
+}
+
+function startBackend() {
+  if (app.isPackaged) {
+    console.log("[main] packaged backend startup is not implemented in this phase");
+    return;
+  }
+  if (backendProcess) return;
+
+  try {
+    ensureRuntimeDirectories();
+    ensureProviderConfigFile();
+    ensureInstructionsFile();
+    ensureScenarioPresetsFile();
+
+    const resolved = resolveDevBackendCommand();
+    backendStdoutLogStream = fs.createWriteStream(backendStdoutLogPath, { flags: "a" });
+    backendStderrLogStream = fs.createWriteStream(backendStderrLogPath, { flags: "a" });
+
+    writeBackendLifecycleLog(
+      backendStdoutLogStream,
+      `[main] starting backend: ${resolved.command} ${resolved.args.join(" ")}`
+    );
+
+    const child = spawn(resolved.command, resolved.args, {
+      cwd: resolved.cwd,
+      env: buildBackendEnv(),
+      windowsHide: true,
+    });
+
+    backendProcess = child;
+    backendReady = false;
+    backendStartError = null;
+
+    child.stdout.on("data", (chunk) => {
+      try { backendStdoutLogStream?.write(chunk); } catch (_) {}
+      try { process.stdout.write(chunk); } catch (_) {}
+    });
+    child.stderr.on("data", (chunk) => {
+      try { backendStderrLogStream?.write(chunk); } catch (_) {}
+      try { process.stderr.write(chunk); } catch (_) {}
+    });
+    child.on("error", (err) => {
+      backendReady = false;
+      backendStartError = err && err.message ? err.message : String(err);
+      writeBackendLifecycleLog(backendStderrLogStream, `[main] backend process error: ${backendStartError}`);
+      console.error("[main] backend process error:", backendStartError);
+      if (backendProcess === child) backendProcess = null;
+      closeBackendLogStreams();
+    });
+    child.on("exit", (code, signal) => {
+      const message = `[main] backend process exited code=${code} signal=${signal || ""}`;
+      writeBackendLifecycleLog(backendStdoutLogStream, message);
+      console.log(message);
+      if (!isQuitting && code !== 0) {
+        backendReady = false;
+        backendStartError = message;
+      }
+      if (backendProcess === child) backendProcess = null;
+      closeBackendLogStreams();
+    });
+
+    pollBackendReadiness().catch((err) => {
+      backendReady = false;
+      backendStartError = err && err.message ? err.message : String(err);
+      writeBackendLifecycleLog(backendStderrLogStream, `[main] ${backendStartError}`);
+      console.warn("[main]", backendStartError);
+    });
+  } catch (err) {
+    backendReady = false;
+    backendStartError = err && err.message ? err.message : String(err);
+    writeBackendLifecycleLog(backendStderrLogStream, `[main] backend start failed: ${backendStartError}`);
+    console.error("[main] backend start failed:", backendStartError);
+    closeBackendLogStreams();
+  }
+}
+
+function stopBackend() {
+  if (!backendProcess) return;
+  const child = backendProcess;
+  backendProcess = null;
+  backendReady = false;
+
+  try {
+    if (!child.killed) {
+      writeBackendLifecycleLog(backendStdoutLogStream, "[main] stopping backend child process");
+      child.kill();
+    }
+  } catch (err) {
+    writeBackendLifecycleLog(
+      backendStderrLogStream,
+      `[main] backend stop failed: ${err && err.message ? err.message : err}`
+    );
+  }
 }
 
 // ---- Instructions local-store helpers ----
@@ -312,11 +512,21 @@ app.whenReady().then(() => {
   ensureInstructionsFile();
   ensureScenarioPresetsFile();
 
+  startBackend();
   createWindow();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("before-quit", () => {
+  isQuitting = true;
+  stopBackend();
+});
+
+app.on("will-quit", () => {
+  stopBackend();
 });
 
 app.on("window-all-closed", () => {
