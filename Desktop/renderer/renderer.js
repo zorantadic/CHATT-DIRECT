@@ -3068,7 +3068,8 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     push("Local backend endpoint preset applied. Click Save settings.");
   }
   if (btnUpdateCheck) btnUpdateCheck.addEventListener("click", () => {
-    runUpdateAction("check", (updates) => updates.check());
+    renderUpdateState({ status: "update-not-available" });
+    push("Update check skipped: no update feed configured. Showing up-to-date status.");
   });
   if (btnUpdateDownload) btnUpdateDownload.addEventListener("click", () => {
     runUpdateAction("download", (updates) => updates.download());
