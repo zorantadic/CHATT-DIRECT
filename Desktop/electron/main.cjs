@@ -1,4 +1,5 @@
-﻿const { app, BrowserWindow, ipcMain, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
@@ -7,6 +8,9 @@ const { initMain } = require("electron-audio-loopback");
 
 // Must be called before app is ready
 initMain();
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
 
 /**
  * FIX: Windows Chromium cache "Access is denied"
@@ -87,6 +91,15 @@ let backendStartError = null;
 let isQuitting = false;
 let backendStdoutLogStream = null;
 let backendStderrLogStream = null;
+let updateState = {
+  status: "idle",
+  checking: false,
+  updateAvailable: false,
+  downloaded: false,
+  info: null,
+  progress: null,
+  error: null,
+};
 
 function ensureRuntimeDirectories() {
   fs.mkdirSync(userDataDir, { recursive: true });
@@ -368,6 +381,105 @@ function stopBackend() {
   }
 }
 
+function serializeUpdateError(err) {
+  if (!err) return null;
+  return {
+    name: err.name || "Error",
+    message: err.message || String(err),
+    code: err.code || null,
+  };
+}
+
+function setUpdateState(patch) {
+  updateState = {
+    ...updateState,
+    ...patch,
+  };
+  return updateState;
+}
+
+function sendUpdateStatus(type, payload) {
+  const message = {
+    type,
+    payload: payload || null,
+    state: updateState,
+  };
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (!win.isDestroyed()) win.webContents.send("app-update:status", message);
+    } catch (_) {
+      // ignore
+    }
+  }
+}
+
+autoUpdater.on("checking-for-update", () => {
+  setUpdateState({
+    status: "checking",
+    checking: true,
+    error: null,
+  });
+  sendUpdateStatus("checking-for-update");
+});
+
+autoUpdater.on("update-available", (info) => {
+  setUpdateState({
+    status: "update-available",
+    checking: false,
+    updateAvailable: true,
+    downloaded: false,
+    info: info || null,
+    progress: null,
+    error: null,
+  });
+  sendUpdateStatus("update-available", { info: info || null });
+});
+
+autoUpdater.on("update-not-available", (info) => {
+  setUpdateState({
+    status: "update-not-available",
+    checking: false,
+    updateAvailable: false,
+    downloaded: false,
+    info: info || null,
+    progress: null,
+    error: null,
+  });
+  sendUpdateStatus("update-not-available", { info: info || null });
+});
+
+autoUpdater.on("download-progress", (progress) => {
+  setUpdateState({
+    status: "downloading",
+    checking: false,
+    progress: progress || null,
+    error: null,
+  });
+  sendUpdateStatus("download-progress", { progress: progress || null });
+});
+
+autoUpdater.on("update-downloaded", (info) => {
+  setUpdateState({
+    status: "update-downloaded",
+    checking: false,
+    updateAvailable: true,
+    downloaded: true,
+    info: info || updateState.info,
+    error: null,
+  });
+  sendUpdateStatus("update-downloaded", { info: info || null });
+});
+
+autoUpdater.on("error", (err) => {
+  const error = serializeUpdateError(err);
+  setUpdateState({
+    status: "error",
+    checking: false,
+    error,
+  });
+  sendUpdateStatus("error", { error });
+});
+
 // ---- Instructions local-store helpers ----
 function nowIso() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -468,6 +580,68 @@ function ensureTargetInStore(store, target) {
 }
 
 // ---- IPC handlers (sandbox-safe renderer access) ----
+ipcMain.handle("app-update:get-state", async () => updateState);
+
+ipcMain.handle("app-update:check", async () => {
+  setUpdateState({
+    status: "checking",
+    checking: true,
+    progress: null,
+    error: null,
+  });
+  sendUpdateStatus("check-started");
+
+  try {
+    await autoUpdater.checkForUpdates();
+    return { ok: true, state: updateState };
+  } catch (err) {
+    const error = serializeUpdateError(err);
+    setUpdateState({
+      status: "error",
+      checking: false,
+      error,
+    });
+    sendUpdateStatus("error", { error });
+    return { ok: false, error, state: updateState };
+  }
+});
+
+ipcMain.handle("app-update:download", async () => {
+  setUpdateState({
+    status: "downloading",
+    checking: false,
+    error: null,
+  });
+  sendUpdateStatus("download-started");
+
+  try {
+    await autoUpdater.downloadUpdate();
+    return { ok: true, state: updateState };
+  } catch (err) {
+    const error = serializeUpdateError(err);
+    setUpdateState({
+      status: "error",
+      checking: false,
+      error,
+    });
+    sendUpdateStatus("error", { error });
+    return { ok: false, error, state: updateState };
+  }
+});
+
+ipcMain.handle("app-update:quit-and-install", async () => {
+  setUpdateState({
+    status: "installing",
+    error: null,
+  });
+  sendUpdateStatus("quit-and-install");
+
+  isQuitting = true;
+  stopBackend();
+  autoUpdater.quitAndInstall(false, true);
+  return { ok: true, state: updateState };
+});
+
 ipcMain.handle("instructions:read", async () => readJsonSafe(instructionsPath));
 ipcMain.handle("instructions:write", async (_evt, payload) =>
   writeJsonAtomic(instructionsPath, payload)
