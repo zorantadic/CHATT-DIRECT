@@ -81,6 +81,7 @@ def _read_json_file(path: str) -> Dict[str, Any]:
 
 def _atomic_write_json(path: str, data: Dict[str, Any]) -> None:
     dir_name = os.path.dirname(os.path.abspath(path)) or "."
+    os.makedirs(dir_name, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=dir_name, delete=False) as tf:
         json.dump(data, tf, ensure_ascii=False, indent=2)
         tf.flush()
