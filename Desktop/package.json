@@ -33,6 +33,21 @@
     "asarUnpack": [
       "renderer/stt-worklet-processor.js"
     ],
+    "extraResources": [
+      {
+        "from": "../backend/dist/chatt-backend",
+        "to": "backend-runtime"
+      },
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "provider_capabilities.json",
+          "provider_config.local.example.json",
+          "scenario_presets.json"
+        ]
+      }
+    ],
     "icon": "assets/icon.ico",
     "win": {
       "target": [
