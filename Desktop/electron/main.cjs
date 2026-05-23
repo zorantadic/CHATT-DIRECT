@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+﻿const { app, BrowserWindow, ipcMain, Menu } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
@@ -223,6 +223,14 @@ function checkBackendReadiness() {
   });
 }
 
+async function hasHealthyExistingBackend() {
+  try {
+    return await checkBackendReadiness();
+  } catch (_) {
+    return false;
+  }
+}
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -255,7 +263,7 @@ async function pollBackendReadiness() {
   return false;
 }
 
-function startBackend() {
+async function startBackend() {
   if (backendProcess) return;
 
   try {
@@ -266,6 +274,17 @@ function startBackend() {
 
     backendStdoutLogStream = fs.createWriteStream(backendStdoutLogPath, { flags: "a" });
     backendStderrLogStream = fs.createWriteStream(backendStderrLogPath, { flags: "a" });
+    if (await hasHealthyExistingBackend()) {
+      backendReady = true;
+      backendStartError = null;
+      backendProcess = null;
+      const message = "[main] existing backend detected at http://127.0.0.1:50505/; using existing backend without spawning child process";
+      writeBackendLifecycleLog(backendStdoutLogStream, message);
+      console.log(message);
+      closeBackendLogStreams();
+      return;
+    }
+
     const resolved = resolveBackendCommand();
     if (!resolved) {
       closeBackendLogStreams();
@@ -533,6 +552,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   ensureRuntimeDirectories();
   ensureProviderConfigFile();
   ensureInstructionsFile();
@@ -558,3 +578,4 @@ app.on("will-quit", () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
+
