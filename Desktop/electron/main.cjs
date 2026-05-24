@@ -701,6 +701,168 @@ ipcMain.handle("instructions:reset", async (_evt, args) => {
 const APP_UI_ZOOM_FACTOR = 0.7;
 
 let mainWindow;
+let miniControlWindow = null;
+
+const allowedMiniControlCommands = new Set([
+  "start",
+  "stop",
+  "refresh",
+  "repeat",
+  "reset",
+]);
+
+function isLiveWindow(win) {
+  return !!win && !win.isDestroyed();
+}
+
+function sendToMainWindow(channel, payload) {
+  if (!isLiveWindow(mainWindow)) return false;
+  try {
+    mainWindow.webContents.send(channel, payload || {});
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function sendToMiniControlWindow(channel, payload) {
+  if (!isLiveWindow(miniControlWindow)) return false;
+  try {
+    miniControlWindow.webContents.send(channel, payload || {});
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function closeMiniControlWindow() {
+  if (!isLiveWindow(miniControlWindow)) {
+    miniControlWindow = null;
+    return;
+  }
+
+  const win = miniControlWindow;
+  miniControlWindow = null;
+
+  try {
+    win.close();
+  } catch (_) {
+    // ignore
+  }
+}
+
+function requestMiniControlStatus() {
+  sendToMainWindow("mini-control:request-status", {});
+}
+
+function createMiniControlWindow() {
+  if (isLiveWindow(miniControlWindow)) {
+    try {
+      miniControlWindow.show();
+      miniControlWindow.focus();
+      requestMiniControlStatus();
+    } catch (_) {
+      // ignore
+    }
+    return miniControlWindow;
+  }
+
+  miniControlWindow = new BrowserWindow({
+    width: 220,
+    height: 500,
+    minWidth: 200,
+    minHeight: 460,
+    maxWidth: 260,
+    maxHeight: 580,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    hasShadow: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  miniControlWindow.setMenuBarVisibility(false);
+
+  miniControlWindow.once("ready-to-show", () => {
+    if (!isLiveWindow(miniControlWindow)) return;
+    miniControlWindow.show();
+    miniControlWindow.focus();
+    requestMiniControlStatus();
+  });
+
+  miniControlWindow.webContents.once("did-finish-load", () => {
+    requestMiniControlStatus();
+  });
+
+  miniControlWindow.on("closed", () => {
+    miniControlWindow = null;
+  });
+
+  const miniPath = path.join(__dirname, "..", "renderer", "mini-control.html");
+  miniControlWindow.loadFile(miniPath);
+
+  return miniControlWindow;
+}
+
+function restoreMainWindowFromMiniControl() {
+  if (!isLiveWindow(mainWindow)) {
+    createWindow();
+  }
+
+  if (isLiveWindow(mainWindow)) {
+    try {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+      requestMiniControlStatus();
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  closeMiniControlWindow();
+}
+
+ipcMain.handle("mini-control:command", async (_evt, command) => {
+  const normalized = String(command || "").trim();
+  if (!allowedMiniControlCommands.has(normalized)) {
+    return { ok: false, error: `Unsupported mini-control command: ${normalized}` };
+  }
+
+  const sent = sendToMainWindow("mini-control:command", { command: normalized });
+  return { ok: sent };
+});
+
+ipcMain.handle("mini-control:open-main", async () => {
+  restoreMainWindowFromMiniControl();
+  return { ok: true };
+});
+
+ipcMain.handle("mini-control:close", async () => {
+  closeMiniControlWindow();
+  return { ok: true };
+});
+
+ipcMain.handle("mini-control:status", async (_evt, payload) => {
+  const sent = sendToMiniControlWindow("mini-control:status", payload || {});
+  return { ok: sent };
+});
+
+ipcMain.handle("mini-control:request-status", async () => {
+  requestMiniControlStatus();
+  return { ok: true };
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -730,6 +892,23 @@ function createWindow() {
     const indexPath = path.join(__dirname, "..", "renderer", "index.html");
     mainWindow.loadFile(indexPath);
   }
+
+  mainWindow.on("minimize", () => {
+    if (!isQuitting) createMiniControlWindow();
+  });
+
+  mainWindow.on("restore", () => {
+    closeMiniControlWindow();
+  });
+
+  mainWindow.on("show", () => {
+    if (!mainWindow.isMinimized()) closeMiniControlWindow();
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    closeMiniControlWindow();
+  });
 }
 
 app.whenReady().then(() => {

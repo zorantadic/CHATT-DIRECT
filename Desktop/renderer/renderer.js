@@ -141,6 +141,7 @@ Do not introduce new topics.`;
         host;
     }
     try { document.body.dataset.session = normalized.toLowerCase(); } catch {}
+    publishMiniControlStatus();
   }
   function updateActivityStatus() {
     const activity = activitySpeakingActive ? "Speaking" : activityListeningActive ? "Listening" : "Idle";
@@ -151,7 +152,43 @@ Do not introduce new topics.`;
     setPillElement(activityStatusEl, activity === "Idle" ? "warn" : "ok", `${t("status.activityPrefix", "Activity")}: ${activityText}`);
     if (voiceStatusActivityEl) voiceStatusActivityEl.textContent = activityText;
     try { document.body.dataset.activity = activity.toLowerCase(); } catch {}
+    publishMiniControlStatus();
   }
+
+  function readMiniControlButtonDisabled(id) {
+    const btn = document.getElementById(id);
+    return !!(btn && btn.disabled);
+  }
+
+  function buildMiniControlStatus() {
+    const sessionEl = document.getElementById("sessionStatus");
+    const activityEl = document.getElementById("activityStatus");
+
+    return {
+      session: document.body?.dataset?.session || "off",
+      activity: document.body?.dataset?.activity || "idle",
+      sessionText: sessionEl?.textContent || "Session: OFF",
+      activityText: activityEl?.textContent || "Activity: Idle",
+      buttons: {
+        startDisabled: readMiniControlButtonDisabled("btnStart"),
+        stopDisabled: readMiniControlButtonDisabled("btnStop"),
+        refreshDisabled: readMiniControlButtonDisabled("btnInstrRefresh"),
+        repeatDisabled: readMiniControlButtonDisabled("btnRepeatLastAnswer"),
+        resetDisabled: readMiniControlButtonDisabled("btnResetSession"),
+      },
+    };
+  }
+
+  function publishMiniControlStatus() {
+    try {
+      const api = window.electronAPI && window.electronAPI.miniControl;
+      if (!api || typeof api.publishStatus !== "function") return;
+      api.publishStatus(buildMiniControlStatus()).catch(() => {});
+    } catch (_) {
+      // ignore
+    }
+  }
+
   function setListeningIndicator(active) {
     activityListeningActive = !!active;
     if (listenStatusEl && active) {
@@ -2997,6 +3034,7 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     }
     $("btnStart").disabled = directBusy;
     $("btnStop").disabled = !directBusy;
+    publishMiniControlStatus();
   }
   // ------------------------------
   // Reset Session (Ready state; user clicks Connect)
@@ -3307,6 +3345,55 @@ if (playbackVolumeEl) {
       navigator.mediaDevices.ondevicechange = onDeviceChange;
     }
   }
+  function clickMainControlFromMini(buttonId, label) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) {
+      push(`WARN: Mini control command skipped; ${label} button was not found.`);
+      return;
+    }
+
+    if (btn.disabled) {
+      push(`WARN: Mini control command skipped; ${label} button is disabled.`);
+      publishMiniControlStatus();
+      return;
+    }
+
+    btn.click();
+    setTimeout(publishMiniControlStatus, 250);
+  }
+
+  function handleMiniControlCommand(payload) {
+    const command = typeof payload === "string" ? payload : payload && payload.command;
+
+    if (command === "start") {
+      clickMainControlFromMini("btnStart", "Start Direct Realtime");
+    } else if (command === "stop") {
+      clickMainControlFromMini("btnStop", "Stop Direct Realtime");
+    } else if (command === "refresh") {
+      clickMainControlFromMini("btnInstrRefresh", "Refresh Instructions");
+    } else if (command === "repeat") {
+      clickMainControlFromMini("btnRepeatLastAnswer", "Repeat Last Answer");
+    } else if (command === "reset") {
+      clickMainControlFromMini("btnResetSession", "Reset Session");
+    } else {
+      push(`WARN: Unsupported mini control command: ${command || "(empty)"}`);
+      publishMiniControlStatus();
+    }
+  }
+
+  try {
+    const miniApi = window.electronAPI && window.electronAPI.miniControl;
+    if (miniApi && typeof miniApi.onCommand === "function") {
+      miniApi.onCommand(handleMiniControlCommand);
+    }
+    if (miniApi && typeof miniApi.onStatusRequest === "function") {
+      miniApi.onStatusRequest(() => publishMiniControlStatus());
+    }
+    publishMiniControlStatus();
+  } catch (_) {
+    // ignore
+  }
+
   window.addEventListener("beforeunload", () => {
     desiredConnected = false;
     clearReconnectTimers();

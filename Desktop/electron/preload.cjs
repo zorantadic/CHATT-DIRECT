@@ -31,4 +31,36 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return () => ipcRenderer.removeListener("app-update:status", listener);
     },
   },
+
+  miniControl: {
+    sendCommand: (command) => ipcRenderer.invoke("mini-control:command", command),
+    openMainWindow: () => ipcRenderer.invoke("mini-control:open-main"),
+    close: () => ipcRenderer.invoke("mini-control:close"),
+    publishStatus: (payload) => ipcRenderer.invoke("mini-control:status", payload),
+    requestStatus: () => ipcRenderer.invoke("mini-control:request-status"),
+
+    onCommand: (callback) => {
+      const listener = (_event, payload) => {
+        if (typeof callback === "function") callback(payload);
+      };
+      ipcRenderer.on("mini-control:command", listener);
+      return () => ipcRenderer.removeListener("mini-control:command", listener);
+    },
+
+    onStatus: (callback) => {
+      const listener = (_event, payload) => {
+        if (typeof callback === "function") callback(payload);
+      };
+      ipcRenderer.on("mini-control:status", listener);
+      return () => ipcRenderer.removeListener("mini-control:status", listener);
+    },
+
+    onStatusRequest: (callback) => {
+      const listener = (_event, payload) => {
+        if (typeof callback === "function") callback(payload);
+      };
+      ipcRenderer.on("mini-control:request-status", listener);
+      return () => ipcRenderer.removeListener("mini-control:request-status", listener);
+    },
+  },
 });

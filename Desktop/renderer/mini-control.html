@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*;"
+  />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AnswerDesk AI Mini Control</title>
+  <link rel="stylesheet" href="./mini-control.css" />
+</head>
+<body data-session="off" data-activity="idle">
+  <main class="miniShell">
+    <header class="miniHeader">
+      <div class="dragZone" aria-label="Drag mini control window">
+        <div class="miniTitle">AnswerDesk AI</div>
+        <div class="miniSubtitle">Mini controls</div>
+      </div>
+      <div class="windowActions">
+        <button id="miniOpen" class="iconButton noDrag" type="button" title="Open full app">Open</button>
+        <button id="miniClose" class="iconButton noDrag" type="button" title="Close mini controls">X</button>
+      </div>
+    </header>
+
+    <section class="miniStatus" aria-label="Realtime status">
+      <div class="statusCard">
+        <span class="statusLabel">Session</span>
+        <strong id="miniSession">OFF</strong>
+      </div>
+      <div class="statusCard">
+        <span class="statusLabel">Activity</span>
+        <strong id="miniActivity">Idle</strong>
+      </div>
+    </section>
+
+    <section class="miniActions" aria-label="Realtime controls">
+      <button id="miniStart" class="primary" type="button">Start</button>
+      <button id="miniStop" class="danger" type="button">Stop</button>
+      <button id="miniRefresh" type="button">Refresh</button>
+      <button id="miniRepeat" type="button">Repeat</button>
+      <button id="miniReset" type="button">Reset</button>
+    </section>
+
+    <footer id="miniMessage" class="miniMessage">Ready</footer>
+  </main>
+
+  <script src="./mini-control.js"></script>
+</body>
+</html>
