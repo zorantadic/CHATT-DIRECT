@@ -702,8 +702,8 @@ let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1120,
-    height: 820,
+    width: 900,
+    height: 900,
     minWidth: 860,
     minHeight: 720,
     webPreferences: {
@@ -713,6 +713,8 @@ function createWindow() {
       sandbox: true,
     },
   });
+
+  mainWindow.webContents.setZoomFactor(0.9);
 
   // Optional: load dev URL if explicitly provided
   const startUrl = process.env.CHATT_START_URL || process.env.ELECTRON_START_URL;
