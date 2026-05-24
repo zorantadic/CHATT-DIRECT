@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-22
+Last updated: 2026-05-24
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -25,6 +25,7 @@ incoming language planned as transcription language hint
 packaged Windows app
 version 0.1.8 packaged installer
 minimized-app floating mini control window
+deterministic Electron UI zoom factor 0.7 applied in main window runtime
 ```
 Primary value:
 ```text
@@ -44,6 +45,7 @@ hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
 modern dark glass Desktop UI across Voice, Settings, and Scenarios
 responsive default Desktop window size 1120 x 820 with minimum 860 x 720
+deterministic UI scale independent of Chromium persisted profile zoom state
 multilingual UI display support
 header language selector synchronized with Settings language selector
 floating vertical mini control window when main app is minimized
@@ -129,6 +131,8 @@ Important active files:
 ```text
 Desktop/package.json
 Desktop/package-lock.json
+Desktop/electron/main.cjs
+Desktop/electron/preload.cjs
 Desktop/renderer/index.html
 Desktop/renderer/renderer.js
 Desktop/renderer/styles.css
@@ -438,6 +442,8 @@ Modern Desktop UI modernization Phase 1 Voice page: OK
 Modern Desktop UI modernization Phase 2 Settings page: OK
 Modern Desktop UI modernization Phase 3 Scenarios page: OK
 Desktop default window size 1120 x 820 and minimum 860 x 720: OK
+Desktop deterministic UI zoom factor 0.7 applied immediately and after did-finish-load: OK
+Dev profile zoom masking issue identified and resolved by deterministic app zoom approach: OK
 Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
 Mini Control Window opens when the main app is minimized: OK
 Mini Control Window vertical layout fits visible window: OK
@@ -475,6 +481,9 @@ Scenario preset foundation is implemented through backend/scenario_presets.json,
 Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 Desktop UI is modernized across Voice, Settings, and Scenarios with dark glass/3D design language
+Desktop main window uses canonical 1120 x 820 default with 860 x 720 minimum
+Desktop main window applies deterministic APP_UI_ZOOM_FACTOR = 0.7 in Electron main process
+UI scale is not allowed to depend on Chromium persisted per-host zoom state
 Voice page uses Session and Activity as primary user-facing status indicators
 Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Diagnostics, Auth, and Log cards
 Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
@@ -536,6 +545,7 @@ Recent mini control / 0.1.8 release commits:
 cf9a760 Add mini control window for minimized app
 28416ed Bump desktop version to 0.1.8
 a0ac25c Fix desktop package JSON encoding
+Set desktop window baseline and UI zoom
 ```
 ```
 ---
@@ -910,6 +920,38 @@ default width: 1120
 default height: 820
 minimum width: 860
 minimum height: 720
+```
+
+Current deterministic UI zoom baseline:
+
+```text
+APP_UI_ZOOM_FACTOR = 0.7
+Applied in Desktop/electron/main.cjs to mainWindow.webContents.
+Applied immediately after BrowserWindow creation.
+Re-applied on webContents did-finish-load.
+This app-level zoom is intentional and deterministic.
+It replaces accidental dependence on Chromium profile persisted zoom state.
+```
+
+Root cause finding for desktop scale issue:
+
+```text
+The installed app was not incorrectly zoomed.
+The old development profile under Desktop/.electron-userdata contained a persisted Chromium per-host zoom entry around -2.0.
+That persisted dev-profile zoom made npm start appear visually correct and masked the true default UI scale.
+After resetting/renaming Desktop/.electron-userdata, development mode matched the installed app and appeared larger.
+The accepted fix is deterministic Electron app zoom, not CSS rewrite and not user-profile persisted zoom.
+```
+
+Current desktop scale implementation rules:
+
+```text
+Do not use Chromium persisted profile zoom state as a product behavior.
+Do not rely on Ctrl-minus/manual zoom or Preferences per_host_zoom_levels.
+Do not solve desktop scale by broad CSS rewrite unless explicitly approved.
+Keep BrowserWindow default at 1120 x 820 and minimum at 860 x 720.
+Keep APP_UI_ZOOM_FACTOR centralized in Desktop/electron/main.cjs.
+If visual scale needs future tuning, change only APP_UI_ZOOM_FACTOR first and validate before touching CSS.
 ```
 
 Current visual design direction:
