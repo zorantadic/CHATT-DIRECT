@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-23
+Last updated: 2026-05-22
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -23,6 +23,8 @@ selected provider voice applied in Realtime session.update
 outgoing language steering through final Realtime instructions
 incoming language planned as transcription language hint
 packaged Windows app
+version 0.1.8 packaged installer
+minimized-app floating mini control window
 ```
 Primary value:
 ```text
@@ -44,6 +46,8 @@ modern dark glass Desktop UI across Voice, Settings, and Scenarios
 responsive default Desktop window size 1120 x 820 with minimum 860 x 720
 multilingual UI display support
 header language selector synchronized with Settings language selector
+floating vertical mini control window when main app is minimized
+mini control supports Start, Stop, Refresh, Repeat, Reset, Open, Session, and Activity
 ```
 ---
 2. Canonical File Roles
@@ -124,9 +128,13 @@ C:\Projects\chatt-direct\backend
 Important active files:
 ```text
 Desktop/package.json
+Desktop/package-lock.json
 Desktop/renderer/index.html
 Desktop/renderer/renderer.js
 Desktop/renderer/styles.css
+Desktop/renderer/mini-control.html
+Desktop/renderer/mini-control.css
+Desktop/renderer/mini-control.js
 Desktop/renderer/stt-worklet-processor.js
 backend/app_realtime.py
 backend/audio_utils.py
@@ -248,27 +256,9 @@ PORT=50505
 DEBUG=false
 ```
 
-Active provider configuration in the older/manual backend startup path is saved locally in:
+Active provider configuration is saved locally in:
 ```text
 backend/provider_config.local.json
-```
-
-Electron-started local/dev runtime now uses the Electron userData runtime file:
-```text
-Desktop/.electron-userdata/provider_config.local.json
-```
-
-Important AppData/userData migration lesson from 2026-05-23:
-```text
-If Desktop/.electron-userdata/provider_config.local.json is missing and is seeded from provider_config.local.example.json, it may contain placeholder values such as:
-https://your-resource-name.cognitiveservices.azure.com
-apiKey: ""
-
-That placeholder provider config causes Direct Realtime startup to fail after local /voice/ws connects, with:
-[Errno 11001] getaddrinfo failed
-
-This is not an audio, WebSocket, or Realtime engine failure. It means the active provider endpoint cannot be resolved.
-After AppData/userData migration, provider settings must be re-entered through Settings -> Provider Configuration or migrated from backend/provider_config.local.json before Direct Realtime validation.
 ```
 
 Provider capability lists are defined in:
@@ -346,6 +336,9 @@ Barge-in/interruption behavior
 Modern Voice / Settings / Scenarios dark glass UI layout
 Responsive Desktop window behavior at 1120 x 820 default and 860 x 720 minimum
 Scenario Preview slot with displayDetails metadata and no model-facing instruction prompt
+Mini Control Window when the main app is minimized
+Mini Control Window commands: Start, Stop, Refresh, Repeat, Reset, Open
+Mini Control Window status sync: Session and Activity
 ```
 Reset behavior:
 ```text
@@ -446,6 +439,19 @@ Modern Desktop UI modernization Phase 2 Settings page: OK
 Modern Desktop UI modernization Phase 3 Scenarios page: OK
 Desktop default window size 1120 x 820 and minimum 860 x 720: OK
 Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
+Mini Control Window opens when the main app is minimized: OK
+Mini Control Window vertical layout fits visible window: OK
+Mini Control Window can be moved across the desktop: OK
+Mini Control Window Open restores the main app: OK
+Mini Control Window Start/Stop/Refresh/Repeat/Reset commands work through existing main renderer controls: OK
+Mini Control Window Session and Activity status sync: OK
+Desktop version bumped to 0.1.8: OK
+Desktop package.json and package-lock.json UTF-8 without BOM after version bump: OK
+Electron build for 0.1.8: OK
+Installer AnswerDesk AI Setup 0.1.8.exe created: OK
+Installer 0.1.8 installed and upgraded over prior installation successfully: OK
+Old backup folders and old installer artifacts cleaned: OK
+Git clean after 0.1.8 release validation: OK
 ```
 ---
 12. Current Known Good State
@@ -476,6 +482,14 @@ Scenario Preview displays human-readable metadata using displayDetails when avai
 Bottom app status bar no longer shows the redundant bottom volume mirror
 Header Backend/Provider cards removed and replaced with compact Select Language control
 Settings Display Language and Header Select Language controls remain synchronized through shared display-language state
+Minimizing the main app opens a floating vertical Mini Control Window
+Mini Control Window is an Electron UI remote-control layer only
+Mini Control Window does not own or duplicate Direct Realtime audio, WebSocket, backend, provider, or scenario runtime
+Mini Control Window controls existing main renderer commands for Start, Stop, Refresh Instructions, Repeat Last Answer, and Reset Session
+Mini Control Window displays synchronized Session and Activity state from the main renderer
+Mini Control Window Open restores the main app and closes the mini control
+Desktop release 0.1.8 build and installer upgrade are validated
+
 
 Multilingual UI v1 baseline:
 
@@ -514,6 +528,14 @@ Recent multilingual UI commits:
 ```text
 3c1e67a Add multilingual UI display support
 0260f6e Add header language selector
+```
+
+Recent mini control / 0.1.8 release commits:
+
+```text
+cf9a760 Add mini control window for minimized app
+28416ed Bump desktop version to 0.1.8
+a0ac25c Fix desktop package JSON encoding
 ```
 ```
 ---
@@ -961,8 +983,116 @@ They did not change scenario API behavior.
 They did not change Cost Guard runtime logic.
 ```
 
+
 ---
-18. Phase 2 AppData / userData Runtime Plan
+18. Mini Control Window and 0.1.8 Release Baseline
+
+Mini Control Window is now part of the Desktop UI baseline.
+
+Completed commits:
+
+```text
+cf9a760 Add mini control window for minimized app
+28416ed Bump desktop version to 0.1.8
+a0ac25c Fix desktop package JSON encoding
+```
+
+Current mini control files:
+
+```text
+Desktop/renderer/mini-control.html
+Desktop/renderer/mini-control.css
+Desktop/renderer/mini-control.js
+```
+
+Current Electron integration:
+
+```text
+Desktop/electron/main.cjs owns miniControlWindow lifecycle.
+Desktop/electron/preload.cjs exposes electronAPI.miniControl.
+Desktop/renderer/renderer.js remains the only owner of Direct Realtime runtime controls.
+```
+
+Current mini control behavior:
+
+```text
+When the main app is minimized, Electron opens a small floating Mini Control Window.
+The Mini Control Window is always-on-top, frameless, transparent/dark glass, not shown in the taskbar, and movable by dragging the header area.
+The Mini Control Window uses a narrow vertical layout.
+The Mini Control Window shows Session and Activity status.
+The Mini Control Window provides Start, Stop, Refresh, Repeat, Reset, and Open controls.
+Open restores the main app and closes the Mini Control Window.
+Closing the Mini Control Window does not stop the main app or backend.
+```
+
+Current command routing:
+
+```text
+Mini Control Window sends IPC commands to Electron main.
+Electron main forwards supported mini-control commands to the existing main renderer.
+The main renderer maps commands to existing buttons:
+start   -> btnStart
+stop    -> btnStop
+refresh -> btnInstrRefresh
+repeat  -> btnRepeatLastAnswer
+reset   -> btnResetSession
+```
+
+Runtime ownership rule:
+
+```text
+Mini Control Window is a remote UI layer only.
+It must not create a second WebSocket.
+It must not create a second audio context.
+It must not directly call backend Realtime APIs.
+It must not own Direct Realtime state.
+It must not duplicate provider/scenario/instruction runtime logic.
+```
+
+Status synchronization:
+
+```text
+The main renderer publishes Session and Activity state to the Mini Control Window through IPC.
+Mini Control Window status follows the existing visible Session and Activity state.
+Start/Stop/Refresh/Repeat/Reset disabled state follows the existing main renderer button state.
+```
+
+Release validation:
+
+```text
+node --check Desktop/electron/main.cjs: OK
+node --check Desktop/electron/preload.cjs: OK
+node --check Desktop/renderer/renderer.js: OK
+node --check Desktop/renderer/mini-control.js: OK
+Desktop runtime test: OK
+Mini Control Window opens on minimize: OK
+Mini Control Window vertical layout fits: OK
+Mini Control Window can be moved: OK
+Open restores full app: OK
+Start/Stop/Refresh/Repeat/Reset work from Mini Control Window: OK
+Session and Activity sync: OK
+Desktop version 0.1.8: OK
+Desktop package.json / package-lock.json UTF-8 without BOM: OK
+Electron build 0.1.8: OK
+Installer generated: dist\AnswerDesk AI Setup 0.1.8.exe
+Installer upgrade over previous installed version: OK
+Old local backup folders cleaned: OK
+Old installer artifacts 0.1.5, 0.1.6, and 0.1.7 removed from dist: OK
+Git clean after validation: OK
+```
+
+Design boundary:
+
+```text
+Do not change Direct Realtime audio capture/playback because of Mini Control Window.
+Do not change backend app_realtime.py because of Mini Control Window.
+Do not change provider adapters because of Mini Control Window.
+Do not change scenario APIs because of Mini Control Window.
+Do not remove main renderer ownership of Start/Stop/Refresh/Repeat/Reset.
+```
+
+---
+19. Phase 2 AppData / userData Runtime Plan
 
 Phase 2 objective:
 
@@ -1094,7 +1224,7 @@ Start Direct Realtime still works with loopback/system audio only.
 ```
 
 ---
-19. Session Cost Guard Baseline
+20. Session Cost Guard Baseline
 
 Session Cost Guard is now part of the Direct Realtime runtime cost-protection layer.
 
@@ -1156,7 +1286,7 @@ Stability and cost: auto-stop or protection when app is minimized/inactive, paus
 ```
 
 ---
-20. Commercial Direction
+21. Commercial Direction
 Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
@@ -1172,7 +1302,7 @@ BYOK privacy/control
 workflow-specific use cases
 ```
 ---
-21. Work Process Rules
+22. Work Process Rules
 For all future project work:
 ```text
 Analyze first
@@ -1195,7 +1325,7 @@ Restore accidental runtime changes before commit
 
 ---
 
-22. Simplified Voice Status Indicators Baseline
+23. Simplified Voice Status Indicators Baseline
 
 Commit:
 
@@ -1288,32 +1418,3 @@ Design boundary:
 ```text
 Do not remove hidden technical status elements without a separate diagnostics design.
 Do not change audio capture/playback, Realtime websocket flow, provider logic, scenario logic, or Cost Guard logic for this UI simplification.
-```
----
-23. Update Workflow / AppData Runtime Notes
-
-Completed update foundation commits:
-```text
-Add updater dependency and publish config
-Add update IPC foundation
-```
-
-Current update workflow status:
-```text
-electron-updater dependency is installed.
-Desktop/package.json includes generic publish provider: https://updates.chattdirect.com/win/
-Electron main/preload update IPC foundation exists.
-No Settings Update UI has been implemented yet.
-No automatic startup update check is enabled.
-autoDownload = false.
-autoInstallOnAppQuit = false.
-Restart/install flow must stop only Electron-owned backend child process before quitAndInstall.
-```
-
-AppData/userData runtime warning:
-```text
-Local/dev Electron runtime can use Desktop/.electron-userdata/provider_config.local.json instead of backend/provider_config.local.json.
-If this runtime file is seeded from provider_config.local.example.json, it contains placeholder endpoint/key values.
-Provider config must be re-entered or migrated before Direct Realtime testing.
-A placeholder endpoint causes [Errno 11001] getaddrinfo failed when backend tries to connect to the upstream Realtime provider.
-```
