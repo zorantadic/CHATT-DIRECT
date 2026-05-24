@@ -2245,7 +2245,7 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   function updateOutputSummaryUi() {
     const label = currentOutputLabel();
     const notSelected = t("common.notSelected", "Not selected");
-    if (bottomOutputEl) bottomOutputEl.textContent = label;
+    if (bottomOutputEl) bottomOutputEl.textContent = label === notSelected ? notSelected : t("common.ready", "Ready");
     if (settingsOutputDeviceTextEl) settingsOutputDeviceTextEl.textContent = label;
     if (settingsDiagOutputEl) settingsDiagOutputEl.textContent = label === notSelected ? notSelected : t("common.ready", "Ready");
     if (settingsOutputBadgeEl) setSettingsBadge(settingsOutputBadgeEl, label === notSelected ? "warn" : "ok", label === notSelected ? notSelected : t("common.outputReady", "Output Ready"));

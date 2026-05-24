@@ -719,7 +719,7 @@ body[data-activity="speaking"] .waveform {
 
 .appBottomBar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(220px, 0.9fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   align-items: center;
   margin-top: 18px;
@@ -755,7 +755,7 @@ body[data-activity="speaking"] .waveform {
 
 .settingsDashboard {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
   gap: 16px;
   align-items: start;
 }
@@ -1167,7 +1167,7 @@ body[data-session="off"] #settingsDiagWs {
 
 .scenarioLayout {
   display: grid;
-  grid-template-columns: minmax(300px, 0.82fr) minmax(460px, 1.18fr);
+  grid-template-columns: minmax(280px, 0.82fr) minmax(380px, 1.18fr);
   gap: 16px;
   align-items: start;
 }
@@ -1589,7 +1589,7 @@ body[data-session="off"] #settingsDiagWs {
 }
 
 .logbar input[type="text"] {
-  width: 420px;
+  width: min(420px, 100%);
 }
 
 .logbar .spacer {
