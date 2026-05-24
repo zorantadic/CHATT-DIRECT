@@ -698,12 +698,14 @@ ipcMain.handle("instructions:reset", async (_evt, args) => {
   return { current: t.current, default: t.default, updatedAt: t.updatedAt };
 });
 
+const APP_UI_ZOOM_FACTOR = 0.7;
+
 let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 900,
+    width: 1120,
+    height: 820,
     minWidth: 860,
     minHeight: 720,
     webPreferences: {
@@ -714,7 +716,10 @@ function createWindow() {
     },
   });
 
-  mainWindow.webContents.setZoomFactor(0.9);
+  mainWindow.webContents.setZoomFactor(APP_UI_ZOOM_FACTOR);
+  mainWindow.webContents.on("did-finish-load", () => {
+    mainWindow.webContents.setZoomFactor(APP_UI_ZOOM_FACTOR);
+  });
 
   // Optional: load dev URL if explicitly provided
   const startUrl = process.env.CHATT_START_URL || process.env.ELECTRON_START_URL;
