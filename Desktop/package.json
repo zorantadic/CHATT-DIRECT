@@ -1,6 +1,6 @@
 {
   "name": "chatt-desktop",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "CHATT Desktop - Electron (static renderer)",
   "author": "CHATT",
