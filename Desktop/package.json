@@ -2,8 +2,8 @@
   "name": "chatt-desktop",
   "version": "0.1.6",
   "private": true,
-  "description": "CHATT Desktop - Electron (static renderer)",
-  "author": "CHATT",
+  "description": "AnswerDesk AI - Realtime voice desktop application",
+  "author": "AnswerDesk AI",
   "main": "electron/main.cjs",
   "scripts": {
     "start": "electron .",
@@ -20,8 +20,8 @@
     "electron-builder": "^26.0.0"
   },
   "build": {
-    "appId": "com.chatt.desktop",
-    "productName": "CHATT Desktop",
+    "appId": "com.answerdesk.ai",
+    "productName": "AnswerDesk AI",
     "directories": {
       "output": "dist"
     },
@@ -63,7 +63,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "CHATT Desktop",
+      "shortcutName": "AnswerDesk AI",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico"
     },
