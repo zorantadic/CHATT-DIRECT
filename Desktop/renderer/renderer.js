@@ -469,7 +469,7 @@ Do not introduce new topics.`;
     const lang = getDisplayLanguage();
     try { document.documentElement.lang = lang; } catch {}
     syncDisplayLanguageControls(lang);
-    document.title = `CHATT Direct - ${t("app.subtitle", "Realtime Voice")}`;
+    document.title = `AnswerDesk AI - ${t("app.subtitle", "Realtime Voice")}`;
 
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       applyTranslatedText(el, "data-i18n", "data-i18n-fallback", "textContent");
