@@ -2952,7 +2952,12 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
         if (logText.includes("input_audio_buffer.speech_started")) {
           directLastSpeechStartedAt = Date.now();
           setListeningIndicator(true);
-          if (speakStatusEl && speakStatusEl.classList.contains("ok")) {
+          const hasAssistantAudio =
+            isAssistantSpeaking ||
+            activePlaybackSources.size > 0 ||
+            audioQueue.length > 0 ||
+            bufferedBytes > 0;
+          if (hasAssistantAudio) {
             stopAudioNow();
             try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
             setAssistantSpeaking(false);
