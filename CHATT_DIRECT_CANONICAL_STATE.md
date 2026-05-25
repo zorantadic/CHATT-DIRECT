@@ -1572,23 +1572,26 @@ It does not change provider adapters or session.update payloads.
 It does not change Cost Guard behavior.
 It does not change scenario/instruction behavior.
 
+```
+
 ---
 
-24. Realtime Turn Detection and Safe Barge-in Runtime Baseline
+24. Realtime Turn Detection and Runtime Barge-in Baseline
 
 Completed commits:
 
 ```text
 24ee869 Tune realtime server VAD settings
 b77ab7c Avoid stopping audio on every speech start
+c9bc147 Use runtime audio state for barge-in detection
 ```
 
 Runtime issue investigated:
 
 ```text
 With Direct Realtime using loopback/system audio, external audio player content was being sent to the model correctly.
-However, the provider server VAD segmented the incoming audio into many short speech_started / speech_stopped / committed cycles.
-The Desktop renderer also stopped local playback on every speech_started event regardless of whether assistant playback was active.
+However, provider server VAD was originally segmenting external/system audio into many short speech_started / speech_stopped / committed cycles.
+The Desktop renderer also originally stopped local playback on every speech_started event regardless of whether assistant playback was active.
 ```
 
 Important finding:
@@ -1600,6 +1603,7 @@ When Repeat Last Answer was run without external source audio, the assistant ret
 The proven issue was:
 - provider server_vad was too eager for the system audio/player use case before tuning
 - renderer.js was too aggressive because speech_started always called stopAudioNow()
+- using the UI speaking indicator alone as the barge-in condition was not reliable enough because local AudioContext playback can still have scheduled/active audio sources after visible speaking state changes
 ```
 
 Current provider VAD configuration:
@@ -1649,7 +1653,7 @@ File:
 Desktop/renderer/renderer.js
 ```
 
-Previous behavior:
+Original behavior:
 
 ```javascript
 if (logText.includes("input_audio_buffer.speech_started")) {
@@ -1664,7 +1668,7 @@ if (logText.includes("input_audio_buffer.speech_started")) {
 }
 ```
 
-Current behavior:
+Intermediate behavior from b77ab7c:
 
 ```javascript
 if (logText.includes("input_audio_buffer.speech_started")) {
@@ -1679,18 +1683,55 @@ if (logText.includes("input_audio_buffer.speech_started")) {
 }
 ```
 
+Final current behavior from c9bc147:
+
+```javascript
+if (logText.includes("input_audio_buffer.speech_started")) {
+  directLastSpeechStartedAt = Date.now();
+  setListeningIndicator(true);
+  const hasAssistantAudio =
+    isAssistantSpeaking ||
+    activePlaybackSources.size > 0 ||
+    audioQueue.length > 0 ||
+    bufferedBytes > 0;
+  if (hasAssistantAudio) {
+    stopAudioNow();
+    try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
+    setAssistantSpeaking(false);
+    push("Barge-in detected: cancelled current response and stopped local playback");
+  }
+}
+```
+
 Behavior rule:
 
 ```text
-speech_started while assistant is not speaking:
+speech_started while assistant audio is not active:
   update Direct runtime input activity and Cost Guard timestamp only.
   do not call stopAudioNow().
 
-speech_started while assistant is speaking:
+speech_started while assistant audio is active:
   treat as barge-in.
   stop local playback.
   send response.cancel.
   clear assistant speaking state.
+```
+
+Runtime assistant-audio detection rule:
+
+```text
+The renderer must not rely only on the UI speaking indicator for barge-in decisions.
+
+Barge-in now uses runtime audio state:
+- isAssistantSpeaking
+- activePlaybackSources.size
+- audioQueue.length
+- bufferedBytes
+
+Reason:
+AudioContext playback can have scheduled or active BufferSource nodes even when the UI speaking indicator alone is not a reliable reflection of remaining local playback.
+activePlaybackSources.size is the most important runtime indicator for scheduled/active local assistant audio.
+audioQueue.length and bufferedBytes cover paused/buffered assistant audio.
 ```
 
 Runtime validation evidence:
@@ -1708,11 +1749,16 @@ After VAD tuning:
   RT_AUDIO response chunks
   Direct Realtime response done
 
-After renderer safe barge-in:
+After b77ab7c:
   initial speech_started during input did not log Audio stopped immediately.
   RT_AUDIO response streamed normally.
   Repeat Last Answer streamed normally.
-  A later speech_started during active assistant playback did log Audio stopped immediately and Barge-in detected, which is expected.
+  However, barge-in during assistant playback was sometimes unreliable because the condition depended only on speakStatusEl.
+
+After c9bc147:
+  speech_started while assistant audio is inactive still does not stop local playback.
+  speech_started while assistant local playback is active reliably stops local playback and logs barge-in behavior.
+  Runtime test passed after changing the condition to use actual assistant audio state.
 ```
 
 Known non-blocking observation:
@@ -1745,8 +1791,10 @@ backend/providers/azure_openai_realtime.py py_compile: OK
 Desktop/renderer/renderer.js node --check: OK
 Runtime test with system audio/player input: OK
 Runtime Repeat Last Answer test: OK
+Runtime barge-in test with active assistant playback: OK
 Commit 24ee869 Tune realtime server VAD settings: OK
 Commit b77ab7c Avoid stopping audio on every speech start: OK
+Commit c9bc147 Use runtime audio state for barge-in detection: OK
 ```
 
 Runtime boundaries:
@@ -1761,6 +1809,7 @@ Cost Guard still uses directLastSpeechStartedAt based on speech_started.
 Provider selection and session.update structure remain provider-adapter owned.
 No native Windows process-loopback isolation was added in this phase.
 No AEC (Acoustic Echo Cancellation) was added in this phase.
+This change keeps interrupt_response: True for this phase.
 ```
 
 Future investigation boundary:
@@ -1768,5 +1817,5 @@ Future investigation boundary:
 ```text
 Do not treat model self-hearing as proven unless a controlled test shows speech_started during assistant-only output with no external source audio.
 If system loopback isolation is required later, evaluate native Windows Application Loopback / Process Loopback with "exclude our app process tree" as a separate architecture phase.
-If false barge-in while assistant is speaking remains frequent, evaluate manual delayed barge-in after the current baseline is committed and stable.
+If false barge-in while assistant audio is active remains frequent, evaluate a controlled 300-500 ms delayed/manual barge-in strategy only after the current runtime-audio-state baseline remains stable.
 ```

@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-24
+Last updated: 2026-05-25
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -1461,46 +1461,49 @@ Design boundary:
 Do not remove hidden technical status elements without a separate diagnostics design.
 Do not change audio capture/playback, Realtime websocket flow, provider logic, scenario logic, or Cost Guard logic for this UI simplification.
 
+```
+
 ---
 
-24. Realtime VAD Tuning and Safe Barge-in Baseline
+24. Realtime Turn Detection and Runtime Barge-in Baseline
 
 Completed commits:
 
 ```text
 24ee869 Tune realtime server VAD settings
 b77ab7c Avoid stopping audio on every speech start
+c9bc147 Use runtime audio state for barge-in detection
 ```
 
-Problem identified from runtime logs:
+Runtime issue investigated:
 
 ```text
-External/system audio from an audio player was being split by provider server VAD into many short turn cycles:
-input_audio_buffer.speech_started
-input_audio_buffer.speech_stopped
-input_audio_buffer.committed
-
-The Desktop renderer also called stopAudioNow() on every input_audio_buffer.speech_started event, even when the assistant was not speaking.
-This caused unnecessary "Audio stopped immediately" log entries and could prematurely stop playback behavior.
+With Direct Realtime using loopback/system audio, external audio player content was being sent to the model correctly.
+However, provider server VAD was originally segmenting external/system audio into many short speech_started / speech_stopped / committed cycles.
+The Desktop renderer also originally stopped local playback on every speech_started event regardless of whether assistant playback was active.
 ```
 
-Confirmed finding:
+Important finding:
 
 ```text
-The issue was not proven to be model self-hearing through headphones.
-A Repeat Last Answer test without external source audio showed RT_AUDIO response chunks and Direct Realtime response done without input_audio_buffer.speech_started during playback.
-The stronger finding was that external/system audio had natural pauses and provider server_vad was segmenting it too aggressively.
+The tested logs did not prove that the model was hearing its own headphone output.
+When Repeat Last Answer was run without external source audio, the assistant returned RT_AUDIO chunks and Direct Realtime response done without speech_started during playback.
+
+The proven issue was:
+- provider server_vad was too eager for the system audio/player use case before tuning
+- renderer.js was too aggressive because speech_started always called stopAudioNow()
+- using the UI speaking indicator alone as the barge-in condition was not reliable enough because local AudioContext playback can still have scheduled/active audio sources after visible speaking state changes
 ```
 
-Backend provider adapter change:
+Current provider VAD configuration:
 
 ```text
-Files changed:
+Files:
 - backend/providers/openai_realtime.py
 - backend/providers/azure_openai_realtime.py
 ```
 
-Current Direct Realtime server VAD settings in both provider adapters:
+Both provider adapters now send:
 
 ```python
 "turn_detection": {
@@ -1513,80 +1516,151 @@ Current Direct Realtime server VAD settings in both provider adapters:
 }
 ```
 
-VAD tuning intent:
+Interpretation:
 
 ```text
 threshold: 0.6
-  makes server_vad less sensitive to small audio transitions/noise.
+  reduces sensitivity to minor signal changes.
 
 prefix_padding_ms: 500
-  preserves some audio before the detected speech start.
+  preserves short context before detected speech begins.
 
 silence_duration_ms: 1500
-  waits for a longer silence before considering the current speech turn complete.
+  prevents short pauses in external/system audio from ending a turn too quickly.
+
+create_response: True
+  provider still creates a response after committed input.
+
+interrupt_response: True
+  provider-side interruption behavior remains enabled for this phase.
 ```
 
-Frontend safe barge-in change:
+Current renderer barge-in behavior:
 
 ```text
-File changed:
-- Desktop/renderer/renderer.js
+File:
+Desktop/renderer/renderer.js
 ```
 
-Previous behavior:
+Original behavior:
 
-```text
-Every input_audio_buffer.speech_started event called stopAudioNow().
+```javascript
+if (logText.includes("input_audio_buffer.speech_started")) {
+  directLastSpeechStartedAt = Date.now();
+  setListeningIndicator(true);
+  stopAudioNow();
+  if (speakStatusEl && speakStatusEl.classList.contains("ok")) {
+    try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
+    setAssistantSpeaking(false);
+    push("Barge-in detected: cancelled current response and stopped local playback");
+  }
+}
 ```
 
-Current behavior:
+Intermediate behavior from b77ab7c:
 
-```text
-input_audio_buffer.speech_started always updates:
-- directLastSpeechStartedAt
-- Listening indicator
-
-stopAudioNow() is called only when the assistant speaking indicator is active.
-response.cancel is sent only inside that assistant-speaking branch.
+```javascript
+if (logText.includes("input_audio_buffer.speech_started")) {
+  directLastSpeechStartedAt = Date.now();
+  setListeningIndicator(true);
+  if (speakStatusEl && speakStatusEl.classList.contains("ok")) {
+    stopAudioNow();
+    try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
+    setAssistantSpeaking(false);
+    push("Barge-in detected: cancelled current response and stopped local playback");
+  }
+}
 ```
 
-Current speech_started handling intent:
+Final current behavior from c9bc147:
 
-```text
-When external input speech starts while the assistant is not speaking:
-  do not stop local playback because there is no active assistant playback to stop.
-
-When external input speech starts while the assistant is speaking:
-  stop local assistant playback and send response.cancel as barge-in behavior.
+```javascript
+if (logText.includes("input_audio_buffer.speech_started")) {
+  directLastSpeechStartedAt = Date.now();
+  setListeningIndicator(true);
+  const hasAssistantAudio =
+    isAssistantSpeaking ||
+    activePlaybackSources.size > 0 ||
+    audioQueue.length > 0 ||
+    bufferedBytes > 0;
+  if (hasAssistantAudio) {
+    stopAudioNow();
+    try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
+    setAssistantSpeaking(false);
+    push("Barge-in detected: cancelled current response and stopped local playback");
+  }
+}
 ```
 
-Runtime validation result:
+Behavior rule:
 
 ```text
-After VAD tuning, a system audio/player test produced one longer speech segment instead of many short cycles:
-speech_started
-~22 seconds of input audio
-speech_stopped
-committed
-RT_AUDIO response chunks
-Direct Realtime response done
+speech_started while assistant audio is not active:
+  update Direct runtime input activity and Cost Guard timestamp only.
+  do not call stopAudioNow().
 
-After renderer safe barge-in, speech_started while the assistant was not speaking no longer produced "Audio stopped immediately".
-When speech_started occurred while assistant playback was active, the app stopped local audio and logged barge-in behavior.
+speech_started while assistant audio is active:
+  treat as barge-in.
+  stop local playback.
+  send response.cancel.
+  clear assistant speaking state.
 ```
 
-Known non-critical runtime observation:
+Runtime assistant-audio detection rule:
 
 ```text
-A late response.cancel can return:
+The renderer must not rely only on the UI speaking indicator for barge-in decisions.
+
+Barge-in now uses runtime audio state:
+- isAssistantSpeaking
+- activePlaybackSources.size
+- audioQueue.length
+- bufferedBytes
+
+Reason:
+AudioContext playback can have scheduled or active BufferSource nodes even when the UI speaking indicator alone is not a reliable reflection of remaining local playback.
+activePlaybackSources.size is the most important runtime indicator for scheduled/active local assistant audio.
+audioQueue.length and bufferedBytes cover paused/buffered assistant audio.
+```
+
+Runtime validation evidence:
+
+```text
+Before VAD tuning:
+  external audio player input produced many short speech_started / speech_stopped / committed cycles.
+
+After VAD tuning:
+  external audio player input produced a longer speech interval:
+  speech_started
+  approximately 22 seconds of input
+  speech_stopped
+  committed
+  RT_AUDIO response chunks
+  Direct Realtime response done
+
+After b77ab7c:
+  initial speech_started during input did not log Audio stopped immediately.
+  RT_AUDIO response streamed normally.
+  Repeat Last Answer streamed normally.
+  However, barge-in during assistant playback was sometimes unreliable because the condition depended only on speakStatusEl.
+
+After c9bc147:
+  speech_started while assistant audio is inactive still does not stop local playback.
+  speech_started while assistant local playback is active reliably stops local playback and logs barge-in behavior.
+  Runtime test passed after changing the condition to use actual assistant audio state.
+```
+
+Known non-blocking observation:
+
+```text
+A response.cancel sent during barge-in may produce:
 ERROR(Realtime): Cancellation failed: no active response found
 
-This means the provider response had already completed when cancel was received.
-The local audio had already been stopped.
-This is not currently treated as a runtime blocker.
+This occurs when the provider response is already completed by the time cancel is processed.
+It is not currently treated as a failed runtime test because local playback had already been stopped.
 ```
 
-Validation commands used:
+Validation commands:
 
 ```powershell
 cd C:\Projects\chatt-direct
@@ -1598,31 +1672,39 @@ git diff --name-status
 git diff --stat
 ```
 
-Validation status:
+Confirmed validation:
 
 ```text
-Backend provider py_compile: OK
-Desktop renderer node --check: OK
-Runtime test with audio player/system loopback: OK
+backend/providers/openai_realtime.py py_compile: OK
+backend/providers/azure_openai_realtime.py py_compile: OK
+Desktop/renderer/renderer.js node --check: OK
+Runtime test with system audio/player input: OK
 Runtime Repeat Last Answer test: OK
-Commits completed: OK
-Backup files removed after validation: expected before final clean status
+Runtime barge-in test with active assistant playback: OK
+Commit 24ee869 Tune realtime server VAD settings: OK
+Commit b77ab7c Avoid stopping audio on every speech start: OK
+Commit c9bc147 Use runtime audio state for barge-in detection: OK
 ```
 
-Design boundary:
+Runtime boundaries:
 
 ```text
-This change does not introduce microphone input.
-This change does not change loopback/system/browser audio capture.
-This change does not implement native Windows process-loopback isolation.
-This change does not implement AEC (Acoustic Echo Cancellation).
-This change does not change provider selection, scenario logic, instruction logic, Mini Control Window, update workflow, or audio output safety.
+No microphone input was introduced.
+Loopback/system/browser audio remains the only Direct Realtime input path.
+PCM16 24k mono path remains unchanged.
+Playback path and selected headphones/output sink remain unchanged.
+Audio Output Safety remains unchanged.
+Cost Guard still uses directLastSpeechStartedAt based on speech_started.
+Provider selection and session.update structure remain provider-adapter owned.
+No native Windows process-loopback isolation was added in this phase.
+No AEC (Acoustic Echo Cancellation) was added in this phase.
 This change keeps interrupt_response: True for this phase.
 ```
 
-Future candidate work:
+Future investigation boundary:
 
 ```text
-If false barge-in remains a problem while assistant audio is active, evaluate a controlled 300-500 ms delayed/manual barge-in strategy.
-If system loopback captures unwanted application output, evaluate native Windows process-loopback capture with "exclude our app process tree" as a separate architecture phase.
-Do not claim model self-hearing as proven unless a runtime test shows input_audio_buffer.speech_started during assistant-only output with no external source audio.
+Do not treat model self-hearing as proven unless a controlled test shows speech_started during assistant-only output with no external source audio.
+If system loopback isolation is required later, evaluate native Windows Application Loopback / Process Loopback with "exclude our app process tree" as a separate architecture phase.
+If false barge-in while assistant audio is active remains frequent, evaluate a controlled 300-500 ms delayed/manual barge-in strategy only after the current runtime-audio-state baseline remains stable.
+```
