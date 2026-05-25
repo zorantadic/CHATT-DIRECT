@@ -2952,8 +2952,8 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
         if (logText.includes("input_audio_buffer.speech_started")) {
           directLastSpeechStartedAt = Date.now();
           setListeningIndicator(true);
-          stopAudioNow();
           if (speakStatusEl && speakStatusEl.classList.contains("ok")) {
+            stopAudioNow();
             try { rtWs.send(JSON.stringify({ type: "response.cancel" })); } catch {}
             setAssistantSpeaking(false);
             push("Barge-in detected: cancelled current response and stopped local playback");
