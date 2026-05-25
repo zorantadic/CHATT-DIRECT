@@ -962,6 +962,68 @@ body[data-activity="speaking"] .waveform {
   font-size: 12px;
 }
 
+.audioSafetyBox {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(152, 181, 220, 0.14);
+  border-radius: 8px;
+  background: rgba(5, 11, 21, 0.36);
+}
+
+.audioSafetyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.audioSafetyTitle {
+  color: #d9e6fb;
+  font-weight: 700;
+}
+
+.audioSafetyStatus {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.audioSafetyActions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.audioSafetyMessage {
+  padding: 9px 10px;
+  border: 1px solid rgba(152, 181, 220, 0.12);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(8, 16, 28, 0.62);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.audioSafetyMessage.ok {
+  color: #bff3d1;
+  border-color: rgba(51, 209, 122, 0.28);
+  background: rgba(51, 209, 122, 0.08);
+}
+
+.audioSafetyMessage.warn {
+  color: #ffe8b8;
+  border-color: rgba(255, 194, 102, 0.28);
+  background: rgba(255, 194, 102, 0.08);
+}
+
+.audioSafetyMessage.bad {
+  color: #ffd3d7;
+  border-color: rgba(255, 92, 122, 0.28);
+  background: rgba(255, 92, 122, 0.08);
+}
+
 .switchControl {
   display: inline-flex;
   align-items: center;

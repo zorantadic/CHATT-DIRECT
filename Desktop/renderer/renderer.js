@@ -12,6 +12,7 @@
   const LS_RT_DEVICE_ID = "chatt.rtOutputDeviceId";
   const LS_RT_DEVICE_LABEL = "chatt.rtOutputDeviceLabel";
   const LS_RT_DEVICE_PREFERRED_LABEL = "chatt.rtPreferredDeviceLabel";
+  const LS_AUDIO_SAFETY_RECORD = "chatt.audioSafety.record";
   // Endpoints (settings page)
   const LS_RT_HTTP = "chatt.settings.rtHttp";
   const LS_RT_WS = "chatt.settings.rtWs";
@@ -244,6 +245,11 @@ Do not introduce new topics.`;
   const settingsProviderBadgeEl = $("settingsProviderBadge");
   const settingsPlaybackVolumeTextEl = $("settingsPlaybackVolumeText");
   const settingsOutputDeviceTextEl = $("settingsOutputDeviceText");
+  const audioSafetyStatusEl = $("audioSafetyStatus");
+  const audioSafetyMessageEl = $("audioSafetyMessage");
+  const btnTestSelectedOutput = $("btnTestSelectedOutput");
+  const btnConfirmHeadphonesOutput = $("btnConfirmHeadphonesOutput");
+  const btnResetAudioSafety = $("btnResetAudioSafety");
   const settingsDiagBackendEl = $("settingsDiagBackend");
   const settingsDiagWsEl = $("settingsDiagWs");
   const settingsDiagOutputEl = $("settingsDiagOutput");
@@ -2256,11 +2262,185 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   function isHeadphonesLabel(label) {
     return /headphone|headset|earbuds|earbud|buds/i.test(label || "");
   }
+  let lastTestedOutputFingerprint = "";
+  function buildOutputDeviceFingerprint(device) {
+    if (!device) return "";
+    const deviceId = (device.deviceId || "").toString().trim();
+    const label = (device.label || "").toString().trim();
+    return `${deviceId}|${label}`;
+  }
+  function loadAudioSafetyRecord() {
+    try {
+      const raw = localStorage.getItem(LS_AUDIO_SAFETY_RECORD);
+      if (!raw) return null;
+      const record = JSON.parse(raw);
+      return record && typeof record === "object" ? record : null;
+    } catch {
+      return null;
+    }
+  }
+  function saveAudioSafetyRecord(record) {
+    try {
+      localStorage.setItem(LS_AUDIO_SAFETY_RECORD, JSON.stringify(record));
+    } catch {}
+  }
+  function clearAudioSafetyRecord() {
+    try { localStorage.removeItem(LS_AUDIO_SAFETY_RECORD); } catch {}
+  }
+  function findOutputById(outputs, deviceId) {
+    const id = (deviceId || "").toString().trim();
+    if (!id || !Array.isArray(outputs)) return null;
+    return outputs.find((d) => d.deviceId === id) || null;
+  }
+  function outputMatchesSafetyRecord(device, record) {
+    if (!device || !record || record.confirmed !== true) return false;
+    const deviceId = (device.deviceId || "").toString().trim();
+    const label = (device.label || "").toString().trim();
+    const recordDeviceId = (record.deviceId || "").toString().trim();
+    const recordLabel = (record.label || "").toString().trim();
+    const recordFingerprint = (record.fingerprint || "").toString().trim();
+    return (
+      deviceId === recordDeviceId &&
+      label === recordLabel &&
+      buildOutputDeviceFingerprint(device) === recordFingerprint
+    );
+  }
+  function isSafeHeadphonesDevice(device) {
+    return !!device && isHeadphonesLabel(device.label);
+  }
+  function getSelectedOutputDevice(outputs) {
+    const deviceId = (rtDeviceSel?.value || "").toString().trim();
+    return findOutputById(outputs, deviceId);
+  }
+  function getExplicitSelectedOutputDevice(outputs) {
+    const deviceId = (rtDeviceSel?.value || "").toString().trim();
+    if (!deviceId) return null;
+    return findOutputById(outputs, deviceId);
+  }
+  function setAudioSafetyMessage(message, state) {
+    if (!audioSafetyMessageEl) return;
+    audioSafetyMessageEl.textContent = message || "";
+    audioSafetyMessageEl.classList.remove("ok", "warn", "bad");
+    if (state) audioSafetyMessageEl.classList.add(state);
+  }
+  function getAudioSafetyState(outputs) {
+    const resolved = resolveSafeRealtimeOutput(outputs);
+    if (resolved.ok) return { safe: true, ...resolved };
+    return {
+      safe: false,
+      source: "none",
+      deviceId: "",
+      label: "",
+      reason: resolved.reason || "not-confirmed",
+    };
+  }
+  function updateAudioSafetyUi(outputs) {
+    const state = getAudioSafetyState(outputs);
+    if (audioSafetyStatusEl) {
+      audioSafetyStatusEl.textContent =
+        state.source === "headphones-detected" ? "Status: Headphones detected" :
+        state.source === "user-confirmed" ? "Status: Confirmed" :
+        "Status: Not confirmed";
+    }
+    if (audioSafetyMessageEl) {
+      audioSafetyMessageEl.classList.remove("ok", "warn", "bad");
+      if (state.source === "headphones-detected") {
+        audioSafetyMessageEl.textContent = "Headphones output detected. Realtime voice can use this output.";
+        audioSafetyMessageEl.classList.add("ok");
+      } else if (state.source === "user-confirmed") {
+        audioSafetyMessageEl.textContent = "This output was confirmed for headphones.";
+        audioSafetyMessageEl.classList.add("ok");
+      } else {
+        audioSafetyMessageEl.textContent = "Select an output device, test it, then confirm it plays only in headphones.";
+        audioSafetyMessageEl.classList.add("warn");
+      }
+    }
+    if (btnConfirmHeadphonesOutput) {
+      btnConfirmHeadphonesOutput.disabled = !getExplicitSelectedOutputDevice(outputs);
+    }
+    if (btnResetAudioSafety) {
+      btnResetAudioSafety.disabled = !loadAudioSafetyRecord();
+    }
+  }
   function loadSavedRtDeviceId() {
     try { return (localStorage.getItem(LS_RT_DEVICE_ID) || "").trim(); } catch { return ""; }
   }
   function loadPreferredRtLabel() {
     try { return (localStorage.getItem(LS_RT_DEVICE_PREFERRED_LABEL) || "").trim(); } catch { return ""; }
+  }
+  function resolveSafeRealtimeOutput(outputs) {
+    const list = Array.isArray(outputs) ? outputs : [];
+    const selected = getSelectedOutputDevice(list);
+    const record = loadAudioSafetyRecord();
+    const savedConfirmed = list.find((d) => outputMatchesSafetyRecord(d, record)) || null;
+    const savedRtDevice = findOutputById(list, loadSavedRtDeviceId());
+    const preferredLabel = loadPreferredRtLabel();
+    const preferredDevice = preferredLabel
+      ? list.find((d) => (d.label || "").trim() === preferredLabel)
+      : null;
+    const firstHeadphones = list.find((d) => isSafeHeadphonesDevice(d)) || null;
+
+    if (selected && isSafeHeadphonesDevice(selected)) {
+      return {
+        ok: true,
+        deviceId: selected.deviceId || "",
+        label: selected.label || "",
+        source: "headphones-detected",
+        reason: "selected-headphones",
+      };
+    }
+    if (selected && outputMatchesSafetyRecord(selected, record)) {
+      return {
+        ok: true,
+        deviceId: selected.deviceId || "",
+        label: selected.label || "",
+        source: "user-confirmed",
+        reason: "selected-confirmed",
+      };
+    }
+    if (savedConfirmed) {
+      return {
+        ok: true,
+        deviceId: savedConfirmed.deviceId || "",
+        label: savedConfirmed.label || "",
+        source: "user-confirmed",
+        reason: "saved-confirmed",
+      };
+    }
+    if (savedRtDevice && isSafeHeadphonesDevice(savedRtDevice)) {
+      return {
+        ok: true,
+        deviceId: savedRtDevice.deviceId || "",
+        label: savedRtDevice.label || "",
+        source: "headphones-detected",
+        reason: "saved-headphones",
+      };
+    }
+    if (preferredDevice && isSafeHeadphonesDevice(preferredDevice)) {
+      return {
+        ok: true,
+        deviceId: preferredDevice.deviceId || "",
+        label: preferredDevice.label || "",
+        source: "headphones-detected",
+        reason: "preferred-label-headphones",
+      };
+    }
+    if (firstHeadphones) {
+      return {
+        ok: true,
+        deviceId: firstHeadphones.deviceId || "",
+        label: firstHeadphones.label || "",
+        source: "headphones-detected",
+        reason: "first-headphones",
+      };
+    }
+    return {
+      ok: false,
+      deviceId: "",
+      label: "",
+      source: "none",
+      reason: selected ? "selected-output-not-confirmed" : "no-safe-output",
+    };
   }
   function saveRtDeviceSelection(deviceId, label) {
     try {
@@ -2290,7 +2470,10 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   async function refreshOutputDevicesUI() {
     const outputs = await enumerateAudioOutputs();
     const current = (rtDeviceSel.value || "").trim();
+    const safetyRecord = loadAudioSafetyRecord();
+    const savedConfirmed = outputs.find((d) => outputMatchesSafetyRecord(d, safetyRecord)) || null;
     const saved = loadSavedRtDeviceId();
+    const firstHeadphones = outputs.find((d) => isSafeHeadphonesDevice(d)) || null;
     rtDeviceSel.innerHTML = "";
     const optAuto = document.createElement("option");
     optAuto.value = "";
@@ -2304,13 +2487,19 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     }
     if (current && outputs.some((o) => o.deviceId === current)) {
       rtDeviceSel.value = current;
+    } else if (savedConfirmed) {
+      rtDeviceSel.value = savedConfirmed.deviceId;
     } else if (saved && outputs.some((o) => o.deviceId === saved)) {
       rtDeviceSel.value = saved;
+    } else if (firstHeadphones) {
+      rtDeviceSel.value = firstHeadphones.deviceId;
     } else {
       rtDeviceSel.value = "";
     }
     updateOutputSummaryUi();
+    updateAudioSafetyUi(outputs);
     push(`Audio outputs detected: ${outputs.length}`);
+    return outputs;
   }
   // Tracks last applied sink so we can "hold" it if headphones disappear.
   let lastAppliedSinkId = "";
@@ -2332,81 +2521,138 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     if (typeof rtOutEl.setSinkId !== "function") {
       push("ERROR: rtOut.setSinkId is not supported in this Electron build. Direct Realtime requires headphones output.");
       updateOutputSummaryUi();
+      updateAudioSafetyUi([]);
       return false;
     }
     const outputs = await enumerateAudioOutputs();
-    // Candidate sources
-    const dropdownId = (rtDeviceSel.value || "").trim();
-    const savedId = loadSavedRtDeviceId();
-    const preferredLabel = loadPreferredRtLabel();
-    let candidateId = "";
-    // 1) Explicit dropdown choice (but enforce headphones-only)
-    if (dropdownId) {
-      const lbl = getOutputLabelById(outputs, dropdownId);
-      if (!REALTIME_HEADPHONES_ONLY || isHeadphonesLabel(lbl)) {
-        candidateId = dropdownId;
-      } else {
-        push(`Realtime sink policy: headphones-only. Ignoring non-headphones selection: ${lbl || dropdownId}`);
-        candidateId = "";
-      }
-    }
-    // 2) Saved deviceId (only if it still exists and is headphones)
-    if (!candidateId && savedId && outputs.some((o) => o.deviceId === savedId)) {
-      const lbl = getOutputLabelById(outputs, savedId);
-      if (!REALTIME_HEADPHONES_ONLY || isHeadphonesLabel(lbl)) {
-        candidateId = savedId;
-      } else {
-        push(`Realtime sink policy: saved device is not headphones now (${lbl}). Will NOT switch to speakers.`);
-      }
-    }
-    // 3) Preferred label match (useful after unplug/replug -> new deviceId)
-    if (!candidateId && preferredLabel) {
-      const byLabel = await findDeviceIdByExactLabel(outputs, preferredLabel);
-      if (byLabel) {
-        const lbl = getOutputLabelById(outputs, byLabel);
-        if (!REALTIME_HEADPHONES_ONLY || isHeadphonesLabel(lbl)) {
-          candidateId = byLabel;
-        }
-      }
-    }
-    // 4) Heuristic: any headphones/headset
-    if (!candidateId) {
-      candidateId = await pickBestHeadphones(outputs);
-    }
-    // If still none: do NOT switch to speakers. Hold current sink.
-    if (!candidateId) {
-      if (REALTIME_HEADPHONES_ONLY) {
-        push("ERROR: Realtime sink: no headphones device available. Direct Realtime will not start.");
-        updateOutputSummaryUi();
-        return false;
-      }
-      push("WARN: No suitable output device found. Realtime will stay on current sink.");
+    const safe = resolveSafeRealtimeOutput(outputs);
+    if (!safe.ok) {
+      push(`ERROR: Realtime sink safety blocked. No safe output is available (${safe.reason}). Select, test, and confirm a headphones-routed output before starting Direct Realtime.`);
       updateOutputSummaryUi();
+      updateAudioSafetyUi(outputs);
       return false;
     }
-    // If candidate is unchanged, skip
-    if (candidateId === lastAppliedSinkId) {
-      updateOutputSummaryUi();
-      return true;
-    }
     try {
-      await rtOutEl.setSinkId(candidateId);
+      await rtOutEl.setSinkId(safe.deviceId);
       // Update UI selection if possible
-      if (candidateId && outputs.some((o) => o.deviceId === candidateId)) {
-        rtDeviceSel.value = candidateId;
+      if (safe.deviceId && outputs.some((o) => o.deviceId === safe.deviceId)) {
+        rtDeviceSel.value = safe.deviceId;
       }
-      const label = getOutputLabelById(outputs, candidateId) || candidateId;
-      saveRtDeviceSelection(candidateId, label);
-      lastAppliedSinkId = candidateId;
+      const label = safe.label || getOutputLabelById(outputs, safe.deviceId) || safe.deviceId;
+      saveRtDeviceSelection(safe.deviceId, label);
+      lastAppliedSinkId = safe.deviceId;
       updateOutputSummaryUi();
+      updateAudioSafetyUi(outputs);
       push(`Realtime output sink set to: ${label}`);
       return true;
     } catch (e) {
       const msg = e?.message || e;
       push(`ERROR: setSinkId failed: ${msg}`);
       updateOutputSummaryUi();
+      updateAudioSafetyUi(outputs);
       return false;
     }
+  }
+  async function testSelectedOutput() {
+    const outputs = await enumerateAudioOutputs();
+    const device = getExplicitSelectedOutputDevice(outputs);
+    if (!device) {
+      setAudioSafetyMessage("Select an output device before testing.", "warn");
+      return false;
+    }
+    if (typeof rtOutEl.setSinkId !== "function") {
+      setAudioSafetyMessage("Audio output routing is not supported in this Electron build.", "bad");
+      return false;
+    }
+
+    try {
+      await rtOutEl.setSinkId(device.deviceId);
+    } catch (e) {
+      setAudioSafetyMessage(`Audio output routing failed: ${e?.message || e}`, "bad");
+      return false;
+    }
+
+    if (!playbackCtx) {
+      playbackCtx = new AudioContext({ sampleRate: 24000 });
+      push(`Playback AudioContext sampleRate=${playbackCtx.sampleRate}`);
+    }
+    if (!playbackGainNode) {
+      playbackGainNode = playbackCtx.createGain();
+      playbackGainNode.gain.value = playbackVolume;
+    }
+    if (!playbackDest) {
+      playbackDest = playbackCtx.createMediaStreamDestination();
+    }
+    try {
+      playbackGainNode.connect(playbackDest);
+    } catch {}
+
+    rtOutEl.srcObject = playbackDest.stream;
+    try { await rtOutEl.play(); } catch {}
+    try {
+      if (playbackCtx.state === "suspended") await playbackCtx.resume();
+    } catch {}
+
+    const osc = playbackCtx.createOscillator();
+    const toneGain = playbackCtx.createGain();
+    const startAt = playbackCtx.currentTime + 0.02;
+    const stopAt = startAt + 0.4;
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, startAt);
+    toneGain.gain.setValueAtTime(0.0001, startAt);
+    toneGain.gain.exponentialRampToValueAtTime(0.18, startAt + 0.03);
+    toneGain.gain.setValueAtTime(0.18, stopAt - 0.05);
+    toneGain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+    osc.connect(toneGain);
+    toneGain.connect(playbackGainNode || playbackDest);
+    osc.start(startAt);
+    osc.stop(stopAt + 0.02);
+
+    lastTestedOutputFingerprint = buildOutputDeviceFingerprint(device);
+    saveRtDeviceSelection(device.deviceId, device.label || "");
+    updateOutputSummaryUi();
+    updateAudioSafetyUi(outputs);
+    setAudioSafetyMessage("Test sound played. If you heard it only in headphones, click Confirm.", "warn");
+    push(`Audio safety test sound played through: ${device.label || device.deviceId}`);
+    return true;
+  }
+  async function confirmSelectedOutputUsesHeadphones() {
+    const outputs = await enumerateAudioOutputs();
+    const device = getExplicitSelectedOutputDevice(outputs);
+    if (!device) {
+      setAudioSafetyMessage("Select an output device before confirming.", "warn");
+      return false;
+    }
+    const fingerprint = buildOutputDeviceFingerprint(device);
+    if (fingerprint !== lastTestedOutputFingerprint) {
+      setAudioSafetyMessage("Test this selected output before confirming.", "warn");
+      return false;
+    }
+
+    saveAudioSafetyRecord({
+      confirmed: true,
+      source: "user-confirmed",
+      deviceId: device.deviceId || "",
+      label: device.label || "",
+      fingerprint,
+      confirmedAt: new Date().toISOString(),
+    });
+    saveRtDeviceSelection(device.deviceId, device.label || "");
+    updateOutputSummaryUi();
+    updateAudioSafetyUi(outputs);
+    refreshButtons();
+    setAudioSafetyMessage("Output confirmed for headphones.", "ok");
+    push(`Audio output confirmed for headphones: ${device.label || device.deviceId}`);
+    return true;
+  }
+  async function resetAudioSafetyConfirmation() {
+    clearAudioSafetyRecord();
+    lastTestedOutputFingerprint = "";
+    const outputs = await enumerateAudioOutputs();
+    updateAudioSafetyUi(outputs);
+    refreshButtons();
+    setAudioSafetyMessage("Audio output confirmation reset.", "warn");
+    push("Audio output safety confirmation reset.");
   }
   // Auto re-bind on device changes (debounced)
   let deviceChangeTimer = null;
@@ -2416,7 +2662,19 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
       deviceChangeTimer = null;
       push("Device change detected (audio outputs may have changed). Re-applying Realtime sink...");
       try {
-        await refreshOutputDevicesUI();
+        const outputs = await refreshOutputDevicesUI();
+        const safe = resolveSafeRealtimeOutput(outputs);
+        if (!safe.ok) {
+          updateAudioSafetyUi(outputs);
+          if (directRealtimeActive || directRealtimeStarting) {
+            push(`WARN: Safe audio output is no longer available (${safe.reason}). Stopping Direct Realtime.`);
+            try { stopAudioNow(); } catch {}
+            await stopDirectRealtime({ closeRealtime: true });
+          } else {
+            push(`WARN: Safe audio output is not available (${safe.reason}). Direct Realtime remains blocked.`);
+          }
+          return;
+        }
         await applyRealtimeSink();
       } catch (e) {
         push(`WARN: device re-bind failed: ${e?.message || e}`);
@@ -3300,20 +3558,47 @@ if (playbackVolumeEl) {
     await applyRealtimeSink();
   });
   rtDeviceSel.addEventListener("change", async () => {
+    lastTestedOutputFingerprint = "";
     const outputs = await enumerateAudioOutputs();
     const deviceId = (rtDeviceSel.value || "").trim();
     const label =
-      outputs.find((d) => d.deviceId === deviceId)?.label ||
-      rtDeviceSel.options[rtDeviceSel.selectedIndex]?.textContent ||
+      (deviceId ? outputs.find((d) => d.deviceId === deviceId)?.label : "") ||
+      (deviceId ? rtDeviceSel.options[rtDeviceSel.selectedIndex]?.textContent : "") ||
       "";
-    if (REALTIME_HEADPHONES_ONLY && deviceId && !isHeadphonesLabel(label)) {
-      push(`Realtime sink policy: headphones-only. Cannot select: ${label || deviceId}`);
-      rtDeviceSel.value = "";
-    } else {
-      saveRtDeviceSelection(deviceId, label);
-    }
+    saveRtDeviceSelection(deviceId, label);
+    updateAudioSafetyUi(outputs);
     await applyRealtimeSink();
   });
+  if (btnTestSelectedOutput) {
+    btnTestSelectedOutput.addEventListener("click", async () => {
+      try {
+        await testSelectedOutput();
+      } catch (e) {
+        setAudioSafetyMessage(`Audio output test failed: ${e?.message || e}`, "bad");
+        push(`ERROR(Audio safety test): ${e?.message || e}`);
+      }
+    });
+  }
+  if (btnConfirmHeadphonesOutput) {
+    btnConfirmHeadphonesOutput.addEventListener("click", async () => {
+      try {
+        await confirmSelectedOutputUsesHeadphones();
+      } catch (e) {
+        setAudioSafetyMessage(`Audio output confirmation failed: ${e?.message || e}`, "bad");
+        push(`ERROR(Audio safety confirm): ${e?.message || e}`);
+      }
+    });
+  }
+  if (btnResetAudioSafety) {
+    btnResetAudioSafety.addEventListener("click", async () => {
+      try {
+        await resetAudioSafetyConfirmation();
+      } catch (e) {
+        setAudioSafetyMessage(`Audio output reset failed: ${e?.message || e}`, "bad");
+        push(`ERROR(Audio safety reset): ${e?.message || e}`);
+      }
+    });
+  }
   $("btnStart").addEventListener("click", async () => {
     try {
       await startDirectRealtime();

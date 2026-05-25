@@ -242,6 +242,19 @@
               </div>
             </div>
 
+            <div class="audioSafetyBox">
+              <div class="audioSafetyHeader">
+                <div class="audioSafetyTitle">Audio Safety</div>
+                <span id="audioSafetyStatus" class="audioSafetyStatus">Status: Not confirmed</span>
+              </div>
+              <div id="audioSafetyMessage" class="audioSafetyMessage warn">Select an output device, test it, then confirm it plays only in headphones.</div>
+              <div class="audioSafetyActions">
+                <button id="btnTestSelectedOutput" type="button">Test Selected Output</button>
+                <button id="btnConfirmHeadphonesOutput" type="button">Confirm This Output Uses Headphones</button>
+                <button id="btnResetAudioSafety" type="button">Reset Confirmation</button>
+              </div>
+            </div>
+
             <div class="audioRouteVisual" aria-hidden="true">
               <div class="routeHeadphones"></div>
               <div class="routeLine"></div>
