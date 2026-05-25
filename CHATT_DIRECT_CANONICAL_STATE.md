@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-24
+Last updated: 2026-05-23
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -40,8 +40,6 @@ hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
 multilingual UI display support
 header language selector synchronized with Settings language selector
-floating vertical Mini Control Window when the main app is minimized
-deterministic Electron UI zoom factor 0.7 for main Desktop window
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -79,6 +77,7 @@ Electron Desktop app
 -> audio response
 -> Desktop playback pipeline
 -> selected headphones/output device
+-> audio output safety gate validates headphones-labeled or user-confirmed sink
 ```
 
 Only one backend service is canonical for active runtime:
@@ -215,8 +214,6 @@ playback volume
 output device routing
 listening/speaking indicators
 reset-session guard behavior
-floating Mini Control Window lifecycle and command forwarding
-main window baseline and deterministic UI zoom application
 ```
 
 ---
@@ -288,14 +285,9 @@ Important active Desktop files:
 
 ```text
 Desktop/package.json
-Desktop/electron/main.cjs
-Desktop/electron/preload.cjs
 Desktop/renderer/index.html
 Desktop/renderer/renderer.js
 Desktop/renderer/styles.css
-Desktop/renderer/mini-control.html
-Desktop/renderer/mini-control.css
-Desktop/renderer/mini-control.js
 Desktop/renderer/stt-worklet-processor.js
 ```
 
@@ -387,9 +379,6 @@ Barge-in/interruption behavior
 Modern Voice / Settings / Scenarios dark glass UI layout
 Responsive Desktop window behavior at 1120 x 820 default and 860 x 720 minimum
 Scenario Preview slot with displayDetails metadata and no model-facing instruction prompt
-Mini Control Window when the main app is minimized
-Mini Control Window commands: Start, Stop, Refresh, Repeat, Reset, Open
-Mini Control Window status sync: Session and Activity
 ```
 
 Reset behavior:
@@ -506,29 +495,13 @@ Modern Desktop UI modernization Phase 1 Voice page: OK
 Modern Desktop UI modernization Phase 2 Settings page: OK
 Modern Desktop UI modernization Phase 3 Scenarios page: OK
 Desktop default window size 1120 x 820 and minimum 860 x 720: OK
-Desktop deterministic UI zoom factor 0.7 applied immediately and after did-finish-load: OK
-Development profile persisted zoom masking issue identified and neutralized by deterministic app zoom: OK
 Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
-Mini Control Window opens when the main app is minimized: OK
-Mini Control Window vertical layout fits visible window: OK
-Mini Control Window can be moved across the desktop: OK
-Mini Control Window Open restores the main app: OK
-Mini Control Window Start/Stop/Refresh/Repeat/Reset commands work through existing main renderer controls: OK
-Mini Control Window Session and Activity status sync: OK
-Desktop version bumped to 0.1.8: OK
-Desktop package.json and package-lock.json UTF-8 without BOM after version bump: OK
-Electron build for 0.1.8: OK
-Installer AnswerDesk AI Setup 0.1.8.exe created: OK
-Installer 0.1.8 installed and upgraded over prior installation successfully: OK
-Old backup folders and old installer artifacts cleaned: OK
-Git clean after 0.1.8 release validation: OK
 ```
 
 Before committing runtime changes, always run at minimum:
 
 ```powershell
 cd C:\Projects\chatt-direct
-node --check .\Desktop\electron\main.cjs
 node --check .\Desktop\renderer\renderer.js
 git status --short
 git diff --name-status
@@ -569,9 +542,6 @@ Scenario preset foundation is implemented through backend/scenario_presets.json,
 Desktop Scenarios tab loads backend scenario presets, renders compact clickable scenario cards, shows human-readable hover details, supports per-scenario custom instruction overrides, and falls back to legacy local presets only when backend scenarios are unavailable
 Voice page displays the selected scenario name and behavior description
 Desktop UI is modernized across Voice, Settings, and Scenarios with dark glass/3D design language
-Desktop main window uses canonical 1120 x 820 default with 860 x 720 minimum
-Desktop main window applies deterministic APP_UI_ZOOM_FACTOR = 0.7 in Electron main process
-UI scale is not allowed to depend on Chromium persisted per-host zoom state
 Voice page uses Session and Activity as primary user-facing status indicators
 Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Diagnostics, Auth, and Log cards
 Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
@@ -579,14 +549,6 @@ Scenario Preview displays human-readable metadata using displayDetails when avai
 Bottom app status bar no longer shows the redundant bottom volume mirror
 Header Backend/Provider cards removed and replaced with compact Select Language control
 Settings Display Language and Header Select Language controls remain synchronized through shared display-language state
-Minimizing the main app opens a floating vertical Mini Control Window
-Mini Control Window is an Electron UI remote-control layer only
-Mini Control Window does not own or duplicate Direct Realtime audio, WebSocket, backend, provider, or scenario runtime
-Mini Control Window controls existing main renderer commands for Start, Stop, Refresh Instructions, Repeat Last Answer, and Reset Session
-Mini Control Window displays synchronized Session and Activity state from the main renderer
-Mini Control Window Open restores the main app and closes the mini control
-Desktop release 0.1.8 build and installer upgrade are validated
-
 
 Multilingual UI v1 baseline:
 
@@ -625,15 +587,6 @@ Recent multilingual UI commits:
 ```text
 3c1e67a Add multilingual UI display support
 0260f6e Add header language selector
-```
-
-Recent mini control / 0.1.8 release commits:
-
-```text
-cf9a760 Add mini control window for minimized app
-28416ed Bump desktop version to 0.1.8
-a0ac25c Fix desktop package JSON encoding
-Set desktop window baseline and UI zoom
 ```
 ```
 
@@ -774,10 +727,31 @@ Outgoing language is not sent as a separate Realtime API field; it is applied th
 Incoming language is planned as provider-specific transcription language hint.
 ```
 
-Current local config storage:
+Current manual/backend-folder config storage:
 
 ```text
 backend/provider_config.local.json
+```
+
+Current Electron-started local/dev runtime config storage after AppData/userData work:
+
+```text
+Desktop/.electron-userdata/provider_config.local.json
+```
+
+Important runtime lesson from 2026-05-23:
+
+```text
+After AppData/userData runtime migration, Desktop may read provider settings from Desktop/.electron-userdata/provider_config.local.json.
+If this file is created from provider_config.local.example.json instead of migrated from an existing valid backend/provider_config.local.json, it will contain placeholder values such as:
+https://your-resource-name.cognitiveservices.azure.com
+apiKey: ""
+
+Direct Realtime then connects locally to /voice/ws but fails on the upstream provider connection with:
+[Errno 11001] getaddrinfo failed
+
+This error indicates invalid/unresolvable provider endpoint configuration, not an audio capture failure and not a local WebSocket failure.
+Fix by entering valid provider endpoint/API key/model in Settings -> Provider Configuration and saving, or by migrating the old valid provider_config.local.json into the Electron userData runtime file.
 ```
 
 Packaging requirement:
@@ -999,190 +973,9 @@ Final packaged app direction:
 
 ---
 
-
 ---
 
-## 17. Desktop Window Baseline and Deterministic UI Zoom
-
-The Desktop main window size and visual scale are now part of the Direct runtime baseline.
-
-Current BrowserWindow baseline in `Desktop/electron/main.cjs`:
-
-```text
-width: 1120
-height: 820
-minWidth: 860
-minHeight: 720
-```
-
-Current deterministic UI zoom baseline:
-
-```text
-APP_UI_ZOOM_FACTOR = 0.7
-Applied to mainWindow.webContents immediately after BrowserWindow creation.
-Re-applied on webContents did-finish-load.
-```
-
-Root cause finding:
-
-```text
-The installed Windows app was not incorrectly zoomed.
-The old development Electron profile under Desktop/.electron-userdata had a persisted Chromium per-host zoom entry around -2.0.
-That persisted zoom made npm start appear visually smaller and masked the true app scale.
-After renaming/resetting Desktop/.electron-userdata, development mode matched the installed app and appeared larger.
-The accepted product fix is deterministic Electron app zoom, not persisted Chromium profile zoom and not broad CSS rewrite.
-```
-
-Implementation rule:
-
-```text
-Do not rely on Chromium Preferences per_host_zoom_levels.
-Do not solve this with user instructions to Ctrl-minus / Ctrl-plus.
-Do not use broad CSS density rewrite for this specific scale issue unless explicitly approved.
-Keep APP_UI_ZOOM_FACTOR centralized in Desktop/electron/main.cjs.
-If scale must be tuned later, adjust APP_UI_ZOOM_FACTOR first and validate dev + installed app before changing renderer CSS.
-```
-
-Validation baseline:
-
-```text
-node --check Desktop/electron/main.cjs: OK
-node --check Desktop/renderer/renderer.js: OK
-Only Desktop/electron/main.cjs changed for the accepted patch.
-No CSS files changed.
-No renderer.js, index.html, backend, provider, scenario, or audio/runtime files changed.
-Runtime visual test with APP_UI_ZOOM_FACTOR = 0.7: OK
-Git clean after commit: OK
-```
-
-Boundaries:
-
-```text
-This change is Desktop visual scale only.
-It does not change loopback/system audio capture.
-It does not change Realtime WebSocket behavior.
-It does not change provider adapters or session.update payloads.
-It does not change scenarios, instruction flow, Cost Guard, or Mini Control Window command ownership.
-```
-
----
-
-
-## 18. Mini Control Window and 0.1.8 Release Baseline
-
-Mini Control Window is part of the Direct Desktop runtime UI baseline.
-
-Completed commits:
-
-```text
-cf9a760 Add mini control window for minimized app
-28416ed Bump desktop version to 0.1.8
-a0ac25c Fix desktop package JSON encoding
-```
-
-Current mini control files:
-
-```text
-Desktop/renderer/mini-control.html
-Desktop/renderer/mini-control.css
-Desktop/renderer/mini-control.js
-```
-
-Electron integration:
-
-```text
-Desktop/electron/main.cjs owns the miniControlWindow BrowserWindow lifecycle.
-Desktop/electron/preload.cjs exposes window.electronAPI.miniControl.
-Desktop/renderer/renderer.js remains the only owner of Direct Realtime Start/Stop/Refresh/Repeat/Reset behavior.
-```
-
-Current mini control behavior:
-
-```text
-When the main app is minimized, Electron opens a small floating Mini Control Window.
-The Mini Control Window is always-on-top, frameless, transparent/dark glass, skipped from taskbar, and movable by dragging the header area.
-The Mini Control Window uses a narrow vertical layout.
-The Mini Control Window shows Session and Activity status.
-The Mini Control Window provides Start, Stop, Refresh, Repeat, Reset, and Open controls.
-Open restores the main app and closes the Mini Control Window.
-Closing the Mini Control Window does not stop the main app, backend, audio session, or provider session.
-```
-
-Command routing:
-
-```text
-Mini Control Window -> electronAPI.miniControl.sendCommand(command)
-preload.cjs -> ipcRenderer.invoke("mini-control:command", command)
-main.cjs -> mainWindow.webContents.send("mini-control:command", { command })
-renderer.js -> existing main button click / existing runtime function path
-```
-
-Current command mapping:
-
-```text
-start   -> btnStart
-stop    -> btnStop
-refresh -> btnInstrRefresh
-repeat  -> btnRepeatLastAnswer
-reset   -> btnResetSession
-```
-
-Status synchronization:
-
-```text
-renderer.js publishes Session and Activity state through electronAPI.miniControl.publishStatus(...).
-main.cjs forwards status payloads to mini-control.html.
-mini-control.js updates Session, Activity, and disabled button states.
-Session and Activity values remain owned by the main renderer.
-```
-
-Runtime ownership rule:
-
-```text
-Mini Control Window is a remote UI layer only.
-It must not open a second Direct Realtime WebSocket.
-It must not create a second AudioContext.
-It must not call backend Realtime APIs directly.
-It must not own provider/runtime/scenario/instruction state.
-It must not bypass the existing main renderer buttons or runtime guards.
-```
-
-Release validation:
-
-```text
-node --check Desktop/electron/main.cjs: OK
-node --check Desktop/electron/preload.cjs: OK
-node --check Desktop/renderer/renderer.js: OK
-node --check Desktop/renderer/mini-control.js: OK
-Runtime test: OK
-Mini Control Window opens on minimize: OK
-Mini Control Window vertical layout fits visible window: OK
-Mini Control Window can be moved across the desktop: OK
-Open restores main app: OK
-Start/Stop/Refresh/Repeat/Reset work from Mini Control Window: OK
-Session and Activity status sync: OK
-Desktop version 0.1.8: OK
-package.json and package-lock.json UTF-8 without BOM: OK
-Electron build 0.1.8: OK
-Installer created: dist\AnswerDesk AI Setup 0.1.8.exe
-Installer 0.1.8 upgrade over previous installed version: OK
-Old backup folders and old installer artifacts cleaned: OK
-Git clean after validation: OK
-```
-
-Boundaries:
-
-```text
-Do not change loopback/system audio capture because of Mini Control Window.
-Do not change app_realtime.py because of Mini Control Window.
-Do not change Realtime provider adapters because of Mini Control Window.
-Do not change scenario APIs because of Mini Control Window.
-Do not remove or bypass existing main renderer Start/Stop/Refresh/Repeat/Reset handlers.
-```
-
----
-
-## 19. Phase 2 AppData / userData Runtime Plan
+## 18. Phase 2 AppData / userData Runtime Plan
 
 Phase 2 objective:
 
@@ -1313,7 +1106,7 @@ Reset session guard still works.
 ```
 
 
-## 20. Session Cost Guard Runtime Baseline
+## 19. Session Cost Guard Runtime Baseline
 
 Session Cost Guard is part of the Desktop renderer runtime layer.
 
@@ -1396,7 +1189,7 @@ Stability and cost improvement:
 - reconnect policy review
 ```
 
-## 21. Remaining Work
+## 20. Remaining Work
 
 Known remaining cleanup is documentation-only unless a new scan proves otherwise:
 
@@ -1409,7 +1202,7 @@ Runtime cleanup is complete for the currently verified Direct Realtime baseline.
 
 ---
 
-## 22. Commercial Direction
+## 21. Commercial Direction
 
 Preferred commercial packaging model:
 
@@ -1431,7 +1224,7 @@ workflow-specific use cases
 
 ---
 
-## 23. Work Rules
+## 22. Work Rules
 
 For all future work:
 
@@ -1457,7 +1250,7 @@ Restore accidental runtime changes before commit
 
 ---
 
-## 24. Simplified Voice Status Indicators Runtime Baseline
+## 23. Simplified Voice Status Indicators Runtime Baseline
 
 Commit:
 
@@ -1571,3 +1364,213 @@ It does not change Realtime websocket behavior.
 It does not change provider adapters or session.update payloads.
 It does not change Cost Guard behavior.
 It does not change scenario/instruction behavior.
+```
+---
+
+## 24. Update IPC Foundation Baseline
+
+Completed commits:
+
+```text
+Add updater dependency and publish config
+Add update IPC foundation
+```
+
+Current update implementation state:
+
+```text
+electron-updater is installed as a Desktop dependency.
+Desktop/package.json contains generic publish URL: https://updates.chattdirect.com/win/
+Desktop/electron/main.cjs imports autoUpdater.
+autoUpdater.autoDownload = false.
+autoUpdater.autoInstallOnAppQuit = false.
+main.cjs owns updateState and forwards app-update:status events.
+main.cjs exposes IPC handlers:
+- app-update:get-state
+- app-update:check
+- app-update:download
+- app-update:quit-and-install
+preload.cjs exposes window.electronAPI.updates.
+quit-and-install sets isQuitting = true, calls stopBackend(), then calls autoUpdater.quitAndInstall(false, true).
+No startup auto-check is enabled.
+No Settings UI has been added yet.
+```
+
+Boundaries:
+
+```text
+Do not enable silent auto-install.
+Do not add private GitHub token.
+Do not auto-check on startup unless explicitly approved.
+Do not change Direct Realtime audio capture/playback for update workflow.
+Do not change provider adapters for update workflow.
+```
+
+---
+
+## 25. Audio Output Safety Confirmation Runtime Baseline
+
+Commit:
+
+```text
+6413683 Add audio output safety confirmation
+```
+
+Audio Output Safety is now part of the Direct Realtime runtime gate.
+
+Purpose:
+
+```text
+Prevent Realtime model voice output from accidentally playing through laptop speakers.
+Direct Realtime may start only when the selected output sink is safe.
+```
+
+Canonical runtime safety rule:
+
+```text
+A sink is safe if:
+1. it is currently detected as a headphones-labeled audio output device, or
+2. it matches a user-confirmed audio output device saved in the current Electron user profile/localStorage.
+
+If the safe sink disappears, changes, or fails validation after devicechange, Direct Realtime must stop or remain blocked until a safe output is available again.
+```
+
+Implementation files:
+
+```text
+Desktop/renderer/index.html
+Desktop/renderer/renderer.js
+Desktop/renderer/styles.css
+```
+
+Renderer-owned state:
+
+```text
+chatt.audioSafety.record
+chatt.rtOutputDeviceId
+chatt.rtOutputDeviceLabel
+chatt.rtPreferredDeviceLabel
+```
+
+Audio safety record shape:
+
+```json
+{
+  "confirmed": true,
+  "source": "user-confirmed",
+  "deviceId": "<selected audiooutput deviceId>",
+  "label": "<selected audiooutput label>",
+  "fingerprint": "<deviceId>|<label>",
+  "confirmedAt": "<ISO timestamp>"
+}
+```
+
+Settings -> Audio Output UI:
+
+```text
+Audio Safety
+Status: Not confirmed / Headphones detected / Confirmed
+Test Selected Output
+Confirm This Output Uses Headphones
+Reset Confirmation
+```
+
+Safe output resolution priority:
+
+```text
+1. Explicit selected dropdown device if it is headphones-labeled.
+2. Explicit selected dropdown device if it matches a saved user-confirmed safety record.
+3. Saved confirmed device if present and still valid.
+4. Saved Realtime output device if it is headphones-labeled.
+5. Preferred label match if it is headphones-labeled.
+6. First headphones-labeled output.
+7. Otherwise unsafe.
+```
+
+First-run/runtime behavior:
+
+```text
+If a headphones-labeled output device exists:
+  app auto-selects it and Realtime may start.
+  manual device registration is not required.
+
+If no headphones-labeled output device exists and no confirmed record exists:
+  Realtime is blocked.
+  user must select an output device, test it, and confirm it plays only in headphones.
+
+If a saved confirmed output device exists and still matches:
+  app auto-selects it and Realtime may start.
+```
+
+User-confirmed registration flow:
+
+```text
+User selects an output device.
+User clicks Test Selected Output.
+The app plays a short beep through the same rtOutEl / setSinkId / playback pipeline used by Realtime output.
+User confirms only if the test sound is heard only in headphones.
+The app saves chatt.audioSafety.record and selected output preference.
+Confirm is blocked unless the selected output was tested first and the selected output fingerprint still matches the tested fingerprint.
+```
+
+Devicechange behavior:
+
+```text
+The app uses navigator.mediaDevices.ondevicechange as the runtime output-change signal.
+On devicechange, the app refreshes audio outputs and verifies safe output state.
+If the safe output is no longer valid while Direct Realtime is active or starting:
+  stopAudioNow() runs.
+  stopDirectRealtime({ closeRealtime: true }) runs.
+  Direct Realtime stops.
+  Realtime WebSocket closes cleanly.
+  Start remains blocked until a safe output exists again.
+If headphones are plugged back in and a safe output is detected again:
+  Realtime can start again.
+```
+
+Confirmed validation:
+
+```text
+node --check Desktop/renderer/renderer.js: OK
+Desktop runtime test: OK
+Headphones-labeled output auto-detected and selected: OK
+Test Selected Output beep heard in headphones: OK
+Confirm This Output Uses Headphones flow: OK
+chatt.audioSafety.record persisted in Electron dev profile: OK
+Selected output device persisted in Electron profile: OK
+Direct Realtime start with safe headphones output: OK
+Realtime output sink set to Communications - Headphones (Surface High Definition Audio): OK
+Unplug headphones during active Realtime: devicechange detected and Direct Realtime stopped: OK
+Realtime WebSocket closed cleanly with direct-realtime-stop: OK
+Plug headphones back in: safe output detected and Direct Realtime can start again: OK
+Git clean after commit: OK
+```
+
+Runtime boundaries:
+
+```text
+This change is Desktop renderer safety/routing only.
+It does not change backend/app_realtime.py.
+It does not change provider adapters.
+It does not change Realtime WebSocket protocol.
+It does not change loopback/system/browser audio capture.
+It does not change AudioWorklet behavior.
+It does not change Mini Control Window ownership.
+```
+
+Implementation boundaries:
+
+```text
+Do not blindly allow generic Speakers.
+A generic Speakers output can be used only if it matches a saved user-confirmed safety record.
+Do not require users to rename Windows audio devices.
+Do not replace existing headphones auto-detection.
+Do not introduce microphone input.
+```
+
+Known UX note:
+
+```text
+On machines where the selected output label already contains Headphones, the status may show Headphones detected even when a user-confirmed record also exists.
+This is acceptable because auto-detected headphones is already a safe path.
+On machines where Windows exposes a valid headphones-routed output under an ambiguous label such as Speakers, the saved user-confirmed path should show Confirmed after test/confirmation and restart.
