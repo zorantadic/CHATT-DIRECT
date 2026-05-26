@@ -20,6 +20,18 @@
 !backend/**
 !Desktop/
 !Desktop/**
+!apps/
+!apps/web-ui/
+!apps/web-ui/package.json
+!apps/web-ui/package-lock.json
+!apps/web-ui/index.html
+!apps/web-ui/src/
+!apps/web-ui/src/main.jsx
+!apps/web-ui/src/App.jsx
+!apps/web-ui/src/styles/
+!apps/web-ui/src/styles/app.css
+!apps/web-ui/.env.example
+!apps/web-ui/README_WEB.md
 
 # Ignore secrets / environment files
 .env
@@ -28,6 +40,7 @@
 **/.env.*
 !.env.example
 !backend/.env.example
+!apps/web-ui/.env.example
 backend/provider_config.local.json
 
 # Ignore Python runtime/cache
