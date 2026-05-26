@@ -1,4 +1,4 @@
-# Ignore everything by default
+﻿# Ignore everything by default
 *
 
 # Allow core project files
@@ -20,13 +20,6 @@
 !backend/**
 !Desktop/
 !Desktop/**
-!apps/
-!apps/web-ui/
-!apps/web-ui/**
-!apps/web-ui/src/components/
-!apps/web-ui/src/components/*.jsx
-!apps/web-ui/src/pages/
-!apps/web-ui/src/pages/*.jsx
 
 # Ignore secrets / environment files
 .env
