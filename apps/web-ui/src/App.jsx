@@ -4,6 +4,7 @@ import { getScenarios } from "./api/scenarioClient.js";
 import BottomStatusBar from "./components/BottomStatusBar.jsx";
 import Shell from "./components/Shell.jsx";
 import runtimeConfig from "./config/runtimeConfig.js";
+import useDirectRealtimeRuntime from "./hooks/useDirectRealtimeRuntime.js";
 import ScenariosPage from "./pages/ScenariosPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import VoicePage from "./pages/VoicePage.jsx";
@@ -132,6 +133,7 @@ function hostLabel(url) {
 
 export default function App() {
   const [activePage, setActivePage] = useState("voice");
+  const { runtimeActions, runtimeState } = useDirectRealtimeRuntime();
   const [backendData, setBackendData] = useState({
     loading: true,
     error: "",
@@ -141,9 +143,9 @@ export default function App() {
   });
 
   useEffect(() => {
-    document.body.dataset.session = "off";
-    document.body.dataset.activity = "idle";
-  }, []);
+    document.body.dataset.session = runtimeState.sessionStatus.toLowerCase();
+    document.body.dataset.activity = runtimeState.activityStatus.toLowerCase();
+  }, [runtimeState.activityStatus, runtimeState.sessionStatus]);
 
   useEffect(() => {
     let mounted = true;
@@ -214,6 +216,8 @@ export default function App() {
           connectionState={connectionState}
           loading={backendData.loading}
           providerState={providerState}
+          runtimeActions={runtimeActions}
+          runtimeState={runtimeState}
           scenarioState={scenarioState}
           error={backendData.error}
         />
@@ -234,7 +238,7 @@ export default function App() {
           error={backendData.error}
         />
       )}
-      <BottomStatusBar connectionState={connectionState} />
+      <BottomStatusBar connectionState={connectionState} runtimeState={runtimeState} />
     </Shell>
   );
 }

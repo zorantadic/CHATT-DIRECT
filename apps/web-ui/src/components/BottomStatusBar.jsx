@@ -1,7 +1,7 @@
 import React from "react";
 import GlassPanel from "./GlassPanel.jsx";
 
-export default function BottomStatusBar({ connectionState }) {
+export default function BottomStatusBar({ connectionState, runtimeState }) {
   const backendState = connectionState.error
     ? `Configured: ${connectionState.backendLabel}`
     : connectionState.loading
@@ -22,20 +22,20 @@ export default function BottomStatusBar({ connectionState }) {
         <span>
           <span className="bottomLabel">WS</span>
           <span className="bottomValue" title={connectionState.realtimeWs}>
-            Not connected
+            {runtimeState.wsStatus}
           </span>
         </span>
       </div>
       <div className="bottomItem">
         <span>
           <span className="bottomLabel">Audio Input</span>
-          <span className="bottomValue">Not started</span>
+          <span className="bottomValue">{runtimeState.audioInputStatus}</span>
         </span>
       </div>
       <div className="bottomItem">
         <span>
           <span className="bottomLabel">Output</span>
-          <span className="bottomValue">Browser default / Not selected</span>
+          <span className="bottomValue">{runtimeState.outputStatus}</span>
         </span>
       </div>
     </GlassPanel>

@@ -8,7 +8,25 @@ function firstProvided(values, fallback) {
   return values.find((value) => value && value !== "Not provided" && value !== "Not loaded") || fallback;
 }
 
-export default function VoicePage({ connectionState, error, loading, providerState, scenarioState }) {
+function sessionTone(status) {
+  if (status === "ON") return "ok";
+  if (status === "OFF") return "bad";
+  return "warn";
+}
+
+function activityTone(status) {
+  return status === "Idle" ? "warn" : "ok";
+}
+
+export default function VoicePage({
+  connectionState,
+  error,
+  loading,
+  providerState,
+  runtimeActions,
+  runtimeState,
+  scenarioState,
+}) {
   const selectedScenario = scenarioState.selected;
   const scenarioName = selectedScenario?.name || "Not loaded";
   const scenarioDescription = selectedScenario
@@ -36,14 +54,14 @@ export default function VoicePage({ connectionState, error, loading, providerSta
         </div>
 
         <div className="statusPillRow">
-          <StatusPill tone="bad">Session: OFF</StatusPill>
-          <StatusPill tone="warn">Activity: Idle</StatusPill>
+          <StatusPill tone={sessionTone(runtimeState.sessionStatus)}>Session: {runtimeState.sessionStatus}</StatusPill>
+          <StatusPill tone={activityTone(runtimeState.activityStatus)}>Activity: {runtimeState.activityStatus}</StatusPill>
         </div>
 
         <DataNotice error={error} loading={loading} />
 
         <div className="costGuardNotice active" role="status" aria-live="polite">
-          Session cost guard is ready. Browser runtime controls are read-only in this phase.
+          {runtimeState.lastRuntimeMessage}
         </div>
 
         <div className="aiVisual" aria-hidden="true">
@@ -85,20 +103,23 @@ export default function VoicePage({ connectionState, error, loading, providerSta
         <div className="quickControls">
           <div className="quickControlsHeader">Quick controls</div>
           <div className="quickControlsGrid">
-            <button className="primaryAction" type="button" disabled>
+            <button className="primaryAction" type="button" onClick={runtimeActions.start}>
               Start Direct Realtime
             </button>
-            <button className="dangerAction" type="button" disabled>
+            <button className="dangerAction" type="button" onClick={runtimeActions.stop}>
               Stop
             </button>
-            <button type="button" disabled>
+            <button type="button" onClick={runtimeActions.refreshInstructions}>
               Refresh Instructions
             </button>
-            <button type="button" disabled>
+            <button type="button" onClick={runtimeActions.repeatLastAnswer}>
               Repeat Last Answer
             </button>
-            <button type="button" disabled>
+            <button type="button" onClick={runtimeActions.resetSession}>
               Reset Session
+            </button>
+            <button type="button" onClick={runtimeActions.stopAudioNow}>
+              Stop Audio Now
             </button>
           </div>
         </div>
@@ -114,14 +135,15 @@ export default function VoicePage({ connectionState, error, loading, providerSta
             </div>
           </div>
           <div className="statusTable">
-            <ReadonlyField label="Session" value="OFF" />
-            <ReadonlyField label="Activity" value="Idle" />
+            <ReadonlyField label="Session" value={runtimeState.sessionStatus} />
+            <ReadonlyField label="Activity" value={runtimeState.activityStatus} />
             <ReadonlyField label="Provider" value={providerState.displayName} />
             <ReadonlyField label="Model" value={providerState.model} />
             <ReadonlyField label="Voice" value={providerState.voice} />
             <ReadonlyField label="Output Language" value={providerState.outgoingLanguage} />
             <ReadonlyField label="Sample Rate" value="24 kHz" />
             <ReadonlyField label="Channels" value="1 mono" />
+            <ReadonlyField label="Runtime WS" value={runtimeState.wsStatus} />
             <ReadonlyField label="Backend" value={connectionState.backendLabel} />
           </div>
         </GlassPanel>
@@ -135,8 +157,14 @@ export default function VoicePage({ connectionState, error, loading, providerSta
             </div>
           </div>
           <div className="activityList">
-            <div className="activityItem">Ready. No session activity yet.</div>
-            <div className="activityItem">Direct Realtime is disabled in the web parity phase.</div>
+            {runtimeState.runtimeLog.map((entry) => (
+              <div className="activityItem" key={entry.id}>
+                <span>
+                  <span className="activityTime mono">{entry.at}</span>
+                  {entry.message}
+                </span>
+              </div>
+            ))}
           </div>
         </GlassPanel>
       </aside>

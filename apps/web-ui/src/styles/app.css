@@ -682,6 +682,13 @@ label {
   box-shadow: 0 0 10px rgba(45, 125, 255, 0.7);
 }
 
+.activityTime {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
 .appBottomBar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
