@@ -1,9 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  getCaptureSummary,
-  startBrowserDisplayAudioCapture,
-  stopBrowserDisplayAudioCapture,
-} from "../runtime/browserAudioCapture.js";
+import { useCallback, useMemo, useState } from "react";
 import {
   appendRuntimeLog,
   createInitialRuntimeState,
@@ -17,55 +12,21 @@ import {
 
 export default function useDirectRealtimeRuntime() {
   const [runtimeState, setRuntimeState] = useState(createInitialRuntimeState);
-  const captureStateRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      stopBrowserDisplayAudioCapture(captureStateRef.current);
-      captureStateRef.current = null;
-    };
-  }, []);
 
   const runRuntimeCommand = useCallback((command) => {
     setRuntimeState((current) => appendRuntimeLog(current, command()));
   }, []);
 
-  const start = useCallback(async () => {
-    if (captureStateRef.current?.status === "captured") {
-      setRuntimeState((current) => appendRuntimeLog(current, startRuntimeStub(getCaptureSummary(captureStateRef.current))));
-      return;
-    }
-
-    const captureState = await startBrowserDisplayAudioCapture();
-    captureStateRef.current = captureState.status === "captured" ? captureState : null;
-
-    setRuntimeState((current) => appendRuntimeLog(current, startRuntimeStub(getCaptureSummary(captureState))));
-  }, []);
-
-  const stop = useCallback(() => {
-    const stopSummary = stopBrowserDisplayAudioCapture(captureStateRef.current);
-    captureStateRef.current = null;
-
-    setRuntimeState((current) => appendRuntimeLog(current, stopRuntimeStub(stopSummary)));
-  }, []);
-
-  const resetSession = useCallback(() => {
-    const stopSummary = stopBrowserDisplayAudioCapture(captureStateRef.current);
-    captureStateRef.current = null;
-
-    setRuntimeState((current) => appendRuntimeLog(current, resetSessionStub(stopSummary)));
-  }, []);
-
   const runtimeActions = useMemo(
     () => ({
-      start,
-      stop,
+      start: () => runRuntimeCommand(startRuntimeStub),
+      stop: () => runRuntimeCommand(stopRuntimeStub),
       refreshInstructions: () => runRuntimeCommand(refreshInstructionsStub),
       repeatLastAnswer: () => runRuntimeCommand(repeatLastAnswerStub),
-      resetSession,
+      resetSession: () => runRuntimeCommand(resetSessionStub),
       stopAudioNow: () => runRuntimeCommand(stopAudioNowStub),
     }),
-    [resetSession, runRuntimeCommand, start, stop],
+    [runRuntimeCommand],
   );
 
   return { runtimeActions, runtimeState };

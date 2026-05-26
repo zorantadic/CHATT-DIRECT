@@ -580,13 +580,6 @@ label {
   font-weight: 650;
 }
 
-.quickControlsPhase {
-  margin: -6px 0 12px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .quickControlsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
