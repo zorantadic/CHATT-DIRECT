@@ -1,13 +1,39 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getProviderCapabilities, getProviderConfig } from "./api/providerClient.js";
 import { getScenarios } from "./api/scenarioClient.js";
+import BottomStatusBar from "./components/BottomStatusBar.jsx";
+import Shell from "./components/Shell.jsx";
 import runtimeConfig from "./config/runtimeConfig.js";
+import ScenariosPage from "./pages/ScenariosPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
+import VoicePage from "./pages/VoicePage.jsx";
 
-const pages = ["Voice", "Settings", "Scenarios"];
+const pages = [
+  { id: "voice", label: "Voice" },
+  { id: "settings", label: "Settings" },
+  { id: "scenarios", label: "Scenarios" },
+];
 
 function textValue(value, fallback = "Not loaded") {
   const text = value == null ? "" : String(value).trim();
   return text || fallback;
+}
+
+function firstObjectKey(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  return Object.keys(value)[0] || "";
+}
+
+function optionLabel(value) {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    return textValue(value.label || value.name || value.displayName || value.value || value.id, "");
+  }
+  return textValue(value, "");
+}
+
+function firstOptionLabel(values) {
+  return Array.isArray(values) && values.length ? optionLabel(values[0]) : "";
 }
 
 function providerDisplayName(providerId, providerCapabilities) {
@@ -15,159 +41,97 @@ function providerDisplayName(providerId, providerCapabilities) {
   return textValue(caps?.displayName || caps?.label || caps?.name || providerId);
 }
 
-function selectedProviderConfig(providerConfig) {
-  const activeProvider = textValue(providerConfig?.activeProvider, "");
-  return activeProvider ? providerConfig?.providers?.[activeProvider] || {} : {};
-}
-
-function activeScenario(scenarioData) {
-  const scenarios = Array.isArray(scenarioData?.scenarios) ? scenarioData.scenarios : [];
-  const id = textValue(scenarioData?.activeScenarioId || scenarioData?.defaultScenarioId, "");
-  return scenarios.find((scenario) => String(scenario?.id || "") === id) || null;
-}
-
-function DataNotice({ loading, error }) {
-  if (loading) return <div className="dataNotice">Loading backend data...</div>;
-  if (error) return <div className="dataNotice error">{error}</div>;
-  return null;
-}
-
-function VoicePage({ realtimeHttp, realtimeWs, scenarioData, loading, error }) {
-  const scenario = activeScenario(scenarioData);
-
-  return (
-    <section className="dashboardGrid" aria-label="Voice">
-      <div className="glassPanel heroPanel">
-        <div className="eyebrow">Direct Realtime</div>
-        <h2>Voice</h2>
-        <p>
-          Placeholder for the future browser-safe Direct Realtime voice workflow.
-          Audio capture and WebSocket streaming are intentionally not implemented yet.
-        </p>
-        <div className="statusGrid">
-          <div>
-            <span>Session</span>
-            <strong>OFF</strong>
-          </div>
-          <div>
-            <span>Activity</span>
-            <strong>Idle</strong>
-          </div>
-        </div>
-        <div className="summaryPanel">
-          <span>Selected Scenario</span>
-          <strong>{textValue(scenario?.name || scenario?.id)}</strong>
-          <p>{textValue(scenario?.displayDetails || scenario?.shortDescription, "Scenario data is not loaded.")}</p>
-        </div>
-      </div>
-
-      <aside className="glassPanel sidePanel">
-        <h3>Runtime Endpoints</h3>
-        <DataNotice loading={loading} error={error} />
-        <dl>
-          <div>
-            <dt>HTTP</dt>
-            <dd>{realtimeHttp}</dd>
-          </div>
-          <div>
-            <dt>WebSocket</dt>
-            <dd>{realtimeWs}</dd>
-          </div>
-        </dl>
-      </aside>
-    </section>
+function selectedProviderState(providerConfig, providerCapabilities) {
+  const providerId = textValue(
+    providerConfig?.activeProvider ||
+      providerCapabilities?.defaultProvider ||
+      firstObjectKey(providerCapabilities?.providers),
+    "",
   );
+  const providerEntry = providerId ? providerConfig?.providers?.[providerId] || {} : {};
+  const providerCaps = providerId ? providerCapabilities?.providers?.[providerId] || {} : {};
+
+  return {
+    id: providerId,
+    displayName: providerDisplayName(providerId, providerCapabilities),
+    model: textValue(providerEntry.model || providerCaps.defaultModel),
+    voice: textValue(providerEntry.voice || providerCaps.defaultVoice),
+    incomingLanguage: textValue(providerEntry.incomingLanguage || providerCaps.defaultIncomingLanguage),
+    outgoingLanguage: textValue(providerEntry.outgoingLanguage || providerCaps.defaultOutgoingLanguage),
+    endpoint: textValue(providerEntry.endpoint, "Not configured"),
+    region: textValue(
+      providerEntry.region || providerCaps.defaultRegion || firstOptionLabel(providerCaps.supportedRegions),
+      "Not configured",
+    ),
+    apiVersion: textValue(providerEntry.apiVersion || providerCaps.defaultApiVersion, "Not configured"),
+    modelLabel: textValue(providerCaps.modelLabel, "Deployment / Model"),
+    requiresEndpoint: Boolean(providerCaps.requiresEndpoint),
+    requiresRegion: Boolean(providerCaps.requiresRegion),
+  };
 }
 
-function SettingsPage({ realtimeHttp, realtimeWs, providerConfig, providerCapabilities, loading, error }) {
-  const activeProvider = textValue(providerConfig?.activeProvider, "");
-  const activeConfig = selectedProviderConfig(providerConfig);
+function normalizeScenario(rawScenario) {
+  if (!rawScenario || typeof rawScenario !== "object") return null;
+  const id = textValue(rawScenario.id, "");
+  if (!id) return null;
 
-  return (
-    <section className="settingsGrid" aria-label="Settings">
-      <div className="glassPanel">
-        <div className="eyebrow">Configuration</div>
-        <h2>Settings</h2>
-        <div className="readonlyRows">
-          <div>
-            <span>Realtime HTTP</span>
-            <strong>{realtimeHttp}</strong>
-          </div>
-          <div>
-            <span>Realtime WS</span>
-            <strong>{realtimeWs}</strong>
-          </div>
-        </div>
-      </div>
-      <div className="glassPanel">
-        <div className="eyebrow">Provider</div>
-        <h2>Provider Summary</h2>
-        <DataNotice loading={loading} error={error} />
-        <div className="readonlyRows">
-          <div>
-            <span>Active Provider</span>
-            <strong>{providerDisplayName(activeProvider, providerCapabilities)}</strong>
-          </div>
-          <div>
-            <span>Model</span>
-            <strong>{textValue(activeConfig.model)}</strong>
-          </div>
-          <div>
-            <span>Voice</span>
-            <strong>{textValue(activeConfig.voice)}</strong>
-          </div>
-          <div>
-            <span>Incoming Language</span>
-            <strong>{textValue(activeConfig.incomingLanguage)}</strong>
-          </div>
-          <div>
-            <span>Outgoing Language</span>
-            <strong>{textValue(activeConfig.outgoingLanguage)}</strong>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+  return {
+    id,
+    name: textValue(rawScenario.name || id),
+    category: textValue(rawScenario.category, "Not provided"),
+    shortDescription: textValue(rawScenario.shortDescription, "Not provided"),
+    displayDetails: textValue(rawScenario.displayDetails, "Not provided"),
+    recommendedUse: textValue(rawScenario.recommendedUse, "Not provided"),
+    instruction: textValue(rawScenario.instruction, ""),
+    userInstruction: textValue(rawScenario.userInstruction, ""),
+    userInstructionUpdatedAt: textValue(rawScenario.userInstructionUpdatedAt, "Not provided"),
+  };
 }
 
-function ScenariosPage({ scenarioData, loading, error }) {
-  const scenarios = Array.isArray(scenarioData?.scenarios) ? scenarioData.scenarios : [];
-  const selected = activeScenario(scenarioData);
-  const selectedId = textValue(selected?.id, "");
+function selectedScenarioState(scenarioData) {
+  const scenarios = Array.isArray(scenarioData?.scenarios)
+    ? scenarioData.scenarios.map(normalizeScenario).filter(Boolean)
+    : [];
+  const defaultScenarioId = textValue(scenarioData?.defaultScenarioId, "");
+  const activeScenarioId = textValue(scenarioData?.activeScenarioId || defaultScenarioId || scenarios[0]?.id, "");
+  const selected =
+    scenarios.find((scenario) => scenario.id === activeScenarioId) ||
+    scenarios.find((scenario) => scenario.id === defaultScenarioId) ||
+    scenarios[0] ||
+    null;
+  const hasCustomInstruction = Boolean(selected?.userInstruction);
 
-  return (
-    <section className="glassPanel" aria-label="Scenarios">
-      <div className="eyebrow">Behavior</div>
-      <h2>Scenarios</h2>
-      <p>
-        Read-only scenario list loaded from the existing Direct Realtime backend.
-        Scenario save, edit, and delete actions are intentionally not implemented here.
-      </p>
-      <DataNotice loading={loading} error={error} />
-      <div className="scenarioCards">
-        {scenarios.length === 0 && (
-          <article className="scenarioCard">
-            <span>No scenarios loaded</span>
-            <small>Start the backend to load scenario metadata.</small>
-          </article>
-        )}
-        {scenarios.map((scenario) => (
-          <article
-            className={scenario?.id === selectedId ? "scenarioCard active" : "scenarioCard"}
-            key={scenario?.id || scenario?.name}
-          >
-            <span>{textValue(scenario?.name || scenario?.id)}</span>
-            <small>{scenario?.id === selectedId ? "Selected / Active" : textValue(scenario?.category, "Available")}</small>
-            <p>{textValue(scenario?.displayDetails || scenario?.shortDescription, "No description provided.")}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
+  return {
+    scenarios,
+    selected,
+    activeScenarioId,
+    defaultScenarioId,
+    instructionText: selected ? selected.userInstruction || selected.instruction : "",
+    defaultInstruction: selected?.instruction || "",
+    instructionSource: selected
+      ? hasCustomInstruction
+        ? "Custom override"
+        : "Scenario default"
+      : "Not provided",
+    instructionOverrideLabel: selected
+      ? hasCustomInstruction
+        ? "Custom override loaded"
+        : "Scenario default"
+      : "Override unknown",
+    hasCustomInstruction,
+  };
+}
+
+function hostLabel(url) {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
 }
 
 export default function App() {
-  const [activePage, setActivePage] = useState("Voice");
+  const [activePage, setActivePage] = useState("voice");
   const [backendData, setBackendData] = useState({
     loading: true,
     error: "",
@@ -175,6 +139,11 @@ export default function App() {
     providerCapabilities: null,
     scenarioData: null,
   });
+
+  useEffect(() => {
+    document.body.dataset.session = "off";
+    document.body.dataset.activity = "idle";
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -185,11 +154,16 @@ export default function App() {
         getProviderCapabilities(),
         getScenarios(),
       ]);
+
       if (!mounted) return;
 
-      const errors = [providerConfig, providerCapabilities, scenarioData]
-        .filter((result) => result.status === "rejected")
-        .map((result) => result.reason?.message || String(result.reason));
+      const errors = [
+        ["Provider config", providerConfig],
+        ["Provider capabilities", providerCapabilities],
+        ["Scenarios", scenarioData],
+      ]
+        .filter(([, result]) => result.status === "rejected")
+        .map(([label, result]) => `${label}: ${result.reason?.message || String(result.reason)}`);
 
       setBackendData({
         loading: false,
@@ -214,54 +188,53 @@ export default function App() {
     };
   }, []);
 
-  return (
-    <main className="appShell">
-      <header className="appHeader">
-        <div>
-          <div className="eyebrow">CHATT Direct</div>
-          <h1>Web Console</h1>
-          <p>Parallel web UI skeleton for the Direct Realtime application.</p>
-        </div>
-        <nav className="tabs" aria-label="Primary">
-          {pages.map((page) => (
-            <button
-              className={activePage === page ? "active" : ""}
-              key={page}
-              type="button"
-              onClick={() => setActivePage(page)}
-            >
-              {page}
-            </button>
-          ))}
-        </nav>
-      </header>
+  const providerState = useMemo(
+    () => selectedProviderState(backendData.providerConfig, backendData.providerCapabilities),
+    [backendData.providerCapabilities, backendData.providerConfig],
+  );
 
-      {activePage === "Voice" && (
+  const scenarioState = useMemo(
+    () => selectedScenarioState(backendData.scenarioData),
+    [backendData.scenarioData],
+  );
+
+  const connectionState = {
+    realtimeHttp: runtimeConfig.realtimeHttp,
+    realtimeWs: runtimeConfig.realtimeWs,
+    backendLabel: hostLabel(runtimeConfig.realtimeHttp),
+    wsLabel: runtimeConfig.realtimeWs,
+    loading: backendData.loading,
+    error: backendData.error,
+  };
+
+  return (
+    <Shell activePage={activePage} onPageChange={setActivePage} pages={pages}>
+      {activePage === "voice" && (
         <VoicePage
-          realtimeHttp={runtimeConfig.realtimeHttp}
-          realtimeWs={runtimeConfig.realtimeWs}
-          scenarioData={backendData.scenarioData}
+          connectionState={connectionState}
           loading={backendData.loading}
+          providerState={providerState}
+          scenarioState={scenarioState}
           error={backendData.error}
         />
       )}
-      {activePage === "Settings" && (
+      {activePage === "settings" && (
         <SettingsPage
-          realtimeHttp={runtimeConfig.realtimeHttp}
-          realtimeWs={runtimeConfig.realtimeWs}
-          providerConfig={backendData.providerConfig}
-          providerCapabilities={backendData.providerCapabilities}
+          connectionState={connectionState}
           loading={backendData.loading}
+          providerState={providerState}
           error={backendData.error}
         />
       )}
-      {activePage === "Scenarios" && (
+      {activePage === "scenarios" && (
         <ScenariosPage
-          scenarioData={backendData.scenarioData}
+          connectionState={connectionState}
           loading={backendData.loading}
+          scenarioState={scenarioState}
           error={backendData.error}
         />
       )}
-    </main>
+      <BottomStatusBar connectionState={connectionState} />
+    </Shell>
   );
 }

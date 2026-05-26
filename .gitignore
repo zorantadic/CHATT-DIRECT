@@ -33,6 +33,10 @@
 !apps/web-ui/src/api/scenarioClient.js
 !apps/web-ui/src/config/
 !apps/web-ui/src/config/runtimeConfig.js
+!apps/web-ui/src/components/
+!apps/web-ui/src/components/*.jsx
+!apps/web-ui/src/pages/
+!apps/web-ui/src/pages/*.jsx
 !apps/web-ui/src/styles/
 !apps/web-ui/src/styles/app.css
 !apps/web-ui/.env.example
