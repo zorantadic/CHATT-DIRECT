@@ -102,6 +102,9 @@ export default function VoicePage({
 
         <div className="quickControls">
           <div className="quickControlsHeader">Quick controls</div>
+          <div className="quickControlsPhase">
+            Phase 5B: Start requests browser display audio capture only. Realtime remains disconnected.
+          </div>
           <div className="quickControlsGrid">
             <button className="primaryAction" type="button" onClick={runtimeActions.start}>
               Start Direct Realtime
@@ -143,6 +146,7 @@ export default function VoicePage({
             <ReadonlyField label="Output Language" value={providerState.outgoingLanguage} />
             <ReadonlyField label="Sample Rate" value="24 kHz" />
             <ReadonlyField label="Channels" value="1 mono" />
+            <ReadonlyField label="Audio Input" value={runtimeState.audioInputStatus} />
             <ReadonlyField label="Runtime WS" value={runtimeState.wsStatus} />
             <ReadonlyField label="Backend" value={connectionState.backendLabel} />
           </div>

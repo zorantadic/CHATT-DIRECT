@@ -1,5 +1,5 @@
 const INITIAL_RUNTIME_LOG_MESSAGE =
-  "Web Direct Realtime runtime skeleton ready. Audio and realtime transport are not implemented in Phase 5A.";
+  "Web Direct Realtime capture phase ready. Runtime connection and assistant playback are not implemented yet.";
 
 function createLogMessage(message) {
   return {
@@ -21,21 +21,24 @@ export function createInitialRuntimeState() {
   };
 }
 
-export function startRuntimeStub() {
+export function startRuntimeStub(captureSummary) {
+  const captured = captureSummary?.status === "captured" && captureSummary.audioTrackCount > 0;
+
   return {
     statePatch: {
       sessionStatus: "OFF",
       activityStatus: "Idle",
       wsStatus: "Not connected",
-      audioInputStatus: "Not started",
+      audioInputStatus: captured ? "Browser/system audio captured" : "Not started",
       outputStatus: "Browser default / Not selected",
     },
-    message:
-      "Start Direct Realtime requested. Phase 5A only records the command; no live session was started.",
+    message: captured
+      ? `${captureSummary.message} Realtime session remains OFF.`
+      : `Start Direct Realtime requested, but capture is not active. ${captureSummary?.message || ""}`.trim(),
   };
 }
 
-export function stopRuntimeStub() {
+export function stopRuntimeStub(captureSummary) {
   return {
     statePatch: {
       sessionStatus: "OFF",
@@ -44,7 +47,7 @@ export function stopRuntimeStub() {
       audioInputStatus: "Not started",
       outputStatus: "Browser default / Not selected",
     },
-    message: "Stop requested. Runtime state reset to OFF / Idle.",
+    message: captureSummary?.message || "Stop requested. Runtime state reset to OFF / Idle.",
   };
 }
 
@@ -55,7 +58,7 @@ export function refreshInstructionsStub() {
       activityStatus: "Idle",
       wsStatus: "Not connected",
     },
-    message: "Refresh Instructions requested. Phase 5A does not send runtime instruction messages.",
+    message: "Refresh Instructions requested. Capture phase does not send runtime instruction messages.",
   };
 }
 
@@ -66,11 +69,11 @@ export function repeatLastAnswerStub() {
       activityStatus: "Idle",
       wsStatus: "Not connected",
     },
-    message: "Repeat Last Answer requested. Phase 5A does not request assistant audio.",
+    message: "Repeat Last Answer requested. Capture phase does not request assistant audio.",
   };
 }
 
-export function resetSessionStub() {
+export function resetSessionStub(captureSummary) {
   return {
     statePatch: {
       sessionStatus: "OFF",
@@ -79,7 +82,9 @@ export function resetSessionStub() {
       audioInputStatus: "Not started",
       outputStatus: "Browser default / Not selected",
     },
-    message: "Reset Session requested. Runtime skeleton state reset; no session exists yet.",
+    message: captureSummary?.status === "stopped"
+      ? `${captureSummary.message} Runtime skeleton state reset; no session exists yet.`
+      : "Reset Session requested. Runtime skeleton state reset; no session exists yet.",
   };
 }
 
@@ -89,7 +94,7 @@ export function stopAudioNowStub() {
       activityStatus: "Idle",
       outputStatus: "Browser default / Not selected",
     },
-    message: "Stop Audio Now requested. No browser assistant audio exists in Phase 5A.",
+    message: "Stop Audio Now requested. No browser assistant audio exists in this capture phase.",
   };
 }
 
