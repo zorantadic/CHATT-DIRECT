@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { getProviderCapabilities, getProviderConfig } from "./api/providerClient.js";
 import { getScenarios } from "./api/scenarioClient.js";
 import runtimeConfig from "./config/runtimeConfig.js";
