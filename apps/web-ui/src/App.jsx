@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import runtimeConfig from "./config/runtimeConfig.js";
 
 const pages = ["Voice", "Settings", "Scenarios"];
 
@@ -93,13 +94,6 @@ function ScenariosPage() {
 
 export default function App() {
   const [activePage, setActivePage] = useState("Voice");
-  const config = useMemo(
-    () => ({
-      realtimeHttp: import.meta.env.VITE_REALTIME_HTTP || "http://127.0.0.1:50505",
-      realtimeWs: import.meta.env.VITE_REALTIME_WS || "ws://127.0.0.1:50505/voice/ws",
-    }),
-    []
-  );
 
   return (
     <main className="appShell">
@@ -124,10 +118,10 @@ export default function App() {
       </header>
 
       {activePage === "Voice" && (
-        <VoicePage realtimeHttp={config.realtimeHttp} realtimeWs={config.realtimeWs} />
+        <VoicePage realtimeHttp={runtimeConfig.realtimeHttp} realtimeWs={runtimeConfig.realtimeWs} />
       )}
       {activePage === "Settings" && (
-        <SettingsPage realtimeHttp={config.realtimeHttp} realtimeWs={config.realtimeWs} />
+        <SettingsPage realtimeHttp={runtimeConfig.realtimeHttp} realtimeWs={runtimeConfig.realtimeWs} />
       )}
       {activePage === "Scenarios" && <ScenariosPage />}
     </main>

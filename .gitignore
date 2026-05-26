@@ -1,4 +1,4 @@
-﻿# Ignore everything by default
+# Ignore everything by default
 *
 
 # Allow core project files
@@ -28,6 +28,8 @@
 !apps/web-ui/src/
 !apps/web-ui/src/main.jsx
 !apps/web-ui/src/App.jsx
+!apps/web-ui/src/config/
+!apps/web-ui/src/config/runtimeConfig.js
 !apps/web-ui/src/styles/
 !apps/web-ui/src/styles/app.css
 !apps/web-ui/.env.example
