@@ -28,6 +28,9 @@
 !apps/web-ui/src/
 !apps/web-ui/src/main.jsx
 !apps/web-ui/src/App.jsx
+!apps/web-ui/src/api/
+!apps/web-ui/src/api/providerClient.js
+!apps/web-ui/src/api/scenarioClient.js
 !apps/web-ui/src/config/
 !apps/web-ui/src/config/runtimeConfig.js
 !apps/web-ui/src/styles/

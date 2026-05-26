@@ -148,6 +148,42 @@ dd {
   color: #67d89b;
 }
 
+.summaryPanel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(51, 209, 122, 0.18);
+  border-radius: 8px;
+  background: rgba(51, 209, 122, 0.07);
+}
+
+.summaryPanel span {
+  display: block;
+  margin-bottom: 6px;
+  color: #9eb2ce;
+  font-size: 12px;
+}
+
+.summaryPanel strong,
+.readonlyRows strong {
+  overflow-wrap: anywhere;
+}
+
+.dataNotice {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(152, 181, 220, 0.14);
+  border-radius: 8px;
+  color: #cfe0f7;
+  background: rgba(5, 11, 21, 0.42);
+  font-size: 13px;
+}
+
+.dataNotice.error {
+  color: #ffd3d7;
+  border-color: rgba(255, 92, 122, 0.3);
+  background: rgba(255, 92, 122, 0.08);
+}
+
 .scenarioCards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -171,6 +207,16 @@ dd {
 .scenarioCard span {
   color: #e8f1ff;
   font-weight: 700;
+}
+
+.scenarioCard p {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.scenarioCard.active {
+  border-color: rgba(51, 209, 122, 0.48);
+  background: rgba(51, 209, 122, 0.09);
 }
 
 .scenarioCard small {
