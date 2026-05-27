@@ -20,12 +20,16 @@
 !backend/**
 !Desktop/
 !Desktop/**
+!apps/
+!apps/licensing-api/
+!apps/licensing-api/**
 
 # Ignore secrets / environment files
 .env
 .env.*
 **/.env
 **/.env.*
+**/local.settings.json
 !.env.example
 !backend/.env.example
 backend/provider_config.local.json

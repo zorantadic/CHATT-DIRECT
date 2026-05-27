@@ -1,0 +1,16 @@
+{
+  "name": "@answerdesk/licensing-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Separate hosted licensing API skeleton for AnswerDesk AI.",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.7.0"
+  }
+}
