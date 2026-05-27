@@ -18,6 +18,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     reset: (target) => ipcRenderer.invoke("instructions:reset", { target }),
   },
 
+  license: {
+    getState: () => ipcRenderer.invoke("license:get-state"),
+    getCachePath: () => ipcRenderer.invoke("license:get-cache-path"),
+    startTrial: (payload) => ipcRenderer.invoke("license:start-trial", payload),
+    validate: () => ipcRenderer.invoke("license:validate"),
+    activate: (payload) => ipcRenderer.invoke("license:activate", payload),
+    openCheckout: () => ipcRenderer.invoke("license:open-checkout"),
+  },
+
   updates: {
     getState: () => ipcRenderer.invoke("app-update:get-state"),
     check: () => ipcRenderer.invoke("app-update:check"),

@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
 const { spawn } = require("child_process");
+const crypto = require("crypto");
 const { initMain } = require("electron-audio-loopback");
 
 // Must be called before app is ready
@@ -75,6 +76,7 @@ const instructionsPath = path.join(userDataDir, "instructions.json");
 const legacyInstructionsPath = path.join(userDataDir, "instructions.local.json");
 const providerConfigPath = path.join(userDataDir, "provider_config.local.json");
 const scenarioPresetsLocalPath = path.join(userDataDir, "scenario_presets.local.json");
+const licenseStatePath = path.join(userDataDir, "license_state.json");
 const backendInstallDir = app.isPackaged
   ? path.join(process.resourcesPath, "backend")
   : path.join(__dirname, "..", "..", "backend");
@@ -284,6 +286,7 @@ async function startBackend() {
     ensureProviderConfigFile();
     ensureInstructionsFile();
     ensureScenarioPresetsFile();
+    ensureLicenseStateFile();
 
     backendStdoutLogStream = fs.createWriteStream(backendStdoutLogPath, { flags: "a" });
     backendStderrLogStream = fs.createWriteStream(backendStderrLogPath, { flags: "a" });
@@ -485,6 +488,91 @@ function nowIso() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+function createInstallId() {
+  if (crypto && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `install-${Date.now().toString(16)}-${crypto.randomBytes(16).toString("hex")}`;
+}
+
+function createDefaultLicenseState() {
+  return {
+    schemaVersion: 1,
+    installId: createInstallId(),
+    deviceHash: null,
+    status: "not_registered",
+    registeredEmail: null,
+    licenseId: null,
+    activationId: null,
+    licenseKeyLast4: null,
+    trialStartedAt: null,
+    trialExpiresAt: null,
+    licenseActivatedAt: null,
+    lastValidatedAt: null,
+    serverTime: null,
+    offlineGraceExpiresAt: null,
+    lastError: null,
+    checkoutUrl: null,
+    paymentProvider: null,
+    statusSignature: null,
+    updatedAt: nowIso(),
+  };
+}
+
+function nullableString(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function normalizeLicenseState(state) {
+  const raw = state && typeof state === "object" ? state : {};
+  const base = createDefaultLicenseState();
+  return {
+    schemaVersion: 1,
+    installId: nullableString(raw.installId) || base.installId,
+    deviceHash: nullableString(raw.deviceHash),
+    status: nullableString(raw.status) || "not_registered",
+    registeredEmail: nullableString(raw.registeredEmail),
+    licenseId: nullableString(raw.licenseId),
+    activationId: nullableString(raw.activationId),
+    licenseKeyLast4: nullableString(raw.licenseKeyLast4),
+    trialStartedAt: nullableString(raw.trialStartedAt),
+    trialExpiresAt: nullableString(raw.trialExpiresAt),
+    licenseActivatedAt: nullableString(raw.licenseActivatedAt),
+    lastValidatedAt: nullableString(raw.lastValidatedAt),
+    serverTime: nullableString(raw.serverTime),
+    offlineGraceExpiresAt: nullableString(raw.offlineGraceExpiresAt),
+    lastError: nullableString(raw.lastError),
+    checkoutUrl: nullableString(raw.checkoutUrl),
+    paymentProvider: nullableString(raw.paymentProvider),
+    statusSignature: nullableString(raw.statusSignature),
+    updatedAt: nullableString(raw.updatedAt) || base.updatedAt,
+  };
+}
+
+function ensureLicenseStateFile() {
+  const normalized = normalizeLicenseState(readJsonSafe(licenseStatePath));
+  writeJsonAtomic(licenseStatePath, normalized);
+  return normalized;
+}
+
+function readLicenseState() {
+  return ensureLicenseStateFile();
+}
+
+function writeLicenseStatePatch(patch) {
+  const current = readLicenseState();
+  const normalizedPatch = patch && typeof patch === "object" ? patch : {};
+  const next = normalizeLicenseState({
+    ...current,
+    ...normalizedPatch,
+    installId: current.installId,
+  });
+  writeJsonAtomic(licenseStatePath, next);
+  return next;
+}
+
 function defaultInstructionsText() {
   return (
     "Speak slowly and clearly.\n" +
@@ -580,6 +668,84 @@ function ensureTargetInStore(store, target) {
 }
 
 // ---- IPC handlers (sandbox-safe renderer access) ----
+ipcMain.handle("license:get-state", async () => readLicenseState());
+
+ipcMain.handle("license:get-cache-path", async () => licenseStatePath);
+
+ipcMain.handle("license:start-trial", async (_evt, payload) => {
+  const email = nullableString(payload && payload.email);
+  if (!email || !email.includes("@")) {
+    return {
+      ok: false,
+      message: "A valid email address is required to start a trial.",
+      state: readLicenseState(),
+    };
+  }
+
+  const message = "Hosted licensing backend is not connected yet.";
+  const state = writeLicenseStatePatch({
+    status: "not_registered",
+    registeredEmail: email,
+    lastError: message,
+    updatedAt: nowIso(),
+  });
+  return { ok: false, message, state };
+});
+
+ipcMain.handle("license:validate", async () => {
+  const message = "Hosted licensing backend is not connected yet.";
+  const state = writeLicenseStatePatch({
+    lastError: message,
+    updatedAt: nowIso(),
+  });
+  return { ok: false, message, state };
+});
+
+ipcMain.handle("license:activate", async (_evt, payload) => {
+  const licenseKey = nullableString(payload && payload.licenseKey);
+  if (!licenseKey) {
+    return {
+      ok: false,
+      message: "License key is required.",
+      state: readLicenseState(),
+    };
+  }
+
+  const email = nullableString(payload && payload.email);
+  const message = "Hosted licensing backend is not connected yet.";
+  const state = writeLicenseStatePatch({
+    status: "not_registered",
+    registeredEmail: email || readLicenseState().registeredEmail,
+    licenseKeyLast4: licenseKey.slice(-4),
+    lastError: message,
+    updatedAt: nowIso(),
+  });
+  return { ok: false, message, state };
+});
+
+ipcMain.handle("license:open-checkout", async () => {
+  const state = readLicenseState();
+  const checkoutUrl = nullableString(state.checkoutUrl);
+  if (!checkoutUrl) {
+    return { ok: false, message: "Checkout URL is not configured yet.", state };
+  }
+
+  try {
+    const url = new URL(checkoutUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return { ok: false, message: "Checkout URL is invalid.", state };
+    }
+    await shell.openExternal(url.toString());
+    return { ok: true, state };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err && err.message ? err.message : "Checkout URL could not be opened.",
+      state,
+    };
+  }
+});
+
 ipcMain.handle("app-update:get-state", async () => updateState);
 
 ipcMain.handle("app-update:check", async () => {
@@ -917,6 +1083,7 @@ app.whenReady().then(() => {
   ensureProviderConfigFile();
   ensureInstructionsFile();
   ensureScenarioPresetsFile();
+  ensureLicenseStateFile();
 
   startBackend();
   createWindow();
