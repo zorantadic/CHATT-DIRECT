@@ -216,9 +216,11 @@ Do not introduce new topics.`;
   // Navigation (Views)
   // ------------------------------
   const viewVoice = $("viewVoice");
+  const viewLicense = $("viewLicense");
   const viewSettings = $("viewSettings");
   const viewInstructions = $("viewInstructions");
   const navVoice = $("navVoice");
+  const navLicense = $("navLicense");
   const navSettings = $("navSettings");
   const navInstructions = $("navInstructions");
   // Voice view: instructions preview panel
@@ -256,17 +258,28 @@ Do not introduce new topics.`;
   const settingsDiagProviderTestEl = $("settingsDiagProviderTest");
   const btnVoiceCopyInstr = $("btnVoiceCopyInstr");
   const btnVoiceOpenInstr = $("btnVoiceOpenInstr");
+  let skipNextLicenseViewRefresh = false;
   function setActiveNav(btn) {
-    for (const b of [navVoice, navSettings, navInstructions]) {
+    for (const b of [navVoice, navLicense, navSettings, navInstructions]) {
       if (!b) continue;
       b.classList.toggle("active", b === btn);
     }
   }
   function setActiveView(name) {
     if (viewVoice) viewVoice.classList.toggle("active", name === "voice");
+    if (viewLicense) viewLicense.classList.toggle("active", name === "license");
     if (viewSettings) viewSettings.classList.toggle("active", name === "settings");
     if (viewInstructions) viewInstructions.classList.toggle("active", name === "instructions");
     if (name === "voice") { setActiveNav(navVoice); updateVoiceInstructionsUI(); }
+    if (name === "license") {
+      setActiveNav(navLicense);
+      try { renderLicenseState(currentLicenseState || { status: "not_registered" }); } catch {}
+      const shouldRefreshLicense = !skipNextLicenseViewRefresh;
+      skipNextLicenseViewRefresh = false;
+      if (shouldRefreshLicense) {
+        try { refreshLicenseState().catch(() => {}); } catch {}
+      }
+    }
     if (name === "settings") setActiveNav(navSettings);
     if (name === "instructions") setActiveNav(navInstructions);
     if (name === "instructions") {
@@ -275,6 +288,7 @@ Do not introduce new topics.`;
     }
   }
   if (navVoice) navVoice.addEventListener("click", () => setActiveView("voice"));
+  if (navLicense) navLicense.addEventListener("click", () => setActiveView("license"));
   if (btnVoiceOpenInstr) btnVoiceOpenInstr.addEventListener("click", () => setActiveView("instructions"));
   if (btnVoiceCopyInstr) btnVoiceCopyInstr.addEventListener("click", async () => {
     try {
@@ -858,6 +872,21 @@ Do not introduce new topics.`;
     licenseMessageEl.textContent = message || "";
   }
 
+  function focusLicenseView(message, level) {
+    skipNextLicenseViewRefresh = true;
+    try { setActiveView("license"); } catch {}
+    if (message) setLicenseMessage(message, level || "warn");
+    window.setTimeout(() => {
+      if (message) setLicenseMessage(message, level || "warn");
+      const target = licenseEmailEl || btnLicenseStartTrial;
+      try {
+        if (target && typeof target.focus === "function") target.focus({ preventScroll: false });
+      } catch {
+        try { if (target && typeof target.focus === "function") target.focus(); } catch {}
+      }
+    }, 100);
+  }
+
   function updateLicenseButtons() {
     const email = (licenseEmailEl?.value || "").toString().trim();
     const licenseKey = (licenseKeyEl?.value || "").toString().trim();
@@ -935,6 +964,38 @@ Do not introduce new topics.`;
       setLicenseMessage(`${t("settings.license.messageBlocked", "License action could not be completed.")} ${message}`, "bad");
       push(`ERROR(License ${actionName}): ${message}`);
       return null;
+    }
+  }
+
+  async function canStartWithLicense() {
+    const blockedMessage = t("settings.license.messageStartBlocked", "Start blocked. Start a free trial or activate a license to use Direct Realtime.");
+    const api = getLicenseApi();
+    if (!api) {
+      renderLicenseState({ ...(currentLicenseState || {}), status: "error" });
+      focusLicenseView(blockedMessage, "bad");
+      push("ERROR(License guard): license API unavailable; Direct Realtime start blocked.");
+      return false;
+    }
+
+    try {
+      const result = await api.getState();
+      const state = getLicenseStatePayload(result);
+      const status = normalizeLicenseStatus(state.status);
+      if (status === "trial_active" || status === "licensed") {
+        renderLicenseState(state);
+        return true;
+      }
+
+      renderLicenseState(state);
+      focusLicenseView(blockedMessage, "warn");
+      push(`WARN(License guard): Direct Realtime start blocked; license status is ${status}.`);
+      return false;
+    } catch (e) {
+      const message = e?.message || String(e);
+      renderLicenseState({ ...(currentLicenseState || {}), status: "error", lastError: message });
+      focusLicenseView(blockedMessage, "bad");
+      push(`ERROR(License guard): ${message}; Direct Realtime start blocked.`);
+      return false;
     }
   }
 
@@ -3369,6 +3430,9 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
       push("Direct Realtime is already running.");
       return;
     }
+
+    // Licensing enforcement is intentionally disabled during current development/packaging validation.
+    // License UI remains active, but Start Direct Realtime is not license-gated yet.
 
     directRealtimeStarting = true;
     clearCostGuardNotice();

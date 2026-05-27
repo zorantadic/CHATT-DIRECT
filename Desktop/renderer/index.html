@@ -45,6 +45,7 @@
       </header>
     <div class="nav">
       <button id="navVoice" type="button" class="active" data-i18n="nav.voice">Voice</button>
+      <button id="navLicense" type="button" data-i18n="nav.license">License</button>
       <button id="navSettings" type="button" data-i18n="nav.settings">Settings</button>
       <button id="navInstructions" type="button" data-i18n="nav.scenarios">Scenarios</button>
     </div>
@@ -168,6 +169,55 @@
         </div>
 
       </div>
+    <!-- ===========================
+         LICENSE VIEW
+         =========================== -->
+    <div id="viewLicense" class="view">
+      <div class="licensePage">
+        <div class="licensePageHeader">
+          <div>
+            <h2 data-i18n="license.page.title">License &amp; Trial</h2>
+            <div class="panelSub" data-i18n="license.page.subtitle">Start a trial, activate a license, or refresh license status.</div>
+          </div>
+        </div>
+
+        <section class="glassPanel settingsCard licenseSettingsCard">
+          <div class="settingsCardHeader">
+            <div class="settingsIcon settingsIconShield" aria-hidden="true"></div>
+            <div>
+              <h3 data-i18n="settings.license.title">License &amp; Trial</h3>
+              <div class="panelSub" data-i18n="settings.license.subtitle">Manage trial and license activation</div>
+            </div>
+            <span id="settingsLicenseBadge" class="settingsBadge warn" data-i18n="settings.license.badgeUnregistered">Not Registered</span>
+          </div>
+
+          <div class="statusTable settingsStatusTable">
+            <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.status">Status</span><span id="licenseStatus" class="statusValue">Not Registered</span></div>
+            <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.registeredEmail">Registered Email</span><span id="licenseRegisteredEmail" class="statusValue">Not provided</span></div>
+            <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.trialExpires">Trial Expires</span><span id="licenseTrialExpiresAt" class="statusValue">Not provided</span></div>
+            <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.lastValidated">Last Validated</span><span id="licenseLastValidatedAt" class="statusValue">Not provided</span></div>
+            <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.offlineGrace">Offline Grace</span><span id="licenseOfflineGraceExpiresAt" class="statusValue">Not provided</span></div>
+          </div>
+
+          <div class="settingsGrid licenseInputGrid">
+            <label for="licenseEmail" data-i18n="settings.license.email">Email</label>
+            <input id="licenseEmail" type="email" autocomplete="email" placeholder="you@example.com" data-i18n-placeholder="settings.license.emailPlaceholder" />
+
+            <label for="licenseKey" data-i18n="settings.license.licenseKey">License Key</label>
+            <input id="licenseKey" type="password" autocomplete="off" placeholder="Paste license key" data-i18n-placeholder="settings.license.licenseKeyPlaceholder" />
+          </div>
+
+          <div class="settingsActions licenseActions">
+            <button id="btnLicenseStartTrial" type="button" disabled data-i18n="settings.license.startTrial">Start 3-day Trial</button>
+            <button id="btnLicenseActivate" class="primaryAction" type="button" disabled data-i18n="settings.license.activate">Activate License</button>
+            <button id="btnLicenseValidate" type="button" data-i18n="settings.license.validate">Refresh License Status</button>
+            <button id="btnLicenseCheckout" type="button" data-i18n="settings.license.checkout">Buy License</button>
+          </div>
+          <div id="licenseMessage" class="settingsStatusText"></div>
+        </section>
+      </div>
+    </div>
+
     <!-- ===========================
          SETTINGS VIEW
          =========================== -->
@@ -396,41 +446,6 @@
               <button id="btnUpdateDownload" class="primaryAction" type="button" data-i18n="settings.update.download">Download Update</button>
               <button id="btnUpdateRestart" type="button" data-i18n="settings.update.restart">Restart and Install</button>
             </div>
-          </section>
-
-          <section class="glassPanel settingsCard licenseSettingsCard">
-            <div class="settingsCardHeader">
-              <div class="settingsIcon settingsIconShield" aria-hidden="true"></div>
-              <div>
-                <h3 data-i18n="settings.license.title">License &amp; Trial</h3>
-                <div class="panelSub" data-i18n="settings.license.subtitle">Manage trial and license activation</div>
-              </div>
-              <span id="settingsLicenseBadge" class="settingsBadge warn" data-i18n="settings.license.badgeUnregistered">Not Registered</span>
-            </div>
-
-            <div class="statusTable settingsStatusTable">
-              <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.status">Status</span><span id="licenseStatus" class="statusValue">Not Registered</span></div>
-              <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.registeredEmail">Registered Email</span><span id="licenseRegisteredEmail" class="statusValue">Not provided</span></div>
-              <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.trialExpires">Trial Expires</span><span id="licenseTrialExpiresAt" class="statusValue">Not provided</span></div>
-              <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.lastValidated">Last Validated</span><span id="licenseLastValidatedAt" class="statusValue">Not provided</span></div>
-              <div class="statusRow"><span class="statusLabel" data-i18n="settings.license.offlineGrace">Offline Grace</span><span id="licenseOfflineGraceExpiresAt" class="statusValue">Not provided</span></div>
-            </div>
-
-            <div class="settingsGrid licenseInputGrid">
-              <label for="licenseEmail" data-i18n="settings.license.email">Email</label>
-              <input id="licenseEmail" type="email" autocomplete="email" placeholder="you@example.com" data-i18n-placeholder="settings.license.emailPlaceholder" />
-
-              <label for="licenseKey" data-i18n="settings.license.licenseKey">License Key</label>
-              <input id="licenseKey" type="password" autocomplete="off" placeholder="Paste license key" data-i18n-placeholder="settings.license.licenseKeyPlaceholder" />
-            </div>
-
-            <div class="settingsActions licenseActions">
-              <button id="btnLicenseStartTrial" type="button" disabled data-i18n="settings.license.startTrial">Start 3-day Trial</button>
-              <button id="btnLicenseActivate" class="primaryAction" type="button" disabled data-i18n="settings.license.activate">Activate License</button>
-              <button id="btnLicenseValidate" type="button" data-i18n="settings.license.validate">Refresh License Status</button>
-              <button id="btnLicenseCheckout" type="button" data-i18n="settings.license.checkout">Buy License</button>
-            </div>
-            <div id="licenseMessage" class="settingsStatusText"></div>
           </section>
 
           <section class="glassPanel settingsCard diagnosticsCard">

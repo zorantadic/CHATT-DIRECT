@@ -243,7 +243,7 @@ body[data-session="reconnecting"] .statusDot {
 
 .nav {
   display: grid;
-  grid-template-columns: repeat(3, minmax(140px, 220px));
+  grid-template-columns: repeat(4, minmax(140px, 220px));
   gap: 0;
   margin: 0 0 18px;
   padding: 0;
@@ -765,6 +765,17 @@ body[data-activity="speaking"] .waveform {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+}
+
+.licensePage {
+  display: grid;
+  gap: 16px;
+  max-width: 920px;
+}
+
+.licensePageHeader h2 {
+  margin: 0 0 4px;
+  font-size: 26px;
 }
 
 .settingsCard {
@@ -1777,6 +1788,7 @@ pre#log {
   .providerGrid,
   .settingsActions,
   .providerActions,
+  .licenseActions,
   .twoActions,
   .diagnosticsLayout {
     grid-template-columns: 1fr;
