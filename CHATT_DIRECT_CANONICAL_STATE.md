@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-25
+Last updated: 2026-05-27
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -42,6 +42,7 @@ multilingual UI display support
 header language selector synchronized with Settings language selector
 floating vertical Mini Control Window when the main app is minimized
 deterministic Electron UI zoom factor 0.7 for main Desktop window
+licensing/trial commercial access layer planned outside Direct Realtime audio/runtime path
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -995,6 +996,7 @@ Final packaged app direction:
 <AppData>\CHATT-DIRECT\instructions.json
 <AppData>\CHATT-DIRECT\provider_config.local.json
 <AppData>\CHATT-DIRECT\logs\
+<AppData>\CHATT-DIRECT\license_state.json
 ```
 
 ---
@@ -1210,6 +1212,7 @@ Final writable runtime files:
 <AppData>\CHATT-DIRECT\instructions.json
 <AppData>\CHATT-DIRECT\scenario_presets.local.json
 <AppData>\CHATT-DIRECT\logs\
+<AppData>\CHATT-DIRECT\license_state.json
 ```
 
 Final read-only install/template files:
@@ -1416,6 +1419,9 @@ Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
 Customer brings their own provider/API key
+License unlocks application usage only; it does not include AI usage or hosted AI service access
+3-day trial and license validation are planned through a hosted licensing backend
+Payment provider is not finalized; Paddle and Lemon Squeezy remain candidates
 ```
 
 Product value should focus on:
@@ -1818,4 +1824,289 @@ Future investigation boundary:
 Do not treat model self-hearing as proven unless a controlled test shows speech_started during assistant-only output with no external source audio.
 If system loopback isolation is required later, evaluate native Windows Application Loopback / Process Loopback with "exclude our app process tree" as a separate architecture phase.
 If false barge-in while assistant audio is active remains frequent, evaluate a controlled 300-500 ms delayed/manual barge-in strategy only after the current runtime-audio-state baseline remains stable.
+```
+
+---
+
+## 25. License / Trial Commercial Access Baseline
+
+Licensing/trial is a planned commercial access layer for AnswerDesk AI / CHATT Direct.
+
+Product/commercial model:
+
+```text
+AnswerDesk AI is a downloadable Windows desktop application.
+AnswerDesk AI is not a hosted AI SaaS service.
+AnswerDesk AI does not sell AI model access, AI endpoint access, conversation hosting, or AI usage credits.
+The customer brings their own AI provider/API key.
+The license unlocks the desktop application only.
+Provider/API usage remains owned and paid by the customer directly through their selected provider.
+```
+
+Payment provider decision:
+
+```text
+Payment provider is not finalized.
+Paddle remains a candidate.
+Lemon Squeezy remains a candidate.
+Do not treat Paddle as the decided primary provider.
+Do not treat Lemon Squeezy as inactive.
+Desktop code must not be hardcoded to Paddle or Lemon Squeezy.
+Desktop must communicate only with the hosted licensing backend.
+Payment provider webhooks will be handled by the hosted licensing backend later.
+```
+
+Authority rule:
+
+```text
+The hosted licensing backend is authoritative for trial/license status.
+The Desktop app may cache license status locally.
+The local cache is not authoritative.
+The 3-day free trial must be registered with the hosted licensing backend.
+After trial expiration, Start Direct Realtime must be blocked.
+Settings and License UI must remain accessible after trial expiration.
+```
+
+Planned local cache file:
+
+```text
+<AppData>\CHATT-DIRECT\license_state.json
+```
+
+Planned license cache schema:
+
+```json
+{
+  "schemaVersion": 1,
+  "installId": "uuid",
+  "deviceHash": null,
+  "status": "unregistered",
+  "registeredEmail": null,
+  "licenseId": null,
+  "activationId": null,
+  "licenseKeyLast4": null,
+  "trialStartedAt": null,
+  "trialExpiresAt": null,
+  "licenseActivatedAt": null,
+  "lastValidatedAt": null,
+  "serverTime": null,
+  "offlineGraceExpiresAt": null,
+  "lastError": null,
+  "checkoutUrl": null,
+  "paymentProvider": null,
+  "statusSignature": null
+}
+```
+
+Raw license keys should not be stored locally unless explicitly approved after security review.
+
+Runtime allow/block rule:
+
+```text
+Allow Start Direct Realtime only when license status is:
+- trial_active
+- licensed
+
+Block Start Direct Realtime when license status is:
+- unregistered
+- trial_expired
+- license_invalid
+- license_revoked
+- offline_grace
+- error
+```
+
+MVP decisions:
+
+```text
+Trial duration: 3 days.
+Trial email: required for Start 3-day trial.
+Offline grace: not implemented in MVP; keep offlineGraceExpiresAt schema field for future use.
+Payment provider: TBD; Paddle and Lemon Squeezy remain candidates.
+```
+
+Hosted licensing backend direction:
+
+```text
+Licensing backend must be separate from backend/app_realtime.py.
+backend/app_realtime.py remains the local Direct Realtime runtime backend only.
+The hosted licensing backend handles trial start, license activation, license validation, payment webhooks, and license records.
+Electron main process should perform hosted licensing API calls over HTTPS.
+Renderer should call only window.electronAPI.license.*.
+```
+
+Planned hosted API endpoints:
+
+```text
+POST /v1/license/trial/start
+POST /v1/license/validate
+POST /v1/license/activate
+POST /v1/license/deactivate      # later
+POST /v1/webhooks/paddle         # later, if Paddle is selected or supported
+POST /v1/webhooks/lemon          # later, if Lemon Squeezy is selected or supported
+```
+
+Provider-neutral checkout rule:
+
+```text
+Buy License opens a configurable checkoutUrl or pricing page.
+checkoutUrl may be returned by the hosted licensing backend and cached in license_state.json.
+Desktop must not assume Paddle-specific or Lemon-specific checkout behavior.
+```
+
+Desktop implementation phases:
+
+```text
+Phase 0 - Baseline and decisions
+  Confirm <AppData>\CHATT-DIRECT\ as the canonical packaged user data folder.
+  Confirm trial email is required.
+  Confirm offline grace is deferred for MVP.
+  Confirm payment provider remains TBD between Paddle and Lemon Squeezy.
+
+Phase 1 - Local license state foundation
+  Files: Desktop/electron/main.cjs, Desktop/electron/preload.cjs
+  Add license_state.json under AppData/userData.
+  Add Electron main process license state helpers and IPC handlers.
+  Add preload bridge window.electronAPI.license.*.
+  No UI, no Start guard, no hosted backend integration yet.
+
+Phase 2 - License & Trial UI in Settings
+  Files: Desktop/renderer/index.html, Desktop/renderer/styles.css, Desktop/renderer/locales/ui.json, Desktop/renderer/renderer.js
+  Add License & Trial Settings card.
+  Add local rendering of current cached license state.
+  Add Start Trial, Activate License, Refresh License Status, and Buy License controls.
+  No Start Direct Realtime guard yet.
+
+Phase 3 - Start Direct Realtime guard
+  File: Desktop/renderer/renderer.js
+  Add guard inside startDirectRealtime() immediately after the already-running check and before any audio/WebSocket startup.
+  Allow Start only for trial_active and licensed.
+  Block all other statuses with a clear UI/log message.
+  Mini Control Window Start must remain routed through the existing main renderer Start flow, so the same guard applies.
+
+Phase 4 - Hosted licensing backend skeleton
+  New hosted service, separate from backend/app_realtime.py.
+  Implement provider-neutral trial/start, validate, and activate API contract.
+  Do not implement Paddle/Lemon webhooks yet unless explicitly approved.
+
+Phase 5 - Desktop integration with hosted licensing backend
+  Electron main process calls the hosted licensing backend over HTTPS.
+  Renderer still calls only window.electronAPI.license.*.
+  Cache successful backend responses to license_state.json.
+
+Phase 6 - Trial expiration UX
+  Show remaining trial time.
+  Show Trial active / Trial expired / License active / License invalid states.
+  Keep Settings and License UI accessible after trial expiration.
+
+Phase 7 - Provider-neutral checkout
+  Add configurable checkoutUrl behavior.
+  Buy License opens checkoutUrl or pricing page.
+  Keep provider-neutral until Paddle vs Lemon Squeezy decision is finalized.
+
+Phase 8 - Payment provider webhooks
+  Add Paddle and/or Lemon Squeezy webhook handling in hosted licensing backend after provider decision.
+  Normalize payment events into internal license records.
+
+Phase 9 - Advanced licensing features
+  Offline grace.
+  Device activation limits.
+  Deactivate/reset device.
+  Revocation handling.
+  Admin dashboard.
+  Customer portal.
+```
+
+Planned DOM IDs:
+
+```text
+settingsLicenseBadge
+licenseStatus
+licenseRegisteredEmail
+licenseTrialExpiresAt
+licenseLastValidatedAt
+licenseOfflineGraceExpiresAt
+licenseEmail
+licenseKey
+btnLicenseStartTrial
+btnLicenseActivate
+btnLicenseValidate
+btnLicenseCheckout
+licenseMessage
+```
+
+Planned Electron IPC names:
+
+```text
+license:get-state
+license:start-trial
+license:validate
+license:activate
+license:get-cache-path
+license:open-checkout
+```
+
+Planned preload API:
+
+```javascript
+electronAPI.license.getState()
+electronAPI.license.startTrial({ email })
+electronAPI.license.validate()
+electronAPI.license.activate({ email, licenseKey })
+electronAPI.license.getCachePath()
+electronAPI.license.openCheckout()
+```
+
+Start guard placement:
+
+```text
+The guard must be placed in Desktop/renderer/renderer.js inside startDirectRealtime().
+It must run immediately after the existing already-running check.
+It must run before refreshOutputDevicesUI(), ensurePlayback(), connectRealtime(), getLoopbackStream(), AudioContext creation, or AudioWorklet loading.
+```
+
+This license/trial layer must not change:
+
+```text
+Direct Realtime audio flow
+loopback/system/browser audio capture
+microphone prohibition
+provider adapters
+Realtime WebSocket path
+scenario preset logic
+selected output/headphones playback
+Cost Guard behavior
+Mini Control Window runtime ownership
+instruction refresh WebSocket message shape
+backend/app_realtime.py Realtime bridge behavior
+```
+
+Validation after each Desktop licensing phase:
+
+```powershell
+cd C:\Projects\chatt-direct
+node --check .\Desktop\electron\main.cjs
+node --check .\Desktop\electron\preload.cjs
+node --check .\Desktop\renderer\renderer.js
+git status --short
+git diff --name-status
+git diff --stat
+```
+
+For Python/backend changes only:
+
+```powershell
+cd C:\Projects\chatt-direct
+python -m py_compile backend/app_realtime.py backend/provider_config.py
+```
+
+Runtime validation requirements:
+
+```text
+Unregistered/trial_expired/license_invalid/license_revoked/error status blocks Start Direct Realtime before audio/WebSocket startup.
+trial_active and licensed allow existing Direct Realtime behavior unchanged.
+Settings and License UI remain accessible in all statuses.
+Mini Control Window Start follows the same guard because it routes through the main renderer Start flow.
+No microphone input is introduced.
+No provider/session.update/audio/playback/scenario/Cost Guard behavior is changed by licensing.
 ```
