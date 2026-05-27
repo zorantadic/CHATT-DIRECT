@@ -785,7 +785,9 @@ Packaging requirement:
 
 ```text
 Before packaged Windows app release, provider settings must be stored in a user-specific app data location, not inside the installed app folder or repository backend folder.
-Target pattern: Electron app.getPath("userData") / Windows AppData.
+Target pattern: Electron userData.
+Development mode / npm start: C:\Projects\chatt-direct\Desktop\.electron-userdata\
+Packaged/installed Windows app: C:\Users\zoran\AppData\Roaming\answerdesk-ai\
 ```
 
 Language control:
@@ -992,11 +994,11 @@ Final packaged app direction:
 
 ```text
 <install>\backend\scenario_presets.json
-<AppData>\CHATT-DIRECT\scenario_presets.local.json
-<AppData>\CHATT-DIRECT\instructions.json
-<AppData>\CHATT-DIRECT\provider_config.local.json
-<AppData>\CHATT-DIRECT\logs\
-<AppData>\CHATT-DIRECT\license_state.json
+<Electron userData>\scenario_presets.local.json
+<Electron userData>\instructions.json
+<Electron userData>\provider_config.local.json
+<Electron userData>\license_state.json
+<Electron userData>\logs\
 ```
 
 ---
@@ -1184,35 +1186,45 @@ Do not remove or bypass existing main renderer Start/Stop/Refresh/Repeat/Reset h
 
 ---
 
-## 19. Phase 2 AppData / userData Runtime Plan
+## 19. Phase 2 Electron userData Runtime Plan
 
 Phase 2 objective:
 
 ```text
-Move packaged runtime/user state out of the install/backend folder and into Electron userData/AppData.
+Move packaged runtime/user state out of the install/backend folder and into Electron userData.
 ```
 
 Canonical packaged app storage rule:
 
 ```text
 Install folder = read-only application files and default templates.
-AppData/userData = writable runtime/user files.
+Electron userData = writable runtime/user files.
 ```
 
-Final user data folder:
+Canonical writable runtime folder:
 
 ```text
-<AppData>\CHATT-DIRECT\
+<Electron userData>\
+```
+
+Confirmed examples:
+
+```text
+Development mode / npm start:
+C:\Projects\chatt-direct\Desktop\.electron-userdata\
+
+Packaged/installed Windows app:
+C:\Users\zoran\AppData\Roaming\answerdesk-ai\
 ```
 
 Final writable runtime files:
 
 ```text
-<AppData>\CHATT-DIRECT\provider_config.local.json
-<AppData>\CHATT-DIRECT\instructions.json
-<AppData>\CHATT-DIRECT\scenario_presets.local.json
-<AppData>\CHATT-DIRECT\logs\
-<AppData>\CHATT-DIRECT\license_state.json
+<Electron userData>\provider_config.local.json
+<Electron userData>\instructions.json
+<Electron userData>\scenario_presets.local.json
+<Electron userData>\license_state.json
+<Electron userData>\logs\
 ```
 
 Final read-only install/template files:
@@ -1228,9 +1240,9 @@ Final read-only install/template files:
 Backend must receive explicit paths from Electron in packaged runtime:
 
 ```env
-PROVIDER_CONFIG_PATH=<AppData>\CHATT-DIRECT\provider_config.local.json
-INSTRUCTIONS_PATH=<AppData>\CHATT-DIRECT\instructions.json
-SCENARIO_PRESETS_PATH=<AppData>\CHATT-DIRECT\scenario_presets.local.json
+PROVIDER_CONFIG_PATH=<Electron userData>\provider_config.local.json
+INSTRUCTIONS_PATH=<Electron userData>\instructions.json
+SCENARIO_PRESETS_PATH=<Electron userData>\scenario_presets.local.json
 PROVIDER_CAPABILITIES_PATH=<install>\backend\provider_capabilities.json
 PROVIDER_CONFIG_EXAMPLE_PATH=<install>\backend\provider_config.local.example.json
 SCENARIO_PRESETS_DEFAULT_PATH=<install>\backend\scenario_presets.json
@@ -1241,7 +1253,7 @@ Electron main process responsibilities for Phase 2:
 
 ```text
 Use app.getPath("userData") as the root user data location.
-Create the CHATT-DIRECT user runtime folder if needed.
+Electron main process uses Electron userData as the writable runtime folder.
 Seed or migrate runtime files before backend startup.
 Start the backend as a child process with explicit env path variables.
 Keep backend stdout/stderr available for diagnostics/logging.
@@ -1305,11 +1317,11 @@ Desktop starts backend or gives a clear backend startup error.
 Provider config API works through localhost.
 Instructions API works through localhost.
 Scenarios API works through localhost.
-POST /v1/scenarios/instruction persists userInstruction to AppData scenario runtime state.
-DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from AppData scenario runtime state.
-Provider save writes to AppData.
-Instruction save writes to AppData.
-Scenario local runtime file is created in AppData if missing.
+POST /v1/scenarios/instruction persists userInstruction to Electron userData scenario runtime state.
+DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from Electron userData scenario runtime state.
+Provider save writes to Electron userData.
+Instruction save writes to Electron userData.
+Scenario local runtime file is created in Electron userData if missing.
 Start Direct Realtime still works.
 Stop Direct Realtime still works.
 Reset session guard still works.
@@ -1870,7 +1882,15 @@ Settings and License UI must remain accessible after trial expiration.
 Planned local cache file:
 
 ```text
-<AppData>\CHATT-DIRECT\license_state.json
+<Electron userData>\license_state.json
+```
+
+Runtime storage note:
+
+```text
+license_state.json follows the same Electron userData runtime pattern.
+In development it is created under Desktop\.electron-userdata\.
+In packaged Windows it is expected under AppData\Roaming\answerdesk-ai\.
 ```
 
 Planned license cache schema:
@@ -1958,14 +1978,14 @@ Desktop implementation phases:
 
 ```text
 Phase 0 - Baseline and decisions
-  Confirm <AppData>\CHATT-DIRECT\ as the canonical packaged user data folder.
+  Confirm Electron userData as the canonical writable runtime folder. Confirmed examples: development uses C:\Projects\chatt-direct\Desktop\.electron-userdata\, packaged Windows uses C:\Users\zoran\AppData\Roaming\answerdesk-ai\.
   Confirm trial email is required.
   Confirm offline grace is deferred for MVP.
   Confirm payment provider remains TBD between Paddle and Lemon Squeezy.
 
 Phase 1 - Local license state foundation
   Files: Desktop/electron/main.cjs, Desktop/electron/preload.cjs
-  Add license_state.json under AppData/userData.
+  Add license_state.json under Electron userData.
   Add Electron main process license state helpers and IPC handlers.
   Add preload bridge window.electronAPI.license.*.
   No UI, no Start guard, no hosted backend integration yet.

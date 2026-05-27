@@ -5,7 +5,7 @@ Use this file before making project-wide decisions about architecture, repositor
 For detailed Direct Realtime runtime implementation details, use:
 ```text
 CHATT_DIRECT_CANONICAL_STATE.md
-<AppData>\CHATT-DIRECT\license_state.json   # planned writable licensing/trial cache, not committed
+<Electron userData>\license_state.json   # writable licensing/trial cache, not committed
 ```
 ---
 1. Project Identity
@@ -871,10 +871,11 @@ Final packaged app direction:
 
 ```text
 <install>\backend\scenario_presets.json = read-only default templates
-<AppData>\CHATT-DIRECT\scenario_presets.local.json = user-editable runtime scenario file
-<AppData>\CHATT-DIRECT\instructions.json = user-editable active instructions file
-<AppData>\CHATT-DIRECT\provider_config.local.json = user provider configuration
-<AppData>\CHATT-DIRECT\logs\ = runtime logs
+<Electron userData>\scenario_presets.local.json = user-editable runtime scenario file
+<Electron userData>\instructions.json = user-editable active instructions file
+<Electron userData>\provider_config.local.json = user provider configuration
+<Electron userData>\license_state.json = licensing/trial cache
+<Electron userData>\logs\ = runtime logs
 ```
 
 Do not:
@@ -1139,7 +1140,7 @@ Do not remove main renderer ownership of Start/Stop/Refresh/Repeat/Reset.
 ```
 
 ---
-19. Phase 2 AppData / userData Runtime Plan
+19. Phase 2 Electron userData Runtime Plan
 
 Phase 2 objective:
 
@@ -1151,22 +1152,33 @@ Canonical storage rule:
 
 ```text
 Install folder = static application code and read-only templates
-AppData/userData = writable user/runtime state
+Electron userData = writable user/runtime state
 ```
 
-Final packaged runtime user folder:
+Canonical writable runtime folder:
 
 ```text
-<AppData>\CHATT-DIRECT\
+<Electron userData>\
+```
+
+Confirmed examples:
+
+```text
+Development mode / npm start:
+C:\Projects\chatt-direct\Desktop\.electron-userdata\
+
+Packaged/installed Windows app:
+C:\Users\zoran\AppData\Roaming\answerdesk-ai\
 ```
 
 Final user/runtime files:
 
 ```text
-<AppData>\CHATT-DIRECT\provider_config.local.json
-<AppData>\CHATT-DIRECT\instructions.json
-<AppData>\CHATT-DIRECT\scenario_presets.local.json
-<AppData>\CHATT-DIRECT\logs\
+<Electron userData>\provider_config.local.json
+<Electron userData>\instructions.json
+<Electron userData>\scenario_presets.local.json
+<Electron userData>\license_state.json
+<Electron userData>\logs\
 ```
 
 Static install/backend files:
@@ -1182,9 +1194,9 @@ Static install/backend files:
 Required backend path variables for packaged runtime:
 
 ```env
-PROVIDER_CONFIG_PATH=<AppData>\CHATT-DIRECT\provider_config.local.json
-INSTRUCTIONS_PATH=<AppData>\CHATT-DIRECT\instructions.json
-SCENARIO_PRESETS_PATH=<AppData>\CHATT-DIRECT\scenario_presets.local.json
+PROVIDER_CONFIG_PATH=<Electron userData>\provider_config.local.json
+INSTRUCTIONS_PATH=<Electron userData>\instructions.json
+SCENARIO_PRESETS_PATH=<Electron userData>\scenario_presets.local.json
 PROVIDER_CAPABILITIES_PATH=<install>\backend\provider_capabilities.json
 PROVIDER_CONFIG_EXAMPLE_PATH=<install>\backend\provider_config.local.example.json
 SCENARIO_PRESETS_DEFAULT_PATH=<install>\backend\scenario_presets.json
@@ -1195,7 +1207,7 @@ Phase 2 implementation direction:
 
 ```text
 Electron main process owns app.getPath("userData").
-Electron main process creates the CHATT-DIRECT user data folder.
+Electron main process uses Electron userData as the writable runtime folder.
 Electron main process seeds or migrates required user/runtime files when missing.
 Electron main process starts the backend child process with explicit env path variables.
 Renderer continues to use localhost endpoints.
@@ -1205,16 +1217,16 @@ Backend continues to own provider, instruction, scenario, and Realtime APIs.
 First-run behavior:
 
 ```text
-If provider_config.local.json does not exist in AppData:
+If provider_config.local.json does not exist in Electron userData:
   seed from provider_config.local.example.json or allow backend fallback to template.
 
-If instructions.json does not exist in AppData:
+If instructions.json does not exist in Electron userData:
   seed from current instruction default logic or migrate existing Electron local instruction store.
 
-If scenario_presets.local.json does not exist in AppData:
+If scenario_presets.local.json does not exist in Electron userData:
   seed from install/backend/scenario_presets.json.
 
-Do not overwrite existing AppData files on application update.
+Do not overwrite existing Electron userData files on application update.
 ```
 
 Important risk to resolve in Phase 2:
@@ -1225,7 +1237,7 @@ The current local/dev app can have two instruction stores:
 - backend instructions.json
 
 Phase 2 must unify final packaged runtime around:
-<AppData>\CHATT-DIRECT\instructions.json
+<Electron userData>\instructions.json
 ```
 
 Phase 2 must not change:
@@ -1262,11 +1274,11 @@ Desktop starts backend or reports a clear backend startup failure.
 GET /v1/provider/config works through localhost.
 GET /v1/instructions works through localhost.
 GET /v1/scenarios works through localhost.
-POST /v1/scenarios/instruction persists userInstruction to AppData scenario runtime state.
-DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from AppData scenario runtime state.
-Provider save persists to AppData.
-Instruction save persists to AppData.
-Scenario local file is created in AppData if missing.
+POST /v1/scenarios/instruction persists userInstruction to Electron userData scenario runtime state.
+DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from Electron userData scenario runtime state.
+Provider save persists to Electron userData.
+Instruction save persists to Electron userData.
+Scenario local file is created in Electron userData if missing.
 Start Direct Realtime still works with loopback/system audio only.
 ```
 
@@ -1761,7 +1773,15 @@ Settings and License UI must remain accessible after trial expiration.
 Planned local licensing cache:
 
 ```text
-<AppData>\CHATT-DIRECT\license_state.json
+<Electron userData>\license_state.json
+```
+
+Runtime storage note:
+
+```text
+license_state.json follows the same Electron userData runtime pattern.
+In development it is created under Desktop\.electron-userdata\.
+In packaged Windows it is expected under AppData\Roaming\answerdesk-ai\.
 ```
 
 Planned license cache schema:
@@ -1858,14 +1878,14 @@ Planned implementation phases:
 
 ```text
 Phase 0 - Baseline and decisions
-  Confirm <AppData>\CHATT-DIRECT\ as the canonical packaged user data folder.
+  Confirm Electron userData as the canonical writable runtime folder. Confirmed examples: development uses C:\Projects\chatt-direct\Desktop\.electron-userdata\, packaged Windows uses C:\Users\zoran\AppData\Roaming\answerdesk-ai\.
   Confirm trial email is required.
   Confirm offline grace is deferred for MVP.
   Confirm payment provider remains TBD between Paddle and Lemon Squeezy.
 
 Phase 1 - Local license state foundation
   Files: Desktop/electron/main.cjs, Desktop/electron/preload.cjs
-  Add license_state.json under AppData/userData.
+  Add license_state.json under Electron userData.
   Add Electron main process license state helpers and IPC handlers.
   Add preload bridge window.electronAPI.license.*.
   No UI, no Start guard, no hosted backend integration yet.
