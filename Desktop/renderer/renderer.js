@@ -377,6 +377,19 @@ Do not introduce new topics.`;
   const btnUpdateCheck = $("btnUpdateCheck");
   const btnUpdateDownload = $("btnUpdateDownload");
   const btnUpdateRestart = $("btnUpdateRestart");
+  const settingsLicenseBadgeEl = $("settingsLicenseBadge");
+  const licenseStatusEl = $("licenseStatus");
+  const licenseRegisteredEmailEl = $("licenseRegisteredEmail");
+  const licenseTrialExpiresAtEl = $("licenseTrialExpiresAt");
+  const licenseLastValidatedAtEl = $("licenseLastValidatedAt");
+  const licenseOfflineGraceExpiresAtEl = $("licenseOfflineGraceExpiresAt");
+  const licenseEmailEl = $("licenseEmail");
+  const licenseKeyEl = $("licenseKey");
+  const btnLicenseStartTrial = $("btnLicenseStartTrial");
+  const btnLicenseActivate = $("btnLicenseActivate");
+  const btnLicenseValidate = $("btnLicenseValidate");
+  const btnLicenseCheckout = $("btnLicenseCheckout");
+  const licenseMessageEl = $("licenseMessage");
   // Instructions page elements
   const instrBackendEl = $("instrBackend");
   const instrCurrentEl = $("instrCurrent");
@@ -408,6 +421,7 @@ Do not introduce new topics.`;
   const instrTargetEl = $("instrTarget");
 
   let currentUpdateState = null;
+  let currentLicenseState = null;
   let lastUpdateProgressLogPercent = null;
 
   const SUPPORTED_DISPLAY_LANGUAGES = ["en", "es", "de", "sr"];
@@ -535,6 +549,7 @@ Do not introduce new topics.`;
       try { updateCostGuardSummaryUi(); } catch {}
     }
     try { renderUpdateState(currentUpdateState || { status: "idle" }); } catch {}
+    try { renderLicenseState(currentLicenseState || { status: "not_registered" }); } catch {}
   }
 
   function setDisplayLanguage(lang) {
@@ -757,6 +772,172 @@ Do not introduce new topics.`;
     }
   }
 
+  function getLicenseApi() {
+    const api = window.electronAPI?.license;
+    if (
+      !api ||
+      typeof api.getState !== "function" ||
+      typeof api.startTrial !== "function" ||
+      typeof api.activate !== "function" ||
+      typeof api.validate !== "function" ||
+      typeof api.openCheckout !== "function"
+    ) {
+      return null;
+    }
+    return api;
+  }
+
+  function getLicenseStatePayload(input) {
+    if (input && typeof input === "object" && input.state && typeof input.state === "object") {
+      return input.state;
+    }
+    return input && typeof input === "object" ? input : {};
+  }
+
+  function normalizeLicenseStatus(status) {
+    const raw = (status || "").toString().trim();
+    return raw || "not_registered";
+  }
+
+  function licenseStatusMeta(status) {
+    const normalized = normalizeLicenseStatus(status);
+    if (normalized === "trial_active") {
+      return { state: "ok", text: t("settings.license.badgeTrialActive", "Trial Active") };
+    }
+    if (normalized === "licensed") {
+      return { state: "ok", text: t("settings.license.badgeLicensed", "Licensed") };
+    }
+    if (normalized === "trial_expired") {
+      return { state: "bad", text: t("settings.license.badgeExpired", "Trial Expired") };
+    }
+    if (normalized === "license_invalid") {
+      return { state: "bad", text: t("settings.license.badgeInvalid", "License Invalid") };
+    }
+    if (normalized === "license_revoked") {
+      return { state: "bad", text: t("settings.license.badgeRevoked", "License Revoked") };
+    }
+    if (normalized === "offline_grace") {
+      return { state: "warn", text: t("settings.license.badgeOfflineGrace", "Offline Grace") };
+    }
+    if (normalized === "error") {
+      return { state: "bad", text: t("settings.license.badgeError", "License Error") };
+    }
+    return { state: "warn", text: t("settings.license.badgeUnregistered", "Not Registered") };
+  }
+
+  function licenseValueText(value) {
+    const text = (value || "").toString().trim();
+    return text || t("common.notProvided", "Not provided");
+  }
+
+  function licenseDateText(value) {
+    const text = (value || "").toString().trim();
+    if (!text) return t("common.notProvided", "Not provided");
+    const d = new Date(text);
+    if (Number.isNaN(d.getTime())) return text;
+    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function localizeLicenseMessage(message) {
+    const text = (message || "").toString().trim();
+    if (!text) return "";
+    const lower = text.toLowerCase();
+    if (lower.includes("hosted licensing backend") && lower.includes("not connected")) {
+      return t("settings.license.messageBackendNotConnected", "Hosted licensing backend is not connected yet.");
+    }
+    if (lower.includes("checkout url") && lower.includes("not configured")) {
+      return t("settings.license.messageCheckoutMissing", "Checkout URL is not configured yet.");
+    }
+    return text;
+  }
+
+  function setLicenseMessage(message, state) {
+    if (!licenseMessageEl) return;
+    licenseMessageEl.classList.remove("ok", "warn", "bad");
+    if (state) licenseMessageEl.classList.add(state);
+    licenseMessageEl.textContent = message || "";
+  }
+
+  function updateLicenseButtons() {
+    const email = (licenseEmailEl?.value || "").toString().trim();
+    const licenseKey = (licenseKeyEl?.value || "").toString().trim();
+    if (btnLicenseStartTrial) btnLicenseStartTrial.disabled = !email;
+    if (btnLicenseActivate) btnLicenseActivate.disabled = !licenseKey;
+    if (btnLicenseValidate) btnLicenseValidate.disabled = false;
+    if (btnLicenseCheckout) btnLicenseCheckout.disabled = false;
+  }
+
+  function renderLicenseState(input) {
+    const state = getLicenseStatePayload(input);
+    currentLicenseState = state;
+    const meta = licenseStatusMeta(state.status);
+    const registeredEmail = (state.registeredEmail || "").toString().trim();
+
+    setSettingsBadge(settingsLicenseBadgeEl, meta.state, meta.text);
+    if (licenseStatusEl) licenseStatusEl.textContent = meta.text;
+    if (licenseRegisteredEmailEl) licenseRegisteredEmailEl.textContent = licenseValueText(registeredEmail);
+    if (licenseTrialExpiresAtEl) licenseTrialExpiresAtEl.textContent = licenseDateText(state.trialExpiresAt);
+    if (licenseLastValidatedAtEl) licenseLastValidatedAtEl.textContent = licenseDateText(state.lastValidatedAt);
+    if (licenseOfflineGraceExpiresAtEl) licenseOfflineGraceExpiresAtEl.textContent = licenseDateText(state.offlineGraceExpiresAt);
+    if (licenseEmailEl && registeredEmail && !licenseEmailEl.value.trim()) {
+      licenseEmailEl.value = registeredEmail;
+    }
+    updateLicenseButtons();
+  }
+
+  async function refreshLicenseState() {
+    const api = getLicenseApi();
+    if (!api) {
+      renderLicenseState({ status: "error" });
+      setLicenseMessage(t("settings.license.messageBlocked", "License action could not be completed."), "bad");
+      push("ERROR(License state): license API unavailable");
+      return null;
+    }
+
+    try {
+      const state = await api.getState();
+      renderLicenseState(state);
+      if (state?.lastError) {
+        setLicenseMessage(localizeLicenseMessage(state.lastError), "warn");
+      }
+      return state;
+    } catch (e) {
+      const message = e?.message || String(e);
+      renderLicenseState({ ...(currentLicenseState || {}), status: "error", lastError: message });
+      setLicenseMessage(`${t("settings.license.messageBlocked", "License action could not be completed.")} ${message}`, "bad");
+      push(`ERROR(License state): ${message}`);
+      return null;
+    }
+  }
+
+  async function runLicenseAction(actionName, run) {
+    const api = getLicenseApi();
+    if (!api) {
+      renderLicenseState({ status: "error" });
+      setLicenseMessage(t("settings.license.messageBlocked", "License action could not be completed."), "bad");
+      push(`ERROR(License ${actionName}): license API unavailable`);
+      return null;
+    }
+
+    try {
+      const result = await run(api);
+      const state = getLicenseStatePayload(result);
+      const ok = result && typeof result === "object" && result.ok === false ? false : true;
+      const meta = licenseStatusMeta(state.status);
+      const message = localizeLicenseMessage(result?.message) || (ok ? t("common.success", "Success") : t("settings.license.messageBlocked", "License action could not be completed."));
+      renderLicenseState(state);
+      setLicenseMessage(message, ok ? "ok" : meta.state === "bad" ? "bad" : "warn");
+      push(`License ${actionName}: ${ok ? "completed" : "not completed"}`);
+      return result;
+    } catch (e) {
+      const message = e?.message || String(e);
+      renderLicenseState({ ...(currentLicenseState || {}), status: "error", lastError: message });
+      setLicenseMessage(`${t("settings.license.messageBlocked", "License action could not be completed.")} ${message}`, "bad");
+      push(`ERROR(License ${actionName}): ${message}`);
+      return null;
+    }
+  }
+
   function readScenarioText(lang, scenarioId, field) {
     const value = localeCatalogs?.scenarios?.[lang]?.[scenarioId]?.[field];
     return typeof value === "string" && value.trim() ? value : "";
@@ -895,6 +1076,8 @@ function loadInstructionsTargetIntoInputs() {
   loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   loadProviderUi().catch(() => {});
   refreshUpdateState().catch(() => {});
+  updateLicenseButtons();
+  refreshLicenseState().catch(() => {});
   try {
     const updates = getUpdateApi();
     if (updates && typeof updates.onStatus === "function") {
@@ -3378,6 +3561,40 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   if (btnUpdateRestart) btnUpdateRestart.addEventListener("click", () => {
     runUpdateAction("restart", (updates) => updates.quitAndInstall());
   });
+  if (licenseEmailEl) licenseEmailEl.addEventListener("input", updateLicenseButtons);
+  if (licenseKeyEl) licenseKeyEl.addEventListener("input", updateLicenseButtons);
+  if (btnLicenseStartTrial) {
+    btnLicenseStartTrial.addEventListener("click", () => {
+      const email = (licenseEmailEl?.value || "").toString().trim();
+      updateLicenseButtons();
+      if (!email) return;
+      runLicenseAction("start trial", (license) => license.startTrial({ email }));
+    });
+  }
+  if (btnLicenseActivate) {
+    btnLicenseActivate.addEventListener("click", () => {
+      const email = (licenseEmailEl?.value || "").toString().trim();
+      const licenseKey = (licenseKeyEl?.value || "").toString().trim();
+      updateLicenseButtons();
+      if (!licenseKey) return;
+
+      runLicenseAction("activate", (license) => license.activate({ email, licenseKey }))
+        .finally(() => {
+          if (licenseKeyEl) licenseKeyEl.value = "";
+          updateLicenseButtons();
+        });
+    });
+  }
+  if (btnLicenseValidate) {
+    btnLicenseValidate.addEventListener("click", () => {
+      runLicenseAction("validate", (license) => license.validate());
+    });
+  }
+  if (btnLicenseCheckout) {
+    btnLicenseCheckout.addEventListener("click", () => {
+      runLicenseAction("checkout", (license) => license.openCheckout());
+    });
+  }
   if (btnUseLocalBackend) btnUseLocalBackend.addEventListener("click", () => {
     applyLocalBackendPreset();
   });
