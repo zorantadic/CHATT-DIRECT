@@ -9,6 +9,7 @@ const {
 const {
   getLicenseRecord,
   getLicenseTableClient,
+  recordToResponseFields,
   resolveLicenseStatus,
   saveLicenseRecord,
 } = require("../shared/storage");
@@ -58,34 +59,12 @@ app.http("licenseValidate", {
         return okResponse({
           status: record.status,
           message,
-          registeredEmail: record.registeredEmail,
-          installId: record.installId,
-          trialStartedAt: record.trialStartedAt,
-          trialExpiresAt: record.trialExpiresAt,
-          licenseId: record.licenseId,
-          activationId: record.activationId,
-          licenseKeyLast4: record.licenseKeyLast4,
-          licenseActivatedAt: record.licenseActivatedAt,
-          lastValidatedAt: record.lastValidatedAt,
-          offlineGraceExpiresAt: record.offlineGraceExpiresAt,
-          checkoutUrl: record.checkoutUrl,
-          paymentProvider: record.paymentProvider,
+          ...recordToResponseFields(record),
         });
       }
 
       return failResponse(200, record.status, message, {
-        registeredEmail: record.registeredEmail,
-        installId: record.installId,
-        trialStartedAt: record.trialStartedAt,
-        trialExpiresAt: record.trialExpiresAt,
-        licenseId: record.licenseId,
-        activationId: record.activationId,
-        licenseKeyLast4: record.licenseKeyLast4,
-        licenseActivatedAt: record.licenseActivatedAt,
-        lastValidatedAt: record.lastValidatedAt,
-        offlineGraceExpiresAt: record.offlineGraceExpiresAt,
-        checkoutUrl: record.checkoutUrl,
-        paymentProvider: record.paymentProvider,
+        ...recordToResponseFields(record),
       });
     } catch (err) {
       return failResponse(

@@ -11,6 +11,9 @@ const {
   createBaseRecord,
   getLicenseRecord,
   getLicenseTableClient,
+  hashEmail,
+  normalizeEmail,
+  recordToResponseFields,
   resolveLicenseStatus,
   saveLicenseRecord,
 } = require("../shared/storage");
@@ -34,28 +37,22 @@ app.http("licenseActivate", {
     if (!client) return errorResponse;
 
     const now = serverTime();
+    const normalizedEmail = normalizeEmail(email.value);
+    const emailHash = hashEmail(normalizedEmail);
+    const deviceHash = String(body && body.deviceHash ? body.deviceHash : "").trim();
     try {
       const existing = await getLicenseRecord(client, installId.value);
       const record = existing || createBaseRecord(installId.value);
-      record.registeredEmail = email.value;
+      record.registeredEmail = normalizedEmail;
+      if (emailHash) record.emailHash = emailHash;
+      if (deviceHash) record.deviceHash = deviceHash;
       record.licenseKeyLast4 = licenseKey.value.slice(-4);
       record.status = existing ? resolveLicenseStatus(existing, now) : LicenseStatuses.NOT_REGISTERED;
       record.updatedAt = now;
       await saveLicenseRecord(client, record);
 
       return failResponse(200, record.status, "Payment-backed license activation is not connected yet.", {
-        registeredEmail: record.registeredEmail,
-        installId: record.installId,
-        trialStartedAt: record.trialStartedAt,
-        trialExpiresAt: record.trialExpiresAt,
-        licenseId: record.licenseId,
-        activationId: record.activationId,
-        licenseKeyLast4: record.licenseKeyLast4,
-        licenseActivatedAt: record.licenseActivatedAt,
-        lastValidatedAt: record.lastValidatedAt,
-        offlineGraceExpiresAt: record.offlineGraceExpiresAt,
-        checkoutUrl: record.checkoutUrl,
-        paymentProvider: record.paymentProvider,
+        ...recordToResponseFields(record),
       });
     } catch (err) {
       return failResponse(

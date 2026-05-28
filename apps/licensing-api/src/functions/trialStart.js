@@ -8,12 +8,18 @@ const {
   validationErrorResponse,
 } = require("../shared/validation");
 const {
-  addTrialDuration,
-  createBaseRecord,
+  DEVICE_LOOKUP_PARTITION_KEY,
+  EMAIL_LOOKUP_PARTITION_KEY,
+  createTrialRecord,
   getLicenseRecord,
+  getRecordByLookup,
   getLicenseTableClient,
+  normalizeEmail,
+  hashEmail,
+  recordToResponseFields,
   resolveLicenseStatus,
   saveLicenseRecord,
+  saveLookupRecord,
 } = require("../shared/storage");
 
 app.http("licenseTrialStart", {
@@ -32,59 +38,54 @@ app.http("licenseTrialStart", {
     if (!client) return errorResponse;
 
     const now = serverTime();
+    const normalizedEmail = normalizeEmail(email.value);
+    const emailHash = hashEmail(normalizedEmail);
+    const deviceHash = String(body && body.deviceHash ? body.deviceHash : "").trim();
     try {
       let record = await getLicenseRecord(client, installId.value);
+      if (!record && emailHash) {
+        record = await getRecordByLookup(client, EMAIL_LOOKUP_PARTITION_KEY, emailHash);
+      }
+      if (!record && deviceHash) {
+        record = await getRecordByLookup(client, DEVICE_LOOKUP_PARTITION_KEY, deviceHash);
+      }
+
       if (!record) {
-        record = createBaseRecord(installId.value);
-        record.registeredEmail = email.value;
-        record.status = LicenseStatuses.TRIAL_ACTIVE;
-        record.trialStartedAt = now;
-        record.trialExpiresAt = addTrialDuration(now);
-        record.lastValidatedAt = now;
-        record.updatedAt = now;
+        record = createTrialRecord(installId.value, normalizedEmail, deviceHash, now);
         await saveLicenseRecord(client, record);
+        await saveLookupRecord(client, EMAIL_LOOKUP_PARTITION_KEY, emailHash, record.installId, now);
+        if (deviceHash) {
+          await saveLookupRecord(client, DEVICE_LOOKUP_PARTITION_KEY, deviceHash, record.installId, now);
+        }
         return okResponse({
           status: LicenseStatuses.TRIAL_ACTIVE,
           message: "Trial started.",
-          registeredEmail: record.registeredEmail,
-          installId: record.installId,
-          trialStartedAt: record.trialStartedAt,
-          trialExpiresAt: record.trialExpiresAt,
-          licenseId: record.licenseId,
-          activationId: record.activationId,
-          licenseKeyLast4: record.licenseKeyLast4,
-          licenseActivatedAt: record.licenseActivatedAt,
-          lastValidatedAt: record.lastValidatedAt,
-          offlineGraceExpiresAt: record.offlineGraceExpiresAt,
-          checkoutUrl: record.checkoutUrl,
-          paymentProvider: record.paymentProvider,
+          ...recordToResponseFields(record),
         });
       }
 
-      record.registeredEmail = email.value;
+      if (!record.registeredEmail) record.registeredEmail = normalizedEmail;
+      if (!record.emailHash && emailHash) record.emailHash = emailHash;
+      if (!record.deviceHash && deviceHash) record.deviceHash = deviceHash;
       record.status = resolveLicenseStatus(record, now);
       record.lastValidatedAt = now;
       record.updatedAt = now;
       await saveLicenseRecord(client, record);
+      if (emailHash) {
+        await saveLookupRecord(client, EMAIL_LOOKUP_PARTITION_KEY, emailHash, record.installId, now);
+      }
+      if (deviceHash) {
+        await saveLookupRecord(client, DEVICE_LOOKUP_PARTITION_KEY, deviceHash, record.installId, now);
+      }
 
       const isActive = record.status === LicenseStatuses.TRIAL_ACTIVE;
+      const isLicensed = record.status === LicenseStatuses.LICENSED;
       const responseBody = {
         status: record.status,
-        message: isActive ? "Trial is active." : "Trial has expired.",
-        registeredEmail: record.registeredEmail,
-        installId: record.installId,
-        trialStartedAt: record.trialStartedAt,
-        trialExpiresAt: record.trialExpiresAt,
-        licenseId: record.licenseId,
-        activationId: record.activationId,
-        licenseKeyLast4: record.licenseKeyLast4,
-        licenseActivatedAt: record.licenseActivatedAt,
-        lastValidatedAt: record.lastValidatedAt,
-        offlineGraceExpiresAt: record.offlineGraceExpiresAt,
-        checkoutUrl: record.checkoutUrl,
-        paymentProvider: record.paymentProvider,
+        message: isLicensed ? "License is active." : isActive ? "Trial is active." : "Trial has expired.",
+        ...recordToResponseFields(record),
       };
-      return isActive
+      return (isActive || isLicensed)
         ? okResponse(responseBody)
         : failResponse(200, record.status, responseBody.message, responseBody);
     } catch (err) {

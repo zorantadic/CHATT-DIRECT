@@ -1,8 +1,11 @@
+const crypto = require("crypto");
 const { TableClient } = require("@azure/data-tables");
 const { failResponse, serverTime } = require("./responses");
 const { LicenseStatuses } = require("./licenseStatuses");
 
 const LICENSE_PARTITION_KEY = "license";
+const EMAIL_LOOKUP_PARTITION_KEY = "email";
+const DEVICE_LOOKUP_PARTITION_KEY = "device";
 const LICENSE_TABLE_NAME = process.env.LICENSE_TABLE_NAME || "LicenseRecords";
 const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -12,6 +15,19 @@ function isoAt(timestamp) {
 
 function addTrialDuration(isoString) {
   return isoAt(Date.parse(isoString) + TRIAL_DURATION_MS);
+}
+
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+}
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function hashEmail(email) {
+  const normalized = normalizeEmail(email);
+  return normalized ? sha256Hex(normalized) : "";
 }
 
 function getLicenseTableClient() {
@@ -49,6 +65,8 @@ function toRecord(entity) {
   return {
     installId: entity.rowKey || entity.RowKey || null,
     registeredEmail: entity.registeredEmail || null,
+    emailHash: entity.emailHash || null,
+    deviceHash: entity.deviceHash || null,
     status: entity.status || LicenseStatuses.NOT_REGISTERED,
     trialStartedAt: entity.trialStartedAt || null,
     trialExpiresAt: entity.trialExpiresAt || null,
@@ -70,6 +88,8 @@ function createBaseRecord(installId) {
   return {
     installId,
     registeredEmail: null,
+    emailHash: null,
+    deviceHash: null,
     status: LicenseStatuses.NOT_REGISTERED,
     trialStartedAt: null,
     trialExpiresAt: null,
@@ -84,6 +104,21 @@ function createBaseRecord(installId) {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function createTrialRecord(installId, email, deviceHash, now) {
+  const normalizedEmail = normalizeEmail(email);
+  const record = createBaseRecord(installId);
+  record.registeredEmail = normalizedEmail || null;
+  record.emailHash = normalizedEmail ? hashEmail(normalizedEmail) : null;
+  record.deviceHash = String(deviceHash || "").trim() || null;
+  record.status = LicenseStatuses.TRIAL_ACTIVE;
+  record.trialStartedAt = now;
+  record.trialExpiresAt = addTrialDuration(now);
+  record.lastValidatedAt = now;
+  record.createdAt = now;
+  record.updatedAt = now;
+  return record;
 }
 
 function resolveLicenseStatus(record, now = serverTime()) {
@@ -106,6 +141,8 @@ function toEntity(record) {
     rowKey: record.installId,
     installId: record.installId,
     registeredEmail: record.registeredEmail || null,
+    emailHash: record.emailHash || null,
+    deviceHash: record.deviceHash || null,
     status: record.status || LicenseStatuses.NOT_REGISTERED,
     trialStartedAt: record.trialStartedAt || null,
     trialExpiresAt: record.trialExpiresAt || null,
@@ -119,6 +156,23 @@ function toEntity(record) {
     paymentProvider: record.paymentProvider || null,
     createdAt: record.createdAt || null,
     updatedAt: record.updatedAt || null,
+  };
+}
+
+function recordToResponseFields(record) {
+  return {
+    registeredEmail: record ? record.registeredEmail : null,
+    installId: record ? record.installId : null,
+    trialStartedAt: record ? record.trialStartedAt : null,
+    trialExpiresAt: record ? record.trialExpiresAt : null,
+    licenseId: record ? record.licenseId : null,
+    activationId: record ? record.activationId : null,
+    licenseKeyLast4: record ? record.licenseKeyLast4 : null,
+    licenseActivatedAt: record ? record.licenseActivatedAt : null,
+    lastValidatedAt: record ? record.lastValidatedAt : null,
+    offlineGraceExpiresAt: record ? record.offlineGraceExpiresAt : null,
+    checkoutUrl: record ? record.checkoutUrl : null,
+    paymentProvider: record ? record.paymentProvider : null,
   };
 }
 
@@ -138,15 +192,57 @@ async function saveLicenseRecord(client, record) {
   return record;
 }
 
+async function getLookupRecord(client, partitionKey, rowKey) {
+  const normalizedRowKey = String(rowKey || "").trim();
+  if (!normalizedRowKey) return null;
+  try {
+    return await client.getEntity(partitionKey, normalizedRowKey);
+  } catch (err) {
+    if (err && err.statusCode === 404) return null;
+    throw err;
+  }
+}
+
+async function saveLookupRecord(client, partitionKey, rowKey, installId, now) {
+  const normalizedRowKey = String(rowKey || "").trim();
+  if (!normalizedRowKey) return null;
+  const existing = await getLookupRecord(client, partitionKey, normalizedRowKey);
+  const entity = {
+    partitionKey,
+    rowKey: normalizedRowKey,
+    installId,
+    createdAt: existing && existing.createdAt ? existing.createdAt : now,
+    updatedAt: now,
+  };
+  await client.upsertEntity(entity, "Merge");
+  return entity;
+}
+
+async function getRecordByLookup(client, partitionKey, rowKey) {
+  const lookup = await getLookupRecord(client, partitionKey, rowKey);
+  if (!lookup || !lookup.installId) return null;
+  return getLicenseRecord(client, lookup.installId);
+}
+
 module.exports = {
   LICENSE_PARTITION_KEY,
+  EMAIL_LOOKUP_PARTITION_KEY,
+  DEVICE_LOOKUP_PARTITION_KEY,
   LICENSE_TABLE_NAME,
   TRIAL_DURATION_MS,
   isoAt,
   addTrialDuration,
+  sha256Hex,
+  normalizeEmail,
+  hashEmail,
   getLicenseTableClient,
   createBaseRecord,
+  createTrialRecord,
   resolveLicenseStatus,
+  recordToResponseFields,
   getLicenseRecord,
   saveLicenseRecord,
+  getLookupRecord,
+  saveLookupRecord,
+  getRecordByLookup,
 };
