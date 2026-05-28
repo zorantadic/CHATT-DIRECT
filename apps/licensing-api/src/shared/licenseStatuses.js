@@ -6,6 +6,7 @@ const LicenseStatuses = Object.freeze({
   LICENSE_INVALID: "license_invalid",
   LICENSE_REVOKED: "license_revoked",
   OFFLINE_GRACE: "offline_grace",
+  RATE_LIMITED: "rate_limited",
   ERROR: "error",
 });
 

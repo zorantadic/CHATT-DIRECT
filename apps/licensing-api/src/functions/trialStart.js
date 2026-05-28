@@ -10,6 +10,7 @@ const {
 const {
   DEVICE_LOOKUP_PARTITION_KEY,
   EMAIL_LOOKUP_PARTITION_KEY,
+  checkTrialStartRateLimit,
   createTrialRecord,
   getLicenseRecord,
   getRecordByLookup,
@@ -42,6 +43,15 @@ app.http("licenseTrialStart", {
     const emailHash = hashEmail(normalizedEmail);
     const deviceHash = String(body && body.deviceHash ? body.deviceHash : "").trim();
     try {
+      const rateLimit = await checkTrialStartRateLimit(client, emailHash, deviceHash, now);
+      if (!rateLimit.allowed) {
+        return failResponse(
+          200,
+          LicenseStatuses.RATE_LIMITED,
+          "Too many trial attempts. Please try again later."
+        );
+      }
+
       let record = await getLicenseRecord(client, installId.value);
       if (!record && emailHash) {
         record = await getRecordByLookup(client, EMAIL_LOOKUP_PARTITION_KEY, emailHash);

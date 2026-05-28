@@ -6,8 +6,11 @@ const { LicenseStatuses } = require("./licenseStatuses");
 const LICENSE_PARTITION_KEY = "license";
 const EMAIL_LOOKUP_PARTITION_KEY = "email";
 const DEVICE_LOOKUP_PARTITION_KEY = "device";
+const RATE_LIMIT_PARTITION_KEY = "rate";
 const LICENSE_TABLE_NAME = process.env.LICENSE_TABLE_NAME || "LicenseRecords";
 const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
+const TRIAL_START_RATE_LIMIT_MAX = 10;
+const TRIAL_START_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 function isoAt(timestamp) {
   return new Date(timestamp).toISOString();
@@ -224,12 +227,90 @@ async function getRecordByLookup(client, partitionKey, rowKey) {
   return getLicenseRecord(client, lookup.installId);
 }
 
+async function getRateLimitRecord(client, rowKey) {
+  return getLookupRecord(client, RATE_LIMIT_PARTITION_KEY, rowKey);
+}
+
+async function checkAndIncrementRateLimit(client, rowKey, now) {
+  const normalizedRowKey = String(rowKey || "").trim();
+  if (!normalizedRowKey) return { allowed: true };
+
+  const existing = await getRateLimitRecord(client, normalizedRowKey);
+  const nowMs = Date.parse(now);
+
+  if (!existing) {
+    await client.upsertEntity({
+      partitionKey: RATE_LIMIT_PARTITION_KEY,
+      rowKey: normalizedRowKey,
+      count: 1,
+      windowStartedAt: now,
+      updatedAt: now,
+    }, "Merge");
+    return { allowed: true };
+  }
+
+  const windowStartedAt = existing.windowStartedAt || now;
+  const windowMs = Date.parse(windowStartedAt);
+  const windowExpired = !Number.isFinite(windowMs) || (nowMs - windowMs) >= TRIAL_START_RATE_LIMIT_WINDOW_MS;
+  const currentCount = Number(existing.count) || 0;
+
+  if (windowExpired) {
+    await client.upsertEntity({
+      partitionKey: RATE_LIMIT_PARTITION_KEY,
+      rowKey: normalizedRowKey,
+      count: 1,
+      windowStartedAt: now,
+      updatedAt: now,
+    }, "Merge");
+    return { allowed: true };
+  }
+
+  if (currentCount >= TRIAL_START_RATE_LIMIT_MAX) {
+    await client.upsertEntity({
+      partitionKey: RATE_LIMIT_PARTITION_KEY,
+      rowKey: normalizedRowKey,
+      count: currentCount,
+      windowStartedAt,
+      updatedAt: now,
+    }, "Merge");
+    return {
+      allowed: false,
+      status: LicenseStatuses.RATE_LIMITED,
+      message: "Too many trial attempts. Please try again later.",
+    };
+  }
+
+  await client.upsertEntity({
+    partitionKey: RATE_LIMIT_PARTITION_KEY,
+    rowKey: normalizedRowKey,
+    count: currentCount + 1,
+    windowStartedAt,
+    updatedAt: now,
+  }, "Merge");
+  return { allowed: true };
+}
+
+async function checkTrialStartRateLimit(client, emailHash, deviceHash, now) {
+  const emailKey = emailHash ? `trialStart:email:${emailHash}` : "";
+  const emailResult = await checkAndIncrementRateLimit(client, emailKey, now);
+  if (!emailResult.allowed) return emailResult;
+
+  const deviceKey = deviceHash ? `trialStart:device:${deviceHash}` : "";
+  const deviceResult = await checkAndIncrementRateLimit(client, deviceKey, now);
+  if (!deviceResult.allowed) return deviceResult;
+
+  return { allowed: true };
+}
+
 module.exports = {
   LICENSE_PARTITION_KEY,
   EMAIL_LOOKUP_PARTITION_KEY,
   DEVICE_LOOKUP_PARTITION_KEY,
+  RATE_LIMIT_PARTITION_KEY,
   LICENSE_TABLE_NAME,
   TRIAL_DURATION_MS,
+  TRIAL_START_RATE_LIMIT_MAX,
+  TRIAL_START_RATE_LIMIT_WINDOW_MS,
   isoAt,
   addTrialDuration,
   sha256Hex,
@@ -245,4 +326,7 @@ module.exports = {
   getLookupRecord,
   saveLookupRecord,
   getRecordByLookup,
+  getRateLimitRecord,
+  checkAndIncrementRateLimit,
+  checkTrialStartRateLimit,
 };
