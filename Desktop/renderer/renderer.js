@@ -871,13 +871,30 @@ Do not introduce new topics.`;
       return t("settings.license.remainingExpired", "Expired");
     }
 
-    const remainingHours = Math.floor(remainingMs / (60 * 60 * 1000));
-    const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+    const hourMs = 60 * 60 * 1000;
+    const dayMs = 24 * hourMs;
+    const remainingHours = Math.floor(remainingMs / hourMs);
+    const remainingDays = Math.floor(remainingMs / dayMs);
+    const leftoverHours = Math.floor((remainingMs - remainingDays * dayMs) / hourMs);
 
-    if (remainingDays >= 2) {
-      return t("settings.license.remainingDays", "{count} days left").replace("{count}", String(remainingDays));
-    }
     if (remainingDays >= 1) {
+      if (leftoverHours >= 2) {
+        if (remainingDays === 1) {
+          return t("settings.license.remainingOneDayHours", "1 day {hours} hours left").replace("{hours}", String(leftoverHours));
+        }
+        return t("settings.license.remainingDaysHours", "{days} days {hours} hours left")
+          .replace("{days}", String(remainingDays))
+          .replace("{hours}", String(leftoverHours));
+      }
+      if (leftoverHours === 1) {
+        if (remainingDays === 1) {
+          return t("settings.license.remainingOneDayOneHour", "1 day 1 hour left");
+        }
+        return t("settings.license.remainingDaysOneHour", "{days} days 1 hour left").replace("{days}", String(remainingDays));
+      }
+      if (remainingDays >= 2) {
+        return t("settings.license.remainingDays", "{count} days left").replace("{count}", String(remainingDays));
+      }
       return t("settings.license.remainingOneDay", "1 day left");
     }
     if (remainingHours >= 2) {
