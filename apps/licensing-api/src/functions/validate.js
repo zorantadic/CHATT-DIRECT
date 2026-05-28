@@ -1,11 +1,17 @@
 const { app } = require("@azure/functions");
-const { failResponse } = require("../shared/responses");
+const { failResponse, okResponse, serverTime } = require("../shared/responses");
 const { LicenseStatuses } = require("../shared/licenseStatuses");
 const {
   readJsonBody,
   requireString,
   validationErrorResponse,
 } = require("../shared/validation");
+const {
+  getLicenseRecord,
+  getLicenseTableClient,
+  resolveLicenseStatus,
+  saveLicenseRecord,
+} = require("../shared/storage");
 
 app.http("licenseValidate", {
   methods: ["POST"],
@@ -16,13 +22,77 @@ app.http("licenseValidate", {
     const installId = requireString(body, "installId", "installId");
     if (!installId.ok) return validationErrorResponse(installId.message);
 
-    return failResponse(200, LicenseStatuses.NOT_REGISTERED, "Licensing storage is not connected yet.", {
-      installId: installId.value,
-      licenseId: null,
-      activationId: null,
-      offlineGraceExpiresAt: null,
-      checkoutUrl: null,
-      paymentProvider: null,
-    });
+    const { client, errorResponse } = getLicenseTableClient();
+    if (!client) return errorResponse;
+
+    const now = serverTime();
+    try {
+      const record = await getLicenseRecord(client, installId.value);
+      if (!record) {
+        return failResponse(200, LicenseStatuses.NOT_REGISTERED, "No license or trial record exists for this install.", {
+          installId: installId.value,
+          licenseId: null,
+          activationId: null,
+          offlineGraceExpiresAt: null,
+          checkoutUrl: null,
+          paymentProvider: null,
+        });
+      }
+
+      record.status = resolveLicenseStatus(record, now);
+      record.lastValidatedAt = now;
+      record.updatedAt = now;
+      await saveLicenseRecord(client, record);
+
+      const ok = record.status === LicenseStatuses.TRIAL_ACTIVE || record.status === LicenseStatuses.LICENSED;
+      const message =
+        record.status === LicenseStatuses.LICENSED
+          ? "License is active."
+          : record.status === LicenseStatuses.TRIAL_ACTIVE
+            ? "Trial is active."
+            : record.status === LicenseStatuses.TRIAL_EXPIRED
+              ? "Trial has expired."
+              : "No active license or trial record exists for this install.";
+
+      if (ok) {
+        return okResponse({
+          status: record.status,
+          message,
+          registeredEmail: record.registeredEmail,
+          installId: record.installId,
+          trialStartedAt: record.trialStartedAt,
+          trialExpiresAt: record.trialExpiresAt,
+          licenseId: record.licenseId,
+          activationId: record.activationId,
+          licenseKeyLast4: record.licenseKeyLast4,
+          licenseActivatedAt: record.licenseActivatedAt,
+          lastValidatedAt: record.lastValidatedAt,
+          offlineGraceExpiresAt: record.offlineGraceExpiresAt,
+          checkoutUrl: record.checkoutUrl,
+          paymentProvider: record.paymentProvider,
+        });
+      }
+
+      return failResponse(200, record.status, message, {
+        registeredEmail: record.registeredEmail,
+        installId: record.installId,
+        trialStartedAt: record.trialStartedAt,
+        trialExpiresAt: record.trialExpiresAt,
+        licenseId: record.licenseId,
+        activationId: record.activationId,
+        licenseKeyLast4: record.licenseKeyLast4,
+        licenseActivatedAt: record.licenseActivatedAt,
+        lastValidatedAt: record.lastValidatedAt,
+        offlineGraceExpiresAt: record.offlineGraceExpiresAt,
+        checkoutUrl: record.checkoutUrl,
+        paymentProvider: record.paymentProvider,
+      });
+    } catch (err) {
+      return failResponse(
+        500,
+        LicenseStatuses.ERROR,
+        `License storage operation failed: ${err && err.message ? err.message : err}`
+      );
+    }
   },
 });
