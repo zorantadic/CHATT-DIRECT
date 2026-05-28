@@ -395,6 +395,7 @@ Do not introduce new topics.`;
   const licenseStatusEl = $("licenseStatus");
   const licenseRegisteredEmailEl = $("licenseRegisteredEmail");
   const licenseTrialExpiresAtEl = $("licenseTrialExpiresAt");
+  const licenseTrialRemainingEl = $("licenseTrialRemaining");
   const licenseLastValidatedAtEl = $("licenseLastValidatedAt");
   const licenseOfflineGraceExpiresAtEl = $("licenseOfflineGraceExpiresAt");
   const licenseEmailEl = $("licenseEmail");
@@ -855,6 +856,39 @@ Do not introduce new topics.`;
     return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   }
 
+  function licenseTrialRemainingText(status, trialExpiresAt) {
+    const raw = (trialExpiresAt || "").toString().trim();
+    if (!raw) return t("common.notProvided", "Not provided");
+    if (normalizeLicenseStatus(status) === "trial_expired") {
+      return t("settings.license.remainingExpired", "Expired");
+    }
+
+    const expiresAt = new Date(raw);
+    if (Number.isNaN(expiresAt.getTime())) return raw;
+
+    const remainingMs = expiresAt.getTime() - Date.now();
+    if (remainingMs <= 0) {
+      return t("settings.license.remainingExpired", "Expired");
+    }
+
+    const remainingHours = Math.floor(remainingMs / (60 * 60 * 1000));
+    const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+
+    if (remainingDays >= 2) {
+      return t("settings.license.remainingDays", "{count} days left").replace("{count}", String(remainingDays));
+    }
+    if (remainingDays >= 1) {
+      return t("settings.license.remainingOneDay", "1 day left");
+    }
+    if (remainingHours >= 2) {
+      return t("settings.license.remainingHours", "{count} hours left").replace("{count}", String(remainingHours));
+    }
+    if (remainingHours >= 1) {
+      return t("settings.license.remainingOneHour", "1 hour left");
+    }
+    return t("settings.license.remainingLessThanHour", "Less than 1 hour left");
+  }
+
   function localizeLicenseMessage(message) {
     const text = (message || "").toString().trim();
     if (!text) return "";
@@ -909,6 +943,7 @@ Do not introduce new topics.`;
     if (licenseStatusEl) licenseStatusEl.textContent = meta.text;
     if (licenseRegisteredEmailEl) licenseRegisteredEmailEl.textContent = licenseValueText(registeredEmail);
     if (licenseTrialExpiresAtEl) licenseTrialExpiresAtEl.textContent = licenseDateText(state.trialExpiresAt);
+    if (licenseTrialRemainingEl) licenseTrialRemainingEl.textContent = licenseTrialRemainingText(state.status, state.trialExpiresAt);
     if (licenseLastValidatedAtEl) licenseLastValidatedAtEl.textContent = licenseDateText(state.lastValidatedAt);
     if (licenseOfflineGraceExpiresAtEl) licenseOfflineGraceExpiresAtEl.textContent = licenseDateText(state.offlineGraceExpiresAt);
     if (licenseEmailEl && registeredEmail && !licenseEmailEl.value.trim()) {
