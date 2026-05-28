@@ -86,6 +86,10 @@ const scenarioPresetsDefaultPath = path.join(backendInstallDir, "scenario_preset
 const backendPort = 50505;
 const backendStdoutLogPath = path.join(logsDir, "backend.log");
 const backendStderrLogPath = path.join(logsDir, "backend-error.log");
+const LICENSE_API_BASE_URL = (
+  process.env.LICENSE_API_BASE_URL ||
+  "https://answerdesk-licensing-api-dev.azurewebsites.net/api"
+).replace(/\/+$/, "");
 
 let backendProcess = null;
 let backendReady = false;
@@ -573,6 +577,99 @@ function writeLicenseStatePatch(patch) {
   return next;
 }
 
+function licenseApiUrl(pathname) {
+  const pathText = String(pathname || "").trim();
+  const suffix = pathText.startsWith("/") ? pathText : `/${pathText}`;
+  return `${LICENSE_API_BASE_URL}${suffix}`;
+}
+
+function getAppVersion() {
+  try {
+    return app.getVersion();
+  } catch (_) {
+    return "0.0.0";
+  }
+}
+
+async function callLicenseApi(pathname, payload) {
+  if (typeof fetch !== "function") {
+    throw new Error("Licensing API call failed: fetch is unavailable in this Electron runtime.");
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  let response;
+  try {
+    response = await fetch(licenseApiUrl(pathname), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {}),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err && err.name === "AbortError") {
+      throw new Error("Licensing API request timed out.");
+    }
+    throw new Error(`Licensing API request failed: ${err && err.message ? err.message : err}`);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  let result;
+  try {
+    result = await response.json();
+  } catch (err) {
+    throw new Error(`Licensing API returned invalid JSON: ${err && err.message ? err.message : err}`);
+  }
+
+  if (!response.ok) {
+    const message = nullableString(result && result.message) || `HTTP ${response.status}`;
+    throw new Error(`Licensing API request failed: ${message}`);
+  }
+
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    throw new Error("Licensing API returned an invalid response.");
+  }
+
+  return result;
+}
+
+function applyLicenseApiResult(result, fallbackPatch) {
+  const source = result && typeof result === "object" ? result : {};
+  const patch = {
+    ...(fallbackPatch && typeof fallbackPatch === "object" ? fallbackPatch : {}),
+    updatedAt: nowIso(),
+  };
+  const fields = [
+    "status",
+    "registeredEmail",
+    "licenseId",
+    "activationId",
+    "licenseKeyLast4",
+    "trialStartedAt",
+    "trialExpiresAt",
+    "licenseActivatedAt",
+    "lastValidatedAt",
+    "serverTime",
+    "offlineGraceExpiresAt",
+    "checkoutUrl",
+    "paymentProvider",
+    "statusSignature",
+  ];
+
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(source, field)) {
+      patch[field] = nullableString(source[field]);
+    }
+  }
+
+  patch.lastError = source.ok === false
+    ? (nullableString(source.message) || "Licensing API returned an unsuccessful response.")
+    : null;
+
+  return writeLicenseStatePatch(patch);
+}
+
 function defaultInstructionsText() {
   return (
     "Speak slowly and clearly.\n" +
@@ -682,23 +779,49 @@ ipcMain.handle("license:start-trial", async (_evt, payload) => {
     };
   }
 
-  const message = "Hosted licensing backend is not connected yet.";
-  const state = writeLicenseStatePatch({
-    status: "not_registered",
-    registeredEmail: email,
-    lastError: message,
-    updatedAt: nowIso(),
-  });
-  return { ok: false, message, state };
+  try {
+    const current = readLicenseState();
+    const result = await callLicenseApi("/v1/license/trial/start", {
+      email,
+      installId: current.installId,
+      deviceHash: current.deviceHash,
+      appVersion: getAppVersion(),
+      platform: process.platform,
+    });
+    const state = applyLicenseApiResult(result, { registeredEmail: email });
+    const message = nullableString(result.message) || "";
+    return { ok: result.ok === true, message, state };
+  } catch (err) {
+    const message = err && err.message ? err.message : String(err);
+    const state = writeLicenseStatePatch({
+      lastError: message,
+      updatedAt: nowIso(),
+    });
+    return { ok: false, message, state };
+  }
 });
 
 ipcMain.handle("license:validate", async () => {
-  const message = "Hosted licensing backend is not connected yet.";
-  const state = writeLicenseStatePatch({
-    lastError: message,
-    updatedAt: nowIso(),
-  });
-  return { ok: false, message, state };
+  try {
+    const current = readLicenseState();
+    const result = await callLicenseApi("/v1/license/validate", {
+      installId: current.installId,
+      deviceHash: current.deviceHash,
+      licenseId: current.licenseId,
+      activationId: current.activationId,
+      appVersion: getAppVersion(),
+    });
+    const state = applyLicenseApiResult(result);
+    const message = nullableString(result.message) || "";
+    return { ok: result.ok === true, message, state };
+  } catch (err) {
+    const message = err && err.message ? err.message : String(err);
+    const state = writeLicenseStatePatch({
+      lastError: message,
+      updatedAt: nowIso(),
+    });
+    return { ok: false, message, state };
+  }
 });
 
 ipcMain.handle("license:activate", async (_evt, payload) => {
@@ -711,16 +834,27 @@ ipcMain.handle("license:activate", async (_evt, payload) => {
     };
   }
 
-  const email = nullableString(payload && payload.email);
-  const message = "Hosted licensing backend is not connected yet.";
-  const state = writeLicenseStatePatch({
-    status: "not_registered",
-    registeredEmail: email || readLicenseState().registeredEmail,
-    licenseKeyLast4: licenseKey.slice(-4),
-    lastError: message,
-    updatedAt: nowIso(),
-  });
-  return { ok: false, message, state };
+  try {
+    const current = readLicenseState();
+    const email = nullableString(payload && payload.email) || current.registeredEmail;
+    const result = await callLicenseApi("/v1/license/activate", {
+      email,
+      licenseKey,
+      installId: current.installId,
+      deviceHash: current.deviceHash,
+      appVersion: getAppVersion(),
+    });
+    const state = applyLicenseApiResult(result, email ? { registeredEmail: email } : null);
+    const message = nullableString(result.message) || "";
+    return { ok: result.ok === true, message, state };
+  } catch (err) {
+    const message = err && err.message ? err.message : String(err);
+    const state = writeLicenseStatePatch({
+      lastError: message,
+      updatedAt: nowIso(),
+    });
+    return { ok: false, message, state };
+  }
 });
 
 ipcMain.handle("license:open-checkout", async () => {
