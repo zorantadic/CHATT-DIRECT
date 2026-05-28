@@ -1829,3 +1829,281 @@ pre#log {
 .scenarioDetailsPanel {
   display: none;
 }
+
+body[data-theme="light"] {
+  --bg-0: #eef4fb;
+  --bg-1: #f6f9fe;
+  --bg-2: #dde8f7;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: rgba(255, 255, 255, 0.94);
+  --line: rgba(113, 146, 193, 0.24);
+  --line-strong: rgba(45, 125, 255, 0.44);
+  --text: #16304f;
+  --muted: #587090;
+  --muted-2: #7286a1;
+  --shadow: 0 18px 42px rgba(72, 106, 151, 0.18);
+}
+
+body[data-theme="light"] {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(45, 125, 255, 0.14), transparent 34rem),
+    radial-gradient(circle at 84% 18%, rgba(67, 177, 255, 0.12), transparent 26rem),
+    linear-gradient(135deg, #edf4fb 0%, #f7fbff 46%, #e9f1fa 100%);
+}
+
+body[data-theme="light"]::before {
+  background:
+    linear-gradient(rgba(70, 114, 173, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(70, 114, 173, 0.05) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.35), transparent 80%);
+}
+
+body[data-theme="light"] button {
+  color: #173251;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 4px 14px rgba(82, 122, 174, 0.08);
+}
+
+body[data-theme="light"] button:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(248, 252, 255, 1), rgba(228, 239, 252, 1));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 8px 18px rgba(82, 122, 174, 0.12);
+}
+
+body[data-theme="light"] input,
+body[data-theme="light"] select,
+body[data-theme="light"] textarea {
+  color: #173251;
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(113, 146, 193, 0.3);
+}
+
+body[data-theme="light"] .glassPanel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(247,251,255,0.86));
+  box-shadow: var(--shadow);
+}
+
+body[data-theme="light"] .appBottomBar {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(240,247,255,0.88));
+  border-color: rgba(113, 146, 193, 0.24);
+}
+
+body[data-theme="light"] .settingsReadonly {
+  color: #173251;
+  background: rgba(255, 255, 255, 0.76);
+  border-color: rgba(113, 146, 193, 0.28);
+}
+
+body[data-theme="light"] .statusTable {
+  background: rgba(255, 255, 255, 0.52);
+  border-color: rgba(113, 146, 193, 0.22);
+}
+
+body[data-theme="light"] .settingsLogPanel {
+  border-top-color: rgba(113, 146, 193, 0.18);
+}
+
+body[data-theme="light"] .log {
+  color: #1b3553;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.94), rgba(241,247,255,0.94));
+  border-color: rgba(113, 146, 193, 0.24);
+}
+
+body[data-theme="light"] .scenarioCard {
+  color: #173251;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.94), rgba(241,247,255,0.88));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 10px 24px rgba(72, 106, 151, 0.1);
+}
+
+body[data-theme="light"] .scenarioCard:hover {
+  box-shadow: 0 14px 28px rgba(72, 106, 151, 0.12);
+}
+
+body[data-theme="light"] .scenarioLibraryPreview,
+body[data-theme="light"] .scenarioPreviewCard {
+  color: #173251;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(113, 146, 193, 0.34);
+  box-shadow: 0 10px 26px rgba(72, 106, 151, 0.1);
+}
+
+body[data-theme="light"] .instructionEditor,
+body[data-theme="light"] .currentInstructionsPanel textarea,
+body[data-theme="light"] .defaultInstructionsPanel textarea,
+body[data-theme="light"] textarea {
+  color: #173251;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(243,248,255,0.96));
+  border-color: rgba(113, 146, 193, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 6px 18px rgba(72, 106, 151, 0.06);
+}
+
+body[data-theme="light"] .selectedScenarioInfo,
+body[data-theme="light"] .scenarioSummary,
+body[data-theme="light"] .selectedScenarioPanel,
+body[data-theme="light"] .scenarioDetailRow,
+body[data-theme="light"] .scenarioPanel,
+body[data-theme="light"] .quickControls,
+body[data-theme="light"] .audioSafetyBox,
+body[data-theme="light"] .scenarioHero {
+  color: #173251;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.94), rgba(242,248,255,0.9));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 12px 28px rgba(72, 106, 151, 0.1);
+}
+
+body[data-theme="light"] .audioSafetyMessage {
+  color: #173251;
+  border-color: rgba(113, 146, 193, 0.24);
+  background: rgba(234, 242, 252, 0.92);
+}
+
+body[data-theme="light"] .audioSafetyMessage.ok {
+  color: #16613d;
+  border-color: rgba(51, 209, 122, 0.28);
+  background: rgba(221, 247, 232, 0.92);
+}
+
+body[data-theme="light"] .audioSafetyMessage.warn,
+body[data-theme="light"] .settingsInfoLine {
+  color: #6f5418;
+  border-color: rgba(232, 184, 78, 0.28);
+  background: rgba(255, 246, 221, 0.92);
+}
+
+body[data-theme="light"] .audioSafetyMessage.bad {
+  color: #9f2f3d;
+  border-color: rgba(255, 92, 108, 0.24);
+  background: rgba(255, 235, 238, 0.92);
+}
+
+body[data-theme="light"] .tabBar,
+body[data-theme="light"] .nav,
+body[data-theme="light"] .navTabs {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,247,255,0.9));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 10px 24px rgba(72, 106, 151, 0.08);
+}
+
+body[data-theme="light"] .tabBar::after {
+  background: linear-gradient(90deg, rgba(45, 125, 255, 0.08), rgba(45, 125, 255, 0));
+}
+
+body[data-theme="light"] .nav button {
+  color: #375170;
+  border-right-color: rgba(113, 146, 193, 0.18);
+}
+
+body[data-theme="light"] .nav button.active {
+  color: #173251;
+  background: linear-gradient(90deg, rgba(45, 125, 255, 0.18), rgba(45, 125, 255, 0.05));
+  box-shadow: inset 0 -3px 0 var(--blue), 0 10px 22px rgba(45, 125, 255, 0.12);
+}
+
+body[data-theme="light"] .scenarioHero h2,
+body[data-theme="light"] .scenarioHero .panelSub,
+body[data-theme="light"] .scenarioPreviewTitle,
+body[data-theme="light"] .scenarioDescriptionText,
+body[data-theme="light"] .scenarioPreviewMeta,
+body[data-theme="light"] .scenarioPreviewText,
+body[data-theme="light"] .scenarioDetailRow strong,
+body[data-theme="light"] .scenarioCardTitle,
+body[data-theme="light"] .scenarioCard .scenarioName,
+body[data-theme="light"] .scenarioCard .scenarioAction,
+body[data-theme="light"] .statusValue,
+body[data-theme="light"] .statusLabel,
+body[data-theme="light"] .settingsLabel,
+body[data-theme="light"] .settingsMuted,
+body[data-theme="light"] .panelSub,
+body[data-theme="light"] .mono,
+body[data-theme="light"] .appHeader .muted {
+  color: #173251;
+}
+
+body[data-theme="light"] .statusLabel,
+body[data-theme="light"] .settingsLabel,
+body[data-theme="light"] .panelSub,
+body[data-theme="light"] .settingsMuted,
+body[data-theme="light"] .appHeader .muted,
+body[data-theme="light"] .scenarioPreviewMeta,
+body[data-theme="light"] .scenarioPreviewText,
+body[data-theme="light"] .scenarioDetailRow span,
+body[data-theme="light"] .scenarioDescriptionText {
+  color: #587090;
+}
+
+body[data-theme="light"] .scenarioCardState,
+body[data-theme="light"] .scenarioCard .scenarioAction {
+  color: #2f67b1;
+}
+
+body[data-theme="light"] .scenarioCard.active {
+  border-color: rgba(45, 125, 255, 0.62);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(33, 212, 255, 0.12), transparent 7rem),
+    linear-gradient(180deg, rgba(225, 239, 255, 0.95), rgba(244, 249, 255, 0.96));
+  box-shadow: 0 0 0 1px rgba(45, 125, 255, 0.18), 0 14px 30px rgba(45, 125, 255, 0.12);
+}
+
+body[data-theme="light"] .scenarioCard.active .scenarioCardTitle,
+body[data-theme="light"] .scenarioCard.active .scenarioName {
+  color: #173251;
+}
+
+body[data-theme="light"] .scenarioCard.active .scenarioCardState,
+body[data-theme="light"] .scenarioBadge.active {
+  color: #16613d;
+}
+
+body[data-theme="light"] .scenarioBadge,
+body[data-theme="light"] .scenarioBadgeBlue {
+  color: #2f67b1;
+  border-color: rgba(45, 125, 255, 0.26);
+  background: rgba(226, 238, 255, 0.92);
+}
+
+body[data-theme="light"] .scenarioBadge.active,
+body[data-theme="light"] .scenarioBadgeGreen {
+  color: #16613d;
+  border-color: rgba(51, 209, 122, 0.24);
+  background: rgba(222, 247, 231, 0.92);
+}
+
+body[data-theme="light"] .scenarioBadge.dirty,
+body[data-theme="light"] .scenarioBadgeAmber {
+  color: #7c5c10;
+  border-color: rgba(232, 184, 78, 0.28);
+  background: rgba(255, 245, 214, 0.94);
+}
+
+body[data-theme="light"] .scenarioBadgeRed {
+  color: #9f2f3d;
+  border-color: rgba(255, 92, 108, 0.24);
+  background: rgba(255, 234, 238, 0.94);
+}
+
+body[data-theme="light"] .scenarioCardIcon {
+  border-color: rgba(82, 137, 204, 0.34);
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.14), rgba(33, 212, 255, 0.04)),
+    rgba(255, 255, 255, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+}
+
+body[data-theme="light"] .scenarioCard.active .scenarioCardIcon {
+  border-color: rgba(51, 209, 122, 0.34);
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.18), rgba(51, 209, 122, 0.08)),
+    rgba(244, 250, 255, 0.92);
+}
+
+body[data-theme="light"] .routeLine {
+  background: linear-gradient(90deg, rgba(76, 136, 214, 0.32), rgba(45, 125, 255, 0.68), rgba(76, 136, 214, 0.32));
+  box-shadow: 0 0 10px rgba(45, 125, 255, 0.12);
+}

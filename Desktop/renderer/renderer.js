@@ -23,11 +23,14 @@ const LS_PLAYBACK_VOLUME = "chatt.realtime.playbackVolume";
 const LS_INSTR_TARGET = "chatt.instructions.target"; // Direct Instructions target; always "realtime"
 const LS_INSTRUCTION_PRESET = "chatt.instructions.preset";
 const LS_DISPLAY_LANGUAGE = "chatt.displayLanguage";
+const LS_UI_THEME = "chatt.uiTheme";
 const LS_IDLE_GUARD_MINUTES = "chatt.costGuard.idleMinutes";
 const LS_IDLE_GUARD_WARN = "chatt.costGuard.warnBeforeStop";
 const LS_MAX_SESSION_MINUTES = "chatt.costGuard.maxSessionMinutes";
 const ALLOWED_REALTIME_RATES = ["1", "0.9", "0.8"];
 const DEFAULT_REALTIME_RATE = "1";
+const SUPPORTED_UI_THEMES = ["dark", "light"];
+const DEFAULT_UI_THEME = "dark";
   // HARD REQUIREMENT: Realtime audio must go to headphones only.
   const REALTIME_HEADPHONES_ONLY = true;
   const FIXED_RULES =
@@ -376,6 +379,7 @@ Do not introduce new topics.`;
   const providerStatusEl = $("providerStatus");
   const headerDisplayLanguageEl = $("headerDisplayLanguage");
   const displayLanguageEl = $("displayLanguage");
+  const uiThemeEl = $("uiTheme");
   const idleGuardMinutesEl = $("idleGuardMinutes");
   const idleGuardWarnEl = $("idleGuardWarn");
   const maxSessionMinutesEl = $("maxSessionMinutes");
@@ -456,11 +460,40 @@ Do not introduce new topics.`;
     return normalizeDisplayLanguage(loadStrLS(LS_DISPLAY_LANGUAGE, DEFAULT_DISPLAY_LANGUAGE));
   }
 
+  function normalizeUiTheme(theme) {
+    const value = (theme || "").toString().trim().toLowerCase();
+    return SUPPORTED_UI_THEMES.includes(value) ? value : DEFAULT_UI_THEME;
+  }
+
+  function getUiTheme() {
+    return normalizeUiTheme(loadStrLS(LS_UI_THEME, DEFAULT_UI_THEME));
+  }
+
   function syncDisplayLanguageControls(lang) {
     const next = normalizeDisplayLanguage(lang);
     if (displayLanguageEl) displayLanguageEl.value = next;
     if (headerDisplayLanguageEl) headerDisplayLanguageEl.value = next;
     return next;
+  }
+
+  function applyUiTheme(theme) {
+    const normalized = normalizeUiTheme(theme);
+    try { document.body.dataset.theme = normalized; } catch {}
+    return normalized;
+  }
+
+  function syncUiThemeControl(theme) {
+    const normalized = normalizeUiTheme(theme);
+    if (uiThemeEl) uiThemeEl.value = normalized;
+    return normalized;
+  }
+
+  function setUiTheme(theme) {
+    const normalized = normalizeUiTheme(theme);
+    saveStrLS(LS_UI_THEME, normalized);
+    applyUiTheme(normalized);
+    syncUiThemeControl(normalized);
+    return normalized;
   }
 
   function loadJsonAsset(path) {
@@ -1197,6 +1230,7 @@ function loadInstructionsTargetIntoInputs() {
   applyPlaybackVolume(loadStrLS(LS_PLAYBACK_VOLUME, "1"));
   loadInstructionsTargetIntoInputs();
   syncDisplayLanguageControls(getDisplayLanguage());
+  setUiTheme(getUiTheme());
   applyLocale();
   loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   loadProviderUi().catch(() => {});
@@ -3774,6 +3808,11 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   if (headerDisplayLanguageEl) {
     headerDisplayLanguageEl.addEventListener("change", () => {
       setDisplayLanguage(headerDisplayLanguageEl.value);
+    });
+  }
+  if (uiThemeEl) {
+    uiThemeEl.addEventListener("change", () => {
+      setUiTheme(uiThemeEl.value);
     });
   }
   for (const el of [idleGuardMinutesEl, idleGuardWarnEl, maxSessionMinutesEl]) {
