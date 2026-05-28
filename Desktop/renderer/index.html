@@ -349,6 +349,24 @@
 
             <div class="settingsInfoLine" data-i18n="settings.costGuardInfo">You will be warned before the session is auto-stopped when warnings are enabled.</div>
           </section>
+
+          <section class="glassPanel settingsCard">
+            <div class="settingsCardHeader">
+              <div class="settingsIcon settingsIconDiag" aria-hidden="true"></div>
+              <div>
+                <h3>Support &amp; Troubleshooting</h3>
+                <div class="panelSub">Create a local support package for diagnostics</div>
+              </div>
+            </div>
+
+            <div class="settingsInfoLine">Exports a sanitized ZIP file that you can send to support. No audio, transcripts, API keys, or personal files are included.</div>
+
+            <div class="settingsActions">
+              <button id="btnExportTroubleshootingPackage" type="button">Export Troubleshooting Package</button>
+            </div>
+
+            <div id="supportExportStatus" class="settingsStatusText"></div>
+          </section>
         </div>
 
         <div class="settingsColumn">

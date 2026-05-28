@@ -1,10 +1,12 @@
-const { app, BrowserWindow, ipcMain, Menu, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, shell, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
+const os = require("os");
 const { spawn, spawnSync } = require("child_process");
 const crypto = require("crypto");
+const AdmZip = require("adm-zip");
 const { initMain } = require("electron-audio-loopback");
 
 // Must be called before app is ready
@@ -724,6 +726,225 @@ function applyLicenseApiResult(result, fallbackPatch) {
   return writeLicenseStatePatch(patch);
 }
 
+const SUPPORT_PACKAGE_VERSION = 1;
+const REDACTED_VALUE = "[REDACTED]";
+const SECRET_KEY_PATTERN = /(apikey|key|token|secret|connectionstring|connection_string|password|licensekey|machineguid|deviceseed)/i;
+
+function supportTimestampPart(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    "-",
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join("");
+}
+
+function supportExportFileName() {
+  return `answerdesk-troubleshooting-${supportTimestampPart()}.zip`;
+}
+
+function cloneJsonSafe(value) {
+  if (value == null) return value;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_) {
+    return value;
+  }
+}
+
+function redactSensitiveValue(value) {
+  if (Array.isArray(value)) return value.map(() => REDACTED_VALUE);
+  if (value && typeof value === "object") return REDACTED_VALUE;
+  return REDACTED_VALUE;
+}
+
+function redactObjectRecursive(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactObjectRecursive(item));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const result = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (SECRET_KEY_PATTERN.test(key)) {
+      result[key] = redactSensitiveValue(entryValue);
+    } else {
+      result[key] = redactObjectRecursive(entryValue);
+    }
+  }
+  return result;
+}
+
+function sanitizeProviderConfig(raw) {
+  const source = raw && typeof raw === "object" ? cloneJsonSafe(raw) : {};
+  const sanitized = redactObjectRecursive(source);
+  const activeProvider = nullableString(source && source.activeProvider);
+  const providers = source && source.providers && typeof source.providers === "object" ? source.providers : {};
+
+  for (const [providerId, providerConfig] of Object.entries(providers)) {
+    if (!providerConfig || typeof providerConfig !== "object") continue;
+    const target = sanitized.providers && sanitized.providers[providerId] && typeof sanitized.providers[providerId] === "object"
+      ? sanitized.providers[providerId]
+      : null;
+    if (!target) continue;
+
+    const apiKeyValue = nullableString(providerConfig.apiKey) || nullableString(providerConfig.key);
+    if (Object.prototype.hasOwnProperty.call(target, "apiKey")) delete target.apiKey;
+    if (Object.prototype.hasOwnProperty.call(target, "key")) delete target.key;
+    target.apiKeyPresent = !!apiKeyValue;
+    target.isActiveProvider = activeProvider === providerId;
+  }
+
+  return sanitized;
+}
+
+function sanitizeLicenseState(raw) {
+  const state = raw && typeof raw === "object" ? raw : {};
+  return {
+    schemaVersion: state.schemaVersion ?? null,
+    installId: nullableString(state.installId),
+    deviceHashPresent: !!nullableString(state.deviceHash),
+    status: nullableString(state.status),
+    registeredEmail: nullableString(state.registeredEmail),
+    licenseId: nullableString(state.licenseId),
+    activationId: nullableString(state.activationId),
+    licenseKeyLast4: nullableString(state.licenseKeyLast4),
+    trialStartedAt: nullableString(state.trialStartedAt),
+    trialExpiresAt: nullableString(state.trialExpiresAt),
+    licenseActivatedAt: nullableString(state.licenseActivatedAt),
+    lastValidatedAt: nullableString(state.lastValidatedAt),
+    serverTime: nullableString(state.serverTime),
+    offlineGraceExpiresAt: nullableString(state.offlineGraceExpiresAt),
+    lastError: nullableString(state.lastError),
+    checkoutUrl: nullableString(state.checkoutUrl),
+    paymentProvider: nullableString(state.paymentProvider),
+    updatedAt: nullableString(state.updatedAt),
+  };
+}
+
+function sanitizeLogText(text) {
+  return String(text || "")
+    .replace(/(authorization\s*:\s*bearer\s+)[^\s]+/ig, `$1${REDACTED_VALUE}`)
+    .replace(/(bearer\s+)[A-Za-z0-9._\-+/=]+/ig, `$1${REDACTED_VALUE}`)
+    .replace(/((?:api[_-]?key|token|secret|password|connection[_-]?string|license[_-]?key)\s*[:=]\s*)[^\s,;]+/ig, `$1${REDACTED_VALUE}`)
+    .replace(/([?&](?:api[_-]?key|token|secret|password|connection[_-]?string|license[_-]?key)=)[^&\s]+/ig, `$1${REDACTED_VALUE}`);
+}
+
+function readRecentLogSection(filePath, title, maxLines = 300) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return `${title}\n(no log file found)\n`;
+    }
+    const text = fs.readFileSync(filePath, "utf8");
+    const lines = text.split(/\r?\n/);
+    const tail = lines.slice(Math.max(0, lines.length - maxLines)).map((line) => sanitizeLogText(line));
+    return `${title}\n${tail.join("\n").trim()}\n`;
+  } catch (err) {
+    return `${title}\n(log read failed: ${err && err.message ? err.message : err})\n`;
+  }
+}
+
+function buildRecentAppLogText() {
+  const combined = [
+    readRecentLogSection(backendStdoutLogPath, "=== backend.log ==="),
+    readRecentLogSection(backendStderrLogPath, "=== backend-error.log ==="),
+  ].join("\n").trim();
+  return combined || "No backend logs were found.";
+}
+
+function getUserDataDirLabel() {
+  try {
+    return path.basename(userDataDir);
+  } catch (_) {
+    return "userData";
+  }
+}
+
+function getLocaleSafe() {
+  try {
+    return app.getLocale();
+  } catch (_) {
+    return null;
+  }
+}
+
+function getTimezoneSafe() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function buildSystemInfo(exportTime) {
+  return {
+    exportTime,
+    appVersion: getAppVersion(),
+    appName: nullableString(app.getName()),
+    productName: nullableString(app.name) || nullableString(app.getName()),
+    isPackaged: app.isPackaged,
+    platform: process.platform,
+    arch: process.arch,
+    osRelease: os.release(),
+    osType: os.type(),
+    locale: getLocaleSafe(),
+    timezone: getTimezoneSafe(),
+    electronVersion: process.versions.electron || null,
+    chromeVersion: process.versions.chrome || null,
+    nodeVersion: process.versions.node || null,
+    userDataDir: getUserDataDirLabel(),
+  };
+}
+
+function buildSupportInfo(exportTime, licenseState, providerConfig, logsIncluded) {
+  const activeProvider = nullableString(providerConfig && providerConfig.activeProvider);
+  const providerDetails = activeProvider && providerConfig && providerConfig.providers && typeof providerConfig.providers === "object"
+    ? providerConfig.providers[activeProvider]
+    : null;
+  return {
+    exportTime,
+    appVersion: getAppVersion(),
+    isPackaged: app.isPackaged,
+    supportPackageVersion: SUPPORT_PACKAGE_VERSION,
+    generatedBy: "AnswerDesk AI",
+    licenseStatus: nullableString(licenseState && licenseState.status),
+    registeredEmail: nullableString(licenseState && licenseState.registeredEmail),
+    trialStartedAt: nullableString(licenseState && licenseState.trialStartedAt),
+    trialExpiresAt: nullableString(licenseState && licenseState.trialExpiresAt),
+    lastValidatedAt: nullableString(licenseState && licenseState.lastValidatedAt),
+    activeProvider,
+    providerConfigured: !!(providerDetails && typeof providerDetails === "object" && Object.keys(providerDetails).length > 0),
+    logsIncluded,
+    contentsNote: "No audio, transcripts, API keys, or personal files are included.",
+  };
+}
+
+function addZipJson(zip, entryName, value) {
+  zip.addFile(entryName, Buffer.from(JSON.stringify(value, null, 2), "utf8"));
+}
+
+function createTroubleshootingZip() {
+  const exportTime = nowIso();
+  const rawLicenseState = readJsonSafe(licenseStatePath);
+  const rawProviderConfig = readJsonSafe(providerConfigPath);
+  const recentAppLogText = buildRecentAppLogText();
+  const zip = new AdmZip();
+
+  addZipJson(zip, "support-info.json", buildSupportInfo(exportTime, rawLicenseState, rawProviderConfig, !!recentAppLogText.trim()));
+  addZipJson(zip, "system-info.json", buildSystemInfo(exportTime));
+  addZipJson(zip, "license-state-redacted.json", sanitizeLicenseState(rawLicenseState));
+  addZipJson(zip, "provider-config-redacted.json", sanitizeProviderConfig(rawProviderConfig));
+  zip.addFile("recent-app-log.txt", Buffer.from(recentAppLogText, "utf8"));
+
+  return zip;
+}
+
 function defaultInstructionsText() {
   return (
     "Speak slowly and clearly.\n" +
@@ -930,6 +1151,34 @@ ipcMain.handle("license:open-checkout", async () => {
       ok: false,
       message: err && err.message ? err.message : "Checkout URL could not be opened.",
       state,
+    };
+  }
+});
+
+ipcMain.handle("support:export-troubleshooting-package", async () => {
+  try {
+    const defaultPath = path.join(app.getPath("documents"), supportExportFileName());
+    const saveResult = await dialog.showSaveDialog(isLiveWindow(mainWindow) ? mainWindow : undefined, {
+      title: "Export Troubleshooting Package",
+      defaultPath,
+      filters: [{ name: "ZIP files", extensions: ["zip"] }],
+      properties: ["createDirectory", "showOverwriteConfirmation"],
+    });
+
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { ok: false, canceled: true };
+    }
+
+    const targetPath = saveResult.filePath.toLowerCase().endsWith(".zip")
+      ? saveResult.filePath
+      : `${saveResult.filePath}.zip`;
+    const zip = createTroubleshootingZip();
+    zip.writeZip(targetPath);
+    return { ok: true, filePath: targetPath };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err && err.message ? err.message : String(err),
     };
   }
 });

@@ -391,6 +391,8 @@ Do not introduce new topics.`;
   const btnUpdateCheck = $("btnUpdateCheck");
   const btnUpdateDownload = $("btnUpdateDownload");
   const btnUpdateRestart = $("btnUpdateRestart");
+  const btnExportTroubleshootingPackage = $("btnExportTroubleshootingPackage");
+  const supportExportStatusEl = $("supportExportStatus");
   const settingsLicenseBadgeEl = $("settingsLicenseBadge");
   const licenseStatusEl = $("licenseStatus");
   const licenseRegisteredEmailEl = $("licenseRegisteredEmail");
@@ -924,6 +926,13 @@ Do not introduce new topics.`;
     licenseMessageEl.classList.remove("ok", "warn", "bad");
     if (state) licenseMessageEl.classList.add(state);
     licenseMessageEl.textContent = message || "";
+  }
+
+  function setSupportExportStatus(message, state) {
+    if (!supportExportStatusEl) return;
+    supportExportStatusEl.classList.remove("ok", "warn", "bad");
+    if (state) supportExportStatusEl.classList.add(state);
+    supportExportStatusEl.textContent = message || "";
   }
 
   function focusLicenseView(message, level) {
@@ -3712,6 +3721,37 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   if (btnLicenseCheckout) {
     btnLicenseCheckout.addEventListener("click", () => {
       runLicenseAction("checkout", (license) => license.openCheckout());
+    });
+  }
+  if (btnExportTroubleshootingPackage) {
+    btnExportTroubleshootingPackage.addEventListener("click", async () => {
+      const supportApi = window.electronAPI && window.electronAPI.support;
+      if (!supportApi || typeof supportApi.exportTroubleshootingPackage !== "function") {
+        setSupportExportStatus("Export failed.", "bad");
+        push("ERROR(Support export): support API unavailable");
+        return;
+      }
+
+      btnExportTroubleshootingPackage.disabled = true;
+      setSupportExportStatus("Preparing troubleshooting package...", "warn");
+      try {
+        const result = await supportApi.exportTroubleshootingPackage();
+        if (result?.canceled) {
+          setSupportExportStatus("Export canceled.", "warn");
+          push("Troubleshooting package export canceled.");
+        } else if (result?.ok) {
+          setSupportExportStatus("Troubleshooting package saved.", "ok");
+          push(`Troubleshooting package saved: ${result.filePath || "(path unavailable)"}`);
+        } else {
+          setSupportExportStatus("Export failed.", "bad");
+          push(`ERROR(Support export): ${result?.message || "Export failed."}`);
+        }
+      } catch (e) {
+        setSupportExportStatus("Export failed.", "bad");
+        push(`ERROR(Support export): ${e?.message || e}`);
+      } finally {
+        btnExportTroubleshootingPackage.disabled = false;
+      }
     });
   }
   if (btnUseLocalBackend) btnUseLocalBackend.addEventListener("click", () => {

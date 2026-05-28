@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     openCheckout: () => ipcRenderer.invoke("license:open-checkout"),
   },
 
+  support: {
+    exportTroubleshootingPackage: () => ipcRenderer.invoke("support:export-troubleshooting-package"),
+  },
+
   updates: {
     getState: () => ipcRenderer.invoke("app-update:get-state"),
     check: () => ipcRenderer.invoke("app-update:check"),
