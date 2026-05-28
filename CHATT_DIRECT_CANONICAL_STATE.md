@@ -1921,6 +1921,7 @@ apps/licensing-api/src/shared/responses.js
 apps/licensing-api/src/shared/licenseStatuses.js
 apps/licensing-api/src/shared/validation.js
 apps/licensing-api/src/shared/storage.js
+apps/licensing-api/src/shared/email.js
 ```
 
 Current Azure Function runtime:
@@ -1931,6 +1932,7 @@ Node.js 24 on Azure Function App
 Local package engine currently allows node >=20
 @azure/functions
 @azure/data-tables
+@azure/communication-email
 ```
 
 Current Azure app settings used by licensing API:
@@ -1938,12 +1940,16 @@ Current Azure app settings used by licensing API:
 ```text
 LICENSE_STORAGE_CONNECTION_STRING
 LICENSE_TABLE_NAME=LicenseRecords
+EMAIL_ENABLED
+ACS_CONNECTION_STRING
+ACS_EMAIL_FROM_ADDRESS
+ACS_EMAIL_FROM_NAME
 ```
 
 Security note:
 
 ```text
-Do not paste or commit LICENSE_STORAGE_CONNECTION_STRING, storage account keys, API keys, tokens, webhook secrets, or payment provider secrets.
+Do not paste or commit LICENSE_STORAGE_CONNECTION_STRING, ACS_CONNECTION_STRING, storage account keys, API keys, tokens, webhook secrets, or payment provider secrets.
 A storage account connection string was displayed during setup in the terminal/chat flow.
 Key rotation is deferred to the later security hardening/check phase per user decision.
 Before production or public release, rotate exposed keys and complete a full secret scan.
@@ -2129,6 +2135,17 @@ If no installId/emailHash/deviceHash match exists:
 - email and device lookup records are created
 ```
 
+Current Trial Started email behavior:
+
+```text
+When trial/start creates a new trial record, the hosted licensing API sends a Trial Started email through Azure Communication Services Email.
+The email is sent only for a newly created trial record.
+The email is not sent when trial/start returns an existing trial/license record through installId, emailHash, or deviceHash lookup.
+Email sending is best-effort.
+If email sending fails, trial/start still returns the normal response.
+Email failure is logged with console.warn for Application Insights visibility.
+```
+
 Current trial/start rate limiting:
 
 ```text
@@ -2230,6 +2247,7 @@ b61ebee Move licensing to dedicated page
 388e36f Add desktop licensing device hash
 2bfb801 Add trial anti-reset protection
 1fb6a01 Add trial start rate limiting
+5a917d7 Add trial started email delivery
 ```
 
 Current endpoint validation results:
@@ -2261,6 +2279,11 @@ POST /v1/license/trial/start repeated 11 times for same emailHash/deviceHash:
 
 POST /v1/license/activate:
   OK for skeleton behavior, returns ok:false with Payment-backed license activation is not connected yet, preserves trial status, returns only licenseKeyLast4.
+
+POST /v1/license/trial/start after Trial Started email implementation:
+  OK for new test email/installId/deviceHash, returns trial_active with message Trial started.
+  Trial Started email delivered through Azure Communication Services Email.
+  Existing-trial path does not send a duplicate Trial Started email.
 ```
 
 Current Desktop end-to-end validation:
@@ -2295,6 +2318,421 @@ Desktop must not assume Paddle-specific or Lemon-specific checkout behavior.
 Current checkoutUrl is null, so Buy License reports that checkout URL is not configured yet.
 ```
 
+
+## 27. Licensing Operations / Monitoring / Support / Email Delivery Baseline
+
+This section captures the current minimal operational model for Azure Licensing API monitoring, licensing support troubleshooting, customer email delivery, and future support tooling.
+
+Licensing operations scope:
+
+```text
+This scope applies to the hosted Azure Licensing API, Azure Table Storage LicenseRecords, Application Insights, Azure Monitor alerts, and Azure Communication Services Email.
+It does not change Direct Realtime runtime, Desktop audio flow, provider adapters, scenario behavior, Mini Control Window, or backend/app_realtime.py.
+```
+
+### Current Licensing Operations MVP
+
+The current licensing operations model is intentionally minimal and uses Azure-native tooling instead of a custom admin portal.
+
+Current operational tools:
+
+```text
+Azure Portal
+  Used for Function App health, configuration, deployment status, and resource overview.
+
+Application Insights
+  Used for Failures, Search, request tracing, exceptions, dependency failures, licenseTrialStart traces, and licenseValidate traces.
+
+Storage browser / Azure Storage Explorer
+  Used for read-only lookup into Azure Table Storage LicenseRecords.
+
+Azure Monitor Action Group
+  Used for alert email notification.
+```
+
+Current verified monitoring state:
+
+```text
+Application Insights telemetry is active for answerdesk-licensing-api-dev.
+Failures view showed 0 failed requests during validation.
+Search showed licenseValidate traces and licenseTrialStart traces.
+licenseValidate calls were successful during validation.
+licenseTrialStart calls were successful during validation.
+Storage browser showed LicenseRecords records for PartitionKey = license.
+Storage browser showed trial/start rate records for PartitionKey = rate.
+```
+
+Current alerting setup:
+
+```text
+Action Group:
+ag-answerdesk-licensing-alerts
+
+Notification:
+Email receiver configured for internal licensing alerts.
+
+Alert rule:
+alert-answerdesk-licensing-failed-requests
+Signal: Failed requests
+Condition: Count greater than 0
+Severity: 2 - Warning
+Scope: Application Insights answerdesk-licensing-api-dev
+
+Availability test:
+health-answerdesk-licensing-api
+URL: https://answerdesk-licensing-api-dev.azurewebsites.net/api/v1/license/health
+Frequency: 5 minutes
+Success condition: HTTP 200
+Action Group: ag-answerdesk-licensing-alerts
+
+Storage alert rule:
+alert-answerdesk-storage-availability
+Scope: Storage account answerdesklicdevst
+Signal: Availability
+Condition: Average less than 90
+Action Group: ag-answerdesk-licensing-alerts
+Severity: 2 - Warning
+```
+
+Alert behavior:
+
+```text
+Azure Monitor alerts do not automatically fix issues.
+When an alert triggers, Azure Monitor activates the Action Group and sends email.
+The operator then opens Application Insights, Failures/Search, and Storage browser to determine the failing component.
+```
+
+### Licensing Support Runbook v1
+
+When a user reports a licensing issue, support should check the following in order.
+
+Support check order:
+
+```text
+1. Check health endpoint availability in Application Insights Availability.
+2. Check Application Insights Failures for failed requests, exceptions, and dependency failures.
+3. Use Application Insights Search for licenseTrialStart and licenseValidate around the reported time.
+4. Check LicenseRecords with PartitionKey = license and RowKey = installId.
+5. Check LicenseRecords with PartitionKey = rate for trial/start rate-limit records.
+6. Check Storage Account availability alert state if storage errors are suspected.
+7. Classify the issue as user state, rate limit, trial expiration, API failure, storage failure, or activate skeleton behavior.
+```
+
+Data to request from the user for licensing support:
+
+```text
+Email used for trial/license.
+Screenshot of Desktop License page if useful.
+installId from Desktop License page.
+Exact error message.
+Approximate time when the problem happened.
+```
+
+Data not to request from the user:
+
+```text
+API keys.
+Raw license key unless strictly required for a controlled activation test.
+MachineGuid.
+Provider credentials.
+Storage connection strings.
+Manual logs unless a later diagnostic package flow is implemented.
+```
+
+Common support interpretations:
+
+```text
+trial_active
+  Trial exists and is active. User may need Refresh License Status in Desktop.
+
+trial_expired
+  Trial exists but trialExpiresAt is in the past. Do not reset automatically.
+
+rate_limited
+  User exceeded trial/start attempt limit. Check PartitionKey = rate records.
+
+no record
+  No record exists for the supplied installId; check if wrong installId/email was supplied.
+
+API failure
+  Application Insights Failures/Search shows failed request or exception.
+
+storage failure
+  Application Insights dependency failure or Storage availability alert indicates storage issue.
+
+activate issue
+  Expected in current phase because paid activation is skeleton-only.
+```
+
+### Application Troubleshooting Direction
+
+Application troubleshooting is separate from licensing operations.
+
+Current decision:
+
+```text
+Do not build a full Support Center portal for app troubleshooting in the MVP.
+Do not continuously monitor or stream user data from the Desktop app.
+Do not implement remote-control support behavior.
+```
+
+Preferred MVP app troubleshooting approach:
+
+```text
+Export Troubleshooting Package
+```
+
+User-initiated diagnostic package flow:
+
+```text
+User has an app problem.
+User clicks Export Troubleshooting Package or Send Troubleshooting Data.
+Desktop app shows exactly what data will be included.
+User confirms.
+For MVP, app creates a local JSON/ZIP package.
+User sends it to support manually by email.
+Support analyzes the package.
+```
+
+Future optional online diagnostic upload flow:
+
+```text
+User has an app problem.
+User clicks Send Troubleshooting Data.
+Desktop app shows exactly what data will be sent.
+User confirms.
+Diagnostic package uploads to a Support Center backend.
+Operator reviews the case and gives instructions.
+Diagnostic data is used to improve future releases.
+```
+
+Allowed diagnostic data candidates:
+
+```text
+installId
+appVersion
+license status
+provider type
+provider configured yes/no
+last provider test result
+backend status
+Realtime WebSocket status
+last sanitized errors
+last sanitized log lines
+Windows version
+app mode: installed/dev
+timestamp
+```
+
+Forbidden diagnostic data:
+
+```text
+Provider API keys.
+Azure/OpenAI keys.
+Raw audio.
+Conversation transcript.
+Full prompts/instructions.
+MachineGuid.
+Raw license key.
+Personal files.
+Provider endpoint secrets.
+Storage connection strings.
+```
+
+### Future Licensing Admin Web App Direction
+
+A full support center is not justified for MVP, but a minimal licensing admin portal may be useful later because licensing data lives in Azure.
+
+Future minimal internal licensing admin app direction:
+
+```text
+Azure Static Web App or Azure App Service
++ Microsoft Entra ID login
++ Admin API endpoints in existing Azure Function App
+```
+
+Phase 1 scope for future admin portal:
+
+```text
+Read-only only.
+LicenseRecords search by email/installId/deviceHash/licenseId later.
+Trial status view.
+Record detail view.
+Rate-limit view.
+Health/Application Insights links.
+No data modification.
+```
+
+Actions forbidden in admin portal v1:
+
+```text
+No reset trial.
+No delete record.
+No manual activation.
+No revoke.
+No user edits.
+No paid license lifecycle actions.
+```
+
+If write actions are added later, requirements are:
+
+```text
+Microsoft Entra ID authentication.
+Role-based access control.
+Audit log.
+Reason required for every write action.
+Timestamp.
+Admin user identity.
+```
+
+### Customer Email Delivery Baseline
+
+Azure Communication Services Email is now the selected Azure-native email service for MVP transactional product emails.
+
+Current Azure email resources:
+
+```text
+Email Communication Services resource:
+answerdesk-email-dev
+
+Communication Services resource:
+answerdesk-comm-dev
+
+Azure managed domain:
+005a7e94-3e60-4be6-a1db-d174298e9946.azurecomm.net
+
+MailFrom:
+DoNotReply@005a7e94-3e60-4be6-a1db-d174298e9946.azurecomm.net
+
+Display name tested:
+DoNotReply / AnswerDesk AI depending on sender configuration
+```
+
+Current domain state:
+
+```text
+Azure managed domain deployed.
+Domain status verified.
+SPF verified.
+DKIM verified.
+DKIM2 verified.
+Domain connected to answerdesk-comm-dev.
+Azure portal test email succeeded.
+```
+
+Current Function App email app settings:
+
+```text
+EMAIL_ENABLED=true
+ACS_CONNECTION_STRING=<secret in Function App settings>
+ACS_EMAIL_FROM_ADDRESS=DoNotReply@005a7e94-3e60-4be6-a1db-d174298e9946.azurecomm.net
+ACS_EMAIL_FROM_NAME=AnswerDesk AI
+```
+
+Security rule:
+
+```text
+ACS_CONNECTION_STRING is a secret.
+Do not paste it into chat.
+Do not commit it.
+Do not expose it to Desktop.
+Store it only in Azure Function App settings / secure deployment configuration.
+```
+
+Current implemented email behavior:
+
+```text
+MVP email type:
+Trial Started email only.
+
+Trigger:
+POST /v1/license/trial/start creates a new trial record.
+
+Do not send:
+If trial/start returns an existing trial/license record.
+If anti-reset lookup finds existing installId/emailHash/deviceHash.
+If EMAIL_ENABLED is not true.
+If required email configuration is missing.
+
+Best-effort behavior:
+Email sending must not break trial/start.
+If email fails, trial/start still returns the normal response.
+Email failure is logged with console.warn so Application Insights can capture it.
+```
+
+Current licensing API email implementation:
+
+```text
+Dependency added:
+@azure/communication-email
+
+New file:
+apps/licensing-api/src/shared/email.js
+
+Updated file:
+apps/licensing-api/src/functions/trialStart.js
+
+Function:
+sendTrialStartedEmailBestEffort(record)
+
+Commit:
+5a917d7 Add trial started email delivery
+```
+
+Current Trial Started email content:
+
+```text
+Subject:
+AnswerDesk AI trial started
+
+Body:
+Your 3-day AnswerDesk AI trial has started.
+Trial expires: <trialExpiresAt>
+Thank you for trying AnswerDesk AI.
+```
+
+Current email validation:
+
+```text
+Azure Communication Services test email from portal: OK.
+Function App settings added: OK.
+Licensing API deployed successfully after code change: OK.
+GET /v1/license/health after deployment: OK.
+POST /v1/license/trial/start with new test email/installId/deviceHash: OK.
+New trial response returned message Trial started.: OK.
+Trial Started email delivered to test inbox: OK.
+```
+
+Known production issue:
+
+```text
+Azure managed sender works technically but can land in spam.
+For production/public release, configure a custom domain such as itprofessional.org.
+Use a professional sender such as support@itprofessional.org or noreply@itprofessional.org.
+Verify SPF/DKIM/DKIM2 for the custom domain.
+Improve email template before public release.
+```
+
+Future customer email candidates:
+
+```text
+Trial expiring soon.
+Trial expired.
+License activated.
+License revoked/disabled.
+Support/troubleshooting response.
+Payment/renewal emails, depending on selected payment provider.
+```
+
+Boundary with Azure Monitor alerts:
+
+```text
+Azure Monitor operational alerts use Azure Monitor Action Groups.
+Customer/product transactional emails use Azure Communication Services Email.
+These are separate email paths.
+```
+
+
 Planned future hosted API endpoints:
 
 ```text
@@ -2315,6 +2753,8 @@ Implement trial expiration UX/countdown if desired.
 Implement license revocation/deactivation/reset device behavior.
 Implement offline grace only after explicit approval.
 Implement storage key rotation and secret scan before production/public release.
+Configure custom email domain such as itprofessional.org before production/public release.
+Improve customer email templates before production/public release.
 Add admin/customer license management only after core paid activation is defined.
 ```
 
@@ -2342,6 +2782,7 @@ node --check .\src\shared\responses.js
 node --check .\src\shared\licenseStatuses.js
 node --check .\src\shared\validation.js
 node --check .\src\shared\storage.js
+node --check .\src\shared\email.js
 ```
 
 Deploy licensing API:
