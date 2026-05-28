@@ -1,6 +1,7 @@
 const { app } = require("@azure/functions");
 const { failResponse, okResponse, serverTime } = require("../shared/responses");
 const { LicenseStatuses } = require("../shared/licenseStatuses");
+const { sendTrialStartedEmailBestEffort } = require("../shared/email");
 const {
   readJsonBody,
   requireEmail,
@@ -67,6 +68,7 @@ app.http("licenseTrialStart", {
         if (deviceHash) {
           await saveLookupRecord(client, DEVICE_LOOKUP_PARTITION_KEY, deviceHash, record.installId, now);
         }
+        await sendTrialStartedEmailBestEffort(record);
         return okResponse({
           status: LicenseStatuses.TRIAL_ACTIVE,
           message: "Trial started.",
