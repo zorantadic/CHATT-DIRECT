@@ -833,6 +833,9 @@ Do not introduce new topics.`;
     if (normalized === "offline_grace") {
       return { state: "warn", text: t("settings.license.badgeOfflineGrace", "Offline Grace") };
     }
+    if (normalized === "rate_limited") {
+      return { state: "warn", text: t("settings.license.badgeRateLimited", "Too Many Attempts") };
+    }
     if (normalized === "error") {
       return { state: "bad", text: t("settings.license.badgeError", "License Error") };
     }
