@@ -3,7 +3,7 @@ const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const crypto = require("crypto");
 const { initMain } = require("electron-audio-loopback");
 
@@ -77,6 +77,7 @@ const legacyInstructionsPath = path.join(userDataDir, "instructions.local.json")
 const providerConfigPath = path.join(userDataDir, "provider_config.local.json");
 const scenarioPresetsLocalPath = path.join(userDataDir, "scenario_presets.local.json");
 const licenseStatePath = path.join(userDataDir, "license_state.json");
+const deviceSeedPath = path.join(userDataDir, "device_seed");
 const backendInstallDir = app.isPackaged
   ? path.join(process.resourcesPath, "backend")
   : path.join(__dirname, "..", "..", "backend");
@@ -499,11 +500,62 @@ function createInstallId() {
   return `install-${Date.now().toString(16)}-${crypto.randomBytes(16).toString("hex")}`;
 }
 
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+}
+
+function getWindowsMachineGuid() {
+  if (process.platform !== "win32") return "";
+  try {
+    const result = spawnSync(
+      "reg.exe",
+      ["query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"],
+      {
+        encoding: "utf8",
+        windowsHide: true,
+      }
+    );
+    if (result.status !== 0) return "";
+    const stdout = (result.stdout || "").toString();
+    const match = stdout.match(/MachineGuid\s+REG_\w+\s+([^\r\n]+)/i);
+    return match && match[1] ? match[1].trim() : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function getFallbackDeviceSeed() {
+  try {
+    if (fs.existsSync(deviceSeedPath)) {
+      const existing = fs.readFileSync(deviceSeedPath, "utf8").trim();
+      if (existing) return existing;
+    }
+  } catch (_) {
+    // ignore and regenerate once below
+  }
+
+  const seed = crypto.randomBytes(32).toString("hex");
+  try {
+    fs.mkdirSync(path.dirname(deviceSeedPath), { recursive: true });
+    fs.writeFileSync(deviceSeedPath, seed, "utf8");
+  } catch (_) {
+    // ignore; we can still derive a hash for this process
+  }
+  return seed;
+}
+
+function createDeviceHash() {
+  const namespace = "answerdesk-ai-device-v1:";
+  const machineGuid = getWindowsMachineGuid();
+  const source = machineGuid || getFallbackDeviceSeed();
+  return sha256Hex(`${namespace}${source}`);
+}
+
 function createDefaultLicenseState() {
   return {
     schemaVersion: 1,
     installId: createInstallId(),
-    deviceHash: null,
+    deviceHash: createDeviceHash(),
     status: "not_registered",
     registeredEmail: null,
     licenseId: null,
@@ -531,11 +583,13 @@ function nullableString(value) {
 
 function normalizeLicenseState(state) {
   const raw = state && typeof state === "object" ? state : {};
-  const base = createDefaultLicenseState();
+  const installId = nullableString(raw.installId) || createInstallId();
+  const deviceHash = nullableString(raw.deviceHash) || createDeviceHash();
+  const updatedAt = nullableString(raw.updatedAt) || nowIso();
   return {
     schemaVersion: 1,
-    installId: nullableString(raw.installId) || base.installId,
-    deviceHash: nullableString(raw.deviceHash),
+    installId,
+    deviceHash,
     status: nullableString(raw.status) || "not_registered",
     registeredEmail: nullableString(raw.registeredEmail),
     licenseId: nullableString(raw.licenseId),
@@ -551,7 +605,7 @@ function normalizeLicenseState(state) {
     checkoutUrl: nullableString(raw.checkoutUrl),
     paymentProvider: nullableString(raw.paymentProvider),
     statusSignature: nullableString(raw.statusSignature),
-    updatedAt: nullableString(raw.updatedAt) || base.updatedAt,
+    updatedAt,
   };
 }
 
