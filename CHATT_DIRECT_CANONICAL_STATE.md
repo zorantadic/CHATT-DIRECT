@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-27
+Last updated: 2026-05-25
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -42,7 +42,6 @@ multilingual UI display support
 header language selector synchronized with Settings language selector
 floating vertical Mini Control Window when the main app is minimized
 deterministic Electron UI zoom factor 0.7 for main Desktop window
-licensing/trial commercial access layer planned outside Direct Realtime audio/runtime path
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -785,9 +784,7 @@ Packaging requirement:
 
 ```text
 Before packaged Windows app release, provider settings must be stored in a user-specific app data location, not inside the installed app folder or repository backend folder.
-Target pattern: Electron userData.
-Development mode / npm start: C:\Projects\chatt-direct\Desktop\.electron-userdata\
-Packaged/installed Windows app: C:\Users\zoran\AppData\Roaming\answerdesk-ai\
+Target pattern: Electron app.getPath("userData") / Windows AppData.
 ```
 
 Language control:
@@ -994,11 +991,10 @@ Final packaged app direction:
 
 ```text
 <install>\backend\scenario_presets.json
-<Electron userData>\scenario_presets.local.json
-<Electron userData>\instructions.json
-<Electron userData>\provider_config.local.json
-<Electron userData>\license_state.json
-<Electron userData>\logs\
+<AppData>\CHATT-DIRECT\scenario_presets.local.json
+<AppData>\CHATT-DIRECT\instructions.json
+<AppData>\CHATT-DIRECT\provider_config.local.json
+<AppData>\CHATT-DIRECT\logs\
 ```
 
 ---
@@ -1186,45 +1182,34 @@ Do not remove or bypass existing main renderer Start/Stop/Refresh/Repeat/Reset h
 
 ---
 
-## 19. Phase 2 Electron userData Runtime Plan
+## 19. Phase 2 AppData / userData Runtime Plan
 
 Phase 2 objective:
 
 ```text
-Move packaged runtime/user state out of the install/backend folder and into Electron userData.
+Move packaged runtime/user state out of the install/backend folder and into Electron userData/AppData.
 ```
 
 Canonical packaged app storage rule:
 
 ```text
 Install folder = read-only application files and default templates.
-Electron userData = writable runtime/user files.
+AppData/userData = writable runtime/user files.
 ```
 
-Canonical writable runtime folder:
+Final user data folder:
 
 ```text
-<Electron userData>\
-```
-
-Confirmed examples:
-
-```text
-Development mode / npm start:
-C:\Projects\chatt-direct\Desktop\.electron-userdata\
-
-Packaged/installed Windows app:
-C:\Users\zoran\AppData\Roaming\answerdesk-ai\
+<AppData>\CHATT-DIRECT\
 ```
 
 Final writable runtime files:
 
 ```text
-<Electron userData>\provider_config.local.json
-<Electron userData>\instructions.json
-<Electron userData>\scenario_presets.local.json
-<Electron userData>\license_state.json
-<Electron userData>\logs\
+<AppData>\CHATT-DIRECT\provider_config.local.json
+<AppData>\CHATT-DIRECT\instructions.json
+<AppData>\CHATT-DIRECT\scenario_presets.local.json
+<AppData>\CHATT-DIRECT\logs\
 ```
 
 Final read-only install/template files:
@@ -1240,9 +1225,9 @@ Final read-only install/template files:
 Backend must receive explicit paths from Electron in packaged runtime:
 
 ```env
-PROVIDER_CONFIG_PATH=<Electron userData>\provider_config.local.json
-INSTRUCTIONS_PATH=<Electron userData>\instructions.json
-SCENARIO_PRESETS_PATH=<Electron userData>\scenario_presets.local.json
+PROVIDER_CONFIG_PATH=<AppData>\CHATT-DIRECT\provider_config.local.json
+INSTRUCTIONS_PATH=<AppData>\CHATT-DIRECT\instructions.json
+SCENARIO_PRESETS_PATH=<AppData>\CHATT-DIRECT\scenario_presets.local.json
 PROVIDER_CAPABILITIES_PATH=<install>\backend\provider_capabilities.json
 PROVIDER_CONFIG_EXAMPLE_PATH=<install>\backend\provider_config.local.example.json
 SCENARIO_PRESETS_DEFAULT_PATH=<install>\backend\scenario_presets.json
@@ -1253,7 +1238,7 @@ Electron main process responsibilities for Phase 2:
 
 ```text
 Use app.getPath("userData") as the root user data location.
-Electron main process uses Electron userData as the writable runtime folder.
+Create the CHATT-DIRECT user runtime folder if needed.
 Seed or migrate runtime files before backend startup.
 Start the backend as a child process with explicit env path variables.
 Keep backend stdout/stderr available for diagnostics/logging.
@@ -1317,11 +1302,11 @@ Desktop starts backend or gives a clear backend startup error.
 Provider config API works through localhost.
 Instructions API works through localhost.
 Scenarios API works through localhost.
-POST /v1/scenarios/instruction persists userInstruction to Electron userData scenario runtime state.
-DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from Electron userData scenario runtime state.
-Provider save writes to Electron userData.
-Instruction save writes to Electron userData.
-Scenario local runtime file is created in Electron userData if missing.
+POST /v1/scenarios/instruction persists userInstruction to AppData scenario runtime state.
+DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from AppData scenario runtime state.
+Provider save writes to AppData.
+Instruction save writes to AppData.
+Scenario local runtime file is created in AppData if missing.
 Start Direct Realtime still works.
 Stop Direct Realtime still works.
 Reset session guard still works.
@@ -1431,9 +1416,6 @@ Preferred commercial packaging model:
 ```text
 Windows app sold as a packaged desktop application
 Customer brings their own provider/API key
-License unlocks application usage only; it does not include AI usage or hosted AI service access
-3-day trial and license validation are planned through a hosted licensing backend
-Payment provider is not finalized; Paddle and Lemon Squeezy remain candidates
 ```
 
 Product value should focus on:
@@ -1840,18 +1822,18 @@ If false barge-in while assistant audio is active remains frequent, evaluate a c
 
 ---
 
-## 25. License / Trial Commercial Access Baseline
+## 26. Azure Licensing / Trial Runtime Baseline
 
-Licensing/trial is a planned commercial access layer for AnswerDesk AI / CHATT Direct.
+Licensing/trial is now an implemented commercial access layer foundation for AnswerDesk AI / CHATT Direct.
 
-Product/commercial model:
+Commercial model:
 
 ```text
 AnswerDesk AI is a downloadable Windows desktop application.
 AnswerDesk AI is not a hosted AI SaaS service.
-AnswerDesk AI does not sell AI model access, AI endpoint access, conversation hosting, or AI usage credits.
+AnswerDesk AI does not sell AI model access, AI endpoint access, hosting of conversations, or AI usage credits.
 The customer brings their own AI provider/API key.
-The license unlocks the desktop application only.
+The license unlocks use of the desktop application only.
 Provider/API usage remains owned and paid by the customer directly through their selected provider.
 ```
 
@@ -1863,23 +1845,144 @@ Paddle remains a candidate.
 Lemon Squeezy remains a candidate.
 Do not treat Paddle as the decided primary provider.
 Do not treat Lemon Squeezy as inactive.
-Desktop code must not be hardcoded to Paddle or Lemon Squeezy.
+Desktop code must not be hardcoded to either payment provider.
 Desktop must communicate only with the hosted licensing backend.
 Payment provider webhooks will be handled by the hosted licensing backend later.
 ```
 
-Authority rule:
+Current Azure licensing infrastructure:
 
 ```text
-The hosted licensing backend is authoritative for trial/license status.
-The Desktop app may cache license status locally.
-The local cache is not authoritative.
-The 3-day free trial must be registered with the hosted licensing backend.
-After trial expiration, Start Direct Realtime must be blocked.
-Settings and License UI must remain accessible after trial expiration.
+Subscription ID:
+8794fa81-0ce6-4fd6-9d1b-ccfa160df329
+
+Tenant ID:
+b7fddbde-dfdf-425e-a785-97d3b91909a0
+
+Resource Group:
+AI
+
+Region:
+East US 2 / eastus2
+
+Storage Account:
+answerdesklicdevst
+
+Azure Function App:
+answerdesk-licensing-api-dev
+
+Default host:
+answerdesk-licensing-api-dev.azurewebsites.net
+
+Application Insights:
+answerdesk-licensing-api-dev
+
+Azure Table:
+LicenseRecords
 ```
 
-Planned local cache file:
+Current hosted licensing API base URL:
+
+```text
+https://answerdesk-licensing-api-dev.azurewebsites.net/api
+```
+
+Current deployed licensing API endpoints:
+
+```text
+GET  /v1/license/health
+POST /v1/license/trial/start
+POST /v1/license/validate
+POST /v1/license/activate
+```
+
+Current local licensing API source folder:
+
+```text
+C:\Projects\chatt-direct\apps\licensing-api
+```
+
+Current licensing API files:
+
+```text
+apps/licensing-api/package.json
+apps/licensing-api/package-lock.json
+apps/licensing-api/host.json
+apps/licensing-api/local.settings.example.json
+apps/licensing-api/README.md
+apps/licensing-api/src/functions/health.js
+apps/licensing-api/src/functions/trialStart.js
+apps/licensing-api/src/functions/validate.js
+apps/licensing-api/src/functions/activate.js
+apps/licensing-api/src/shared/responses.js
+apps/licensing-api/src/shared/licenseStatuses.js
+apps/licensing-api/src/shared/validation.js
+apps/licensing-api/src/shared/storage.js
+```
+
+Current Azure Function runtime:
+
+```text
+Azure Functions v4
+Node.js 24 on Azure Function App
+Local package engine currently allows node >=20
+@azure/functions
+@azure/data-tables
+```
+
+Current Azure app settings used by licensing API:
+
+```text
+LICENSE_STORAGE_CONNECTION_STRING
+LICENSE_TABLE_NAME=LicenseRecords
+```
+
+Security note:
+
+```text
+Do not paste or commit LICENSE_STORAGE_CONNECTION_STRING, storage account keys, API keys, tokens, webhook secrets, or payment provider secrets.
+A storage account connection string was displayed during setup in the terminal/chat flow.
+Key rotation is deferred to the later security hardening/check phase per user decision.
+Before production or public release, rotate exposed keys and complete a full secret scan.
+```
+
+Trial/license authority rule:
+
+```text
+The hosted licensing backend is authoritative for trial/license state.
+The Desktop app may cache license state locally.
+The local cache is not authoritative.
+The 3-day free trial is registered and validated through the hosted Azure Licensing API.
+Azure Table Storage is the current MVP persistence layer for trial records.
+```
+
+Current Desktop licensing state:
+
+```text
+Dedicated License page exists in the Desktop app.
+License page shows current cached/backend license status.
+License page supports:
+- Start 3-day Trial
+- Activate License
+- Refresh License Status
+- Buy License
+
+License page is separate from Settings.
+Settings no longer contains the License & Trial card.
+Renderer calls only window.electronAPI.license.*.
+Electron main performs hosted licensing API calls over HTTPS.
+```
+
+Current Desktop License page navigation:
+
+```text
+Voice
+License
+Settings
+Scenarios
+```
+
+Current local licensing cache:
 
 ```text
 <Electron userData>\license_state.json
@@ -1893,14 +1996,14 @@ In development it is created under Desktop\.electron-userdata\.
 In packaged Windows it is expected under AppData\Roaming\answerdesk-ai\.
 ```
 
-Planned license cache schema:
+Current license cache schema:
 
 ```json
 {
   "schemaVersion": 1,
   "installId": "uuid",
   "deviceHash": null,
-  "status": "unregistered",
+  "status": "not_registered",
   "registeredEmail": null,
   "licenseId": null,
   "activationId": null,
@@ -1914,13 +2017,66 @@ Planned license cache schema:
   "lastError": null,
   "checkoutUrl": null,
   "paymentProvider": null,
-  "statusSignature": null
+  "statusSignature": null,
+  "updatedAt": "ISO timestamp"
 }
 ```
 
-Raw license keys should not be stored locally unless explicitly approved after security review.
+Raw license key rule:
 
-Runtime allow/block rule:
+```text
+Do not store raw license keys locally.
+Desktop may send raw licenseKey only to POST /v1/license/activate.
+The hosted licensing API currently stores/returns only licenseKeyLast4.
+```
+
+Current supported licensing statuses:
+
+```text
+not_registered
+trial_active
+trial_expired
+licensed
+license_invalid
+license_revoked
+offline_grace
+error
+```
+
+Current trial behavior:
+
+```text
+Trial duration: 3 days.
+Trial email: required for Start 3-day Trial.
+trial/start creates a new trial record for a new installId.
+trial/start does not reset or extend trialStartedAt/trialExpiresAt for an existing installId.
+trial/start may update registeredEmail for an existing installId.
+validate reads the record and returns trial_active while now < trialExpiresAt.
+validate returns trial_expired when now >= trialExpiresAt.
+```
+
+Current activate behavior:
+
+```text
+Payment-backed license activation is not connected yet.
+activate validates email, licenseKey, and installId.
+activate never stores or returns the raw licenseKey.
+activate stores/returns licenseKeyLast4 only.
+activate preserves existing trial status if a trial record exists.
+activate does not mark a record licensed yet.
+```
+
+Current access/enforcement rule:
+
+```text
+Start Direct Realtime is intentionally not license-gated during current development and packaging validation.
+The License page, hosted licensing API, local cache, and Azure Table Storage flow are active.
+The enforcement call inside startDirectRealtime() remains disabled/bypassed for now.
+Do not re-enable Start Direct Realtime blocking until explicitly approved.
+Future production enforcement is expected to allow only trial_active and licensed.
+```
+
+Future allow/block rule when enforcement is explicitly re-enabled:
 
 ```text
 Allow Start Direct Realtime only when license status is:
@@ -1928,7 +2084,7 @@ Allow Start Direct Realtime only when license status is:
 - licensed
 
 Block Start Direct Realtime when license status is:
-- unregistered
+- not_registered
 - trial_expired
 - license_invalid
 - license_revoked
@@ -1936,156 +2092,145 @@ Block Start Direct Realtime when license status is:
 - error
 ```
 
-MVP decisions:
+Offline grace rule:
 
 ```text
-Trial duration: 3 days.
-Trial email: required for Start 3-day trial.
-Offline grace: not implemented in MVP; keep offlineGraceExpiresAt schema field for future use.
-Payment provider: TBD; Paddle and Lemon Squeezy remain candidates.
+Offline grace is not implemented in the current MVP.
+offlineGraceExpiresAt remains in schema for future use.
+For now, hosted backend validation remains the authority.
 ```
 
-Hosted licensing backend direction:
+Current implementation commits:
 
 ```text
-Licensing backend must be separate from backend/app_realtime.py.
+8ebdefa Update canonical state for licensing plan
+0e91a2e Add local license state foundation
+5097d7a Correct canonical userData runtime paths
+9450655 Add license trial settings UI
+b61ebee Move licensing to dedicated page
+414b8c0 Add licensing API skeleton
+878eb08 Connect desktop licensing to Azure API
+6dc4ad1 Add licensing trial storage
+```
+
+Current endpoint validation results:
+
+```text
+GET /v1/license/health:
+  OK, returns ok:true, status:healthy.
+
+POST /v1/license/trial/start:
+  OK, creates trial_active record with trialStartedAt and trialExpiresAt.
+
+POST /v1/license/validate:
+  OK, reads trial record and returns trial_active while active.
+
+POST /v1/license/trial/start for same installId:
+  OK, does not extend trialStartedAt/trialExpiresAt.
+
+POST /v1/license/activate:
+  OK for skeleton behavior, returns ok:false with Payment-backed license activation is not connected yet, preserves trial status, returns only licenseKeyLast4.
+```
+
+Current Desktop end-to-end validation:
+
+```text
+Desktop License page successfully calls hosted Azure Licensing API through Electron main.
+Azure Licensing API writes/reads Azure Table Storage LicenseRecords.
+Desktop License page displays Trial Active after Start 3-day Trial.
+Desktop License page displays registered email, Trial Expires, and Last Validated.
+Start Direct Realtime still works without license gating during development.
+Git clean after validation and commit.
+```
+
+Current licensing implementation boundaries:
+
+```text
+Licensing backend is separate from backend/app_realtime.py.
 backend/app_realtime.py remains the local Direct Realtime runtime backend only.
-The hosted licensing backend handles trial start, license activation, license validation, payment webhooks, and license records.
-Electron main process should perform hosted licensing API calls over HTTPS.
-Renderer should call only window.electronAPI.license.*.
-```
-
-Planned hosted API endpoints:
-
-```text
-POST /v1/license/trial/start
-POST /v1/license/validate
-POST /v1/license/activate
-POST /v1/license/deactivate      # later
-POST /v1/webhooks/paddle         # later, if Paddle is selected or supported
-POST /v1/webhooks/lemon          # later, if Lemon Squeezy is selected or supported
+Desktop renderer does not call Azure directly.
+Renderer calls window.electronAPI.license.* only.
+Electron main owns hosted licensing API calls.
+Payment provider logic is not in Desktop.
+Paddle/Lemon Squeezy webhook logic is not implemented yet.
 ```
 
 Provider-neutral checkout rule:
 
 ```text
 Buy License opens a configurable checkoutUrl or pricing page.
-checkoutUrl may be returned by the hosted licensing backend and cached in license_state.json.
+checkoutUrl may be returned by the licensing backend and cached in license_state.json.
 Desktop must not assume Paddle-specific or Lemon-specific checkout behavior.
+Current checkoutUrl is null, so Buy License reports that checkout URL is not configured yet.
 ```
 
-Desktop implementation phases:
+Planned future hosted API endpoints:
 
 ```text
-Phase 0 - Baseline and decisions
-  Confirm Electron userData as the canonical writable runtime folder. Confirmed examples: development uses C:\Projects\chatt-direct\Desktop\.electron-userdata\, packaged Windows uses C:\Users\zoran\AppData\Roaming\answerdesk-ai\.
-  Confirm trial email is required.
-  Confirm offline grace is deferred for MVP.
-  Confirm payment provider remains TBD between Paddle and Lemon Squeezy.
-
-Phase 1 - Local license state foundation
-  Files: Desktop/electron/main.cjs, Desktop/electron/preload.cjs
-  Add license_state.json under Electron userData.
-  Add Electron main process license state helpers and IPC handlers.
-  Add preload bridge window.electronAPI.license.*.
-  No UI, no Start guard, no hosted backend integration yet.
-
-Phase 2 - License & Trial UI in Settings
-  Files: Desktop/renderer/index.html, Desktop/renderer/styles.css, Desktop/renderer/locales/ui.json, Desktop/renderer/renderer.js
-  Add License & Trial Settings card.
-  Add local rendering of current cached license state.
-  Add Start Trial, Activate License, Refresh License Status, and Buy License controls.
-  No Start Direct Realtime guard yet.
-
-Phase 3 - Start Direct Realtime guard
-  File: Desktop/renderer/renderer.js
-  Add guard inside startDirectRealtime() immediately after the already-running check and before any audio/WebSocket startup.
-  Allow Start only for trial_active and licensed.
-  Block all other statuses with a clear UI/log message.
-  Mini Control Window Start must remain routed through the existing main renderer Start flow, so the same guard applies.
-
-Phase 4 - Hosted licensing backend skeleton
-  New hosted service, separate from backend/app_realtime.py.
-  Implement provider-neutral trial/start, validate, and activate API contract.
-  Do not implement Paddle/Lemon webhooks yet unless explicitly approved.
-
-Phase 5 - Desktop integration with hosted licensing backend
-  Electron main process calls the hosted licensing backend over HTTPS.
-  Renderer still calls only window.electronAPI.license.*.
-  Cache successful backend responses to license_state.json.
-
-Phase 6 - Trial expiration UX
-  Show remaining trial time.
-  Show Trial active / Trial expired / License active / License invalid states.
-  Keep Settings and License UI accessible after trial expiration.
-
-Phase 7 - Provider-neutral checkout
-  Add configurable checkoutUrl behavior.
-  Buy License opens checkoutUrl or pricing page.
-  Keep provider-neutral until Paddle vs Lemon Squeezy decision is finalized.
-
-Phase 8 - Payment provider webhooks
-  Add Paddle and/or Lemon Squeezy webhook handling in hosted licensing backend after provider decision.
-  Normalize payment events into internal license records.
-
-Phase 9 - Advanced licensing features
-  Offline grace.
-  Device activation limits.
-  Deactivate/reset device.
-  Revocation handling.
-  Admin dashboard.
-  Customer portal.
+POST /v1/license/deactivate      # later
+POST /v1/webhooks/paddle         # later, if Paddle is selected or supported
+POST /v1/webhooks/lemon          # later, if Lemon Squeezy is selected or supported
 ```
 
-Planned DOM IDs:
+Remaining licensing work:
 
 ```text
-settingsLicenseBadge
-licenseStatus
-licenseRegisteredEmail
-licenseTrialExpiresAt
-licenseLastValidatedAt
-licenseOfflineGraceExpiresAt
-licenseEmail
-licenseKey
-btnLicenseStartTrial
-btnLicenseActivate
-btnLicenseValidate
-btnLicenseCheckout
-licenseMessage
+Integrate payment provider after decision: Paddle, Lemon Squeezy, or both.
+Implement paid license issuing/activation model.
+Implement webhook signature validation.
+Implement provider-neutral checkoutUrl generation or pricing page.
+Implement production Start Direct Realtime license enforcement when approved.
+Implement trial expiration UX/countdown if desired.
+Implement license revocation/deactivation/reset device behavior.
+Implement offline grace only after explicit approval.
+Implement rate limiting / abuse protection for trial start.
+Implement storage key rotation and secret scan before production/public release.
+Add admin/customer license management only after core paid activation is defined.
 ```
 
-Planned Electron IPC names:
+Validation after Desktop licensing changes:
+
+```powershell
+cd C:\Projects\chatt-direct
+node --check .\Desktop\electron\main.cjs
+node --check .\Desktop\electron\preload.cjs
+node --check .\Desktop\renderer\renderer.js
+git status --short
+git diff --name-status
+git diff --stat
+```
+
+Validation after licensing API changes:
+
+```powershell
+cd C:\Projects\chatt-direct\apps\licensing-api
+node --check .\src\functions\health.js
+node --check .\src\functions\trialStart.js
+node --check .\src\functions\validate.js
+node --check .\src\functions\activate.js
+node --check .\src\shared\responses.js
+node --check .\src\shared\licenseStatuses.js
+node --check .\src\shared\validation.js
+node --check .\src\shared\storage.js
+```
+
+Deploy licensing API:
+
+```powershell
+cd C:\Projects\chatt-direct\apps\licensing-api
+func azure functionapp publish answerdesk-licensing-api-dev --javascript
+```
+
+Runtime test URLs:
 
 ```text
-license:get-state
-license:start-trial
-license:validate
-license:activate
-license:get-cache-path
-license:open-checkout
+https://answerdesk-licensing-api-dev.azurewebsites.net/api/v1/license/health
+https://answerdesk-licensing-api-dev.azurewebsites.net/api/v1/license/trial/start
+https://answerdesk-licensing-api-dev.azurewebsites.net/api/v1/license/validate
+https://answerdesk-licensing-api-dev.azurewebsites.net/api/v1/license/activate
 ```
 
-Planned preload API:
-
-```javascript
-electronAPI.license.getState()
-electronAPI.license.startTrial({ email })
-electronAPI.license.validate()
-electronAPI.license.activate({ email, licenseKey })
-electronAPI.license.getCachePath()
-electronAPI.license.openCheckout()
-```
-
-Start guard placement:
-
-```text
-The guard must be placed in Desktop/renderer/renderer.js inside startDirectRealtime().
-It must run immediately after the existing already-running check.
-It must run before refreshOutputDevicesUI(), ensurePlayback(), connectRealtime(), getLoopbackStream(), AudioContext creation, or AudioWorklet loading.
-```
-
-This license/trial layer must not change:
+Licensing must not change:
 
 ```text
 Direct Realtime audio flow
@@ -2099,34 +2244,4 @@ Cost Guard behavior
 Mini Control Window runtime ownership
 instruction refresh WebSocket message shape
 backend/app_realtime.py Realtime bridge behavior
-```
-
-Validation after each Desktop licensing phase:
-
-```powershell
-cd C:\Projects\chatt-direct
-node --check .\Desktop\electron\main.cjs
-node --check .\Desktop\electron\preload.cjs
-node --check .\Desktop\renderer\renderer.js
-git status --short
-git diff --name-status
-git diff --stat
-```
-
-For Python/backend changes only:
-
-```powershell
-cd C:\Projects\chatt-direct
-python -m py_compile backend/app_realtime.py backend/provider_config.py
-```
-
-Runtime validation requirements:
-
-```text
-Unregistered/trial_expired/license_invalid/license_revoked/error status blocks Start Direct Realtime before audio/WebSocket startup.
-trial_active and licensed allow existing Direct Realtime behavior unchanged.
-Settings and License UI remain accessible in all statuses.
-Mini Control Window Start follows the same guard because it routes through the main renderer Start flow.
-No microphone input is introduced.
-No provider/session.update/audio/playback/scenario/Cost Guard behavior is changed by licensing.
 ```
