@@ -3727,27 +3727,27 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     btnExportTroubleshootingPackage.addEventListener("click", async () => {
       const supportApi = window.electronAPI && window.electronAPI.support;
       if (!supportApi || typeof supportApi.exportTroubleshootingPackage !== "function") {
-        setSupportExportStatus("Export failed.", "bad");
+        setSupportExportStatus(t("settings.support.failed", "Export failed."), "bad");
         push("ERROR(Support export): support API unavailable");
         return;
       }
 
       btnExportTroubleshootingPackage.disabled = true;
-      setSupportExportStatus("Preparing troubleshooting package...", "warn");
+      setSupportExportStatus(t("settings.support.preparing", "Preparing troubleshooting package..."), "warn");
       try {
         const result = await supportApi.exportTroubleshootingPackage();
         if (result?.canceled) {
-          setSupportExportStatus("Export canceled.", "warn");
+          setSupportExportStatus(t("settings.support.canceled", "Export canceled."), "warn");
           push("Troubleshooting package export canceled.");
         } else if (result?.ok) {
-          setSupportExportStatus("Troubleshooting package saved.", "ok");
+          setSupportExportStatus(t("settings.support.saved", "Troubleshooting package saved."), "ok");
           push(`Troubleshooting package saved: ${result.filePath || "(path unavailable)"}`);
         } else {
-          setSupportExportStatus("Export failed.", "bad");
-          push(`ERROR(Support export): ${result?.message || "Export failed."}`);
+          setSupportExportStatus(t("settings.support.failed", "Export failed."), "bad");
+          push(`ERROR(Support export): ${result?.message || t("settings.support.failed", "Export failed.")}`);
         }
       } catch (e) {
-        setSupportExportStatus("Export failed.", "bad");
+        setSupportExportStatus(t("settings.support.failed", "Export failed."), "bad");
         push(`ERROR(Support export): ${e?.message || e}`);
       } finally {
         btnExportTroubleshootingPackage.disabled = false;
