@@ -45,6 +45,7 @@ deterministic Electron UI zoom factor 0.7 for main Desktop window
 hosted Azure Licensing API for 3-day free trial registration and validation
 free trial anti-reset protection through installId, emailHash, and deviceHash
 trial/start rate limiting
+user-initiated local troubleshooting package export
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -576,7 +577,7 @@ Desktop main window uses canonical 1120 x 820 default with 860 x 720 minimum
 Desktop main window applies deterministic APP_UI_ZOOM_FACTOR = 0.7 in Electron main process
 UI scale is not allowed to depend on Chromium persisted per-host zoom state
 Voice page uses Session and Activity as primary user-facing status indicators
-Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Diagnostics, Auth, and Log cards
+Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Support & Troubleshooting, Diagnostics, Auth, and Log cards
 Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
 Scenario Preview displays human-readable metadata using displayDetails when available and never displays scenario.instruction
 Bottom app status bar no longer shows the redundant bottom volume mirror
@@ -2248,6 +2249,7 @@ b61ebee Move licensing to dedicated page
 2bfb801 Add trial anti-reset protection
 1fb6a01 Add trial start rate limiting
 5a917d7 Add trial started email delivery
+fe196c5 Add email settings template
 ```
 
 Current endpoint validation results:
@@ -2732,6 +2734,242 @@ Customer/product transactional emails use Azure Communication Services Email.
 These are separate email paths.
 ```
 
+
+
+## 28. Desktop Troubleshooting Package Export Runtime Baseline
+
+
+This section captures the implemented local support package export capability in the Windows/Electron Desktop app.
+
+Feature status:
+
+```text
+Implemented.
+Runtime tested.
+Committed.
+```
+
+Commit:
+
+```text
+493909d Add troubleshooting package export
+```
+
+Purpose:
+
+```text
+Allow a user to create a local sanitized diagnostic ZIP package that can be manually sent to support.
+This is an app troubleshooting feature, not a licensing backend feature.
+```
+
+User flow:
+
+```text
+Settings
+-> Support & Troubleshooting
+-> Export Troubleshooting Package
+-> Windows Save dialog
+-> user chooses local ZIP destination
+-> app saves the troubleshooting ZIP
+-> user manually sends the ZIP to support if needed
+```
+
+Current UI location:
+
+```text
+Settings page
+left settings column
+after Session Cost Guard
+panel title: Support & Troubleshooting
+button: Export Troubleshooting Package
+status line: supportExportStatus
+```
+
+Current implementation files:
+
+```text
+Desktop/package.json
+Desktop/package-lock.json
+Desktop/electron/main.cjs
+Desktop/electron/preload.cjs
+Desktop/renderer/index.html
+Desktop/renderer/renderer.js
+```
+
+Current dependency:
+
+```text
+adm-zip
+```
+
+Reason for dependency:
+
+```text
+The app must create ZIP files directly inside Electron/Node.
+The implementation must not rely on PowerShell Compress-Archive, external shell tools, user PATH configuration, or user command-line knowledge.
+```
+
+Current preload API:
+
+```text
+window.electronAPI.support.exportTroubleshootingPackage()
+```
+
+Current Electron IPC handler:
+
+```text
+support:export-troubleshooting-package
+```
+
+Current package contents:
+
+```text
+support-info.json
+system-info.json
+license-state-redacted.json
+provider-config-redacted.json
+recent-app-log.txt
+```
+
+Current support-info.json scope:
+
+```text
+exportTime
+appVersion
+isPackaged
+supportPackageVersion
+generatedBy
+licenseStatus
+registeredEmail
+trialStartedAt
+trialExpiresAt
+lastValidatedAt
+activeProvider
+providerConfigured
+logsIncluded
+contents note
+```
+
+Current system-info.json scope:
+
+```text
+exportTime
+appVersion
+appName/productName
+isPackaged
+platform
+architecture
+OS release/type
+locale
+timezone
+Electron version
+Chrome version
+Node version
+userDataDir basename only
+```
+
+Current license-state-redacted.json scope:
+
+```text
+sanitized local license cache
+deviceHash is reduced to deviceHashPresent true/false
+raw license key is not exported
+raw MachineGuid is not exported
+device_seed content is not exported
+```
+
+Current provider-config-redacted.json scope:
+
+```text
+sanitized provider configuration
+active provider may be included
+provider/model/region/language/voice configuration may be included
+raw provider API keys are removed
+apiKeyPresent true/false may be included
+secrets, tokens, passwords, connection strings, and key values are redacted
+```
+
+Current recent-app-log.txt scope:
+
+```text
+sanitized backend.log tail
+sanitized backend-error.log tail
+up to 300 lines per file
+no renderer log export in current v1 implementation
+```
+
+Forbidden export data:
+
+```text
+provider API keys
+Azure/OpenAI keys
+ACS_CONNECTION_STRING
+LICENSE_STORAGE_CONNECTION_STRING
+storage account keys
+tokens
+passwords
+raw license key
+raw MachineGuid
+device_seed content
+audio
+conversation transcript
+full prompts/instructions
+personal files
+provider endpoint secrets
+backend environment variables
+```
+
+Current redaction behavior:
+
+```text
+Recursive redaction is implemented in Electron main.
+Keys matching secret/key/token/password/connection-string/license-key/machine-guid/device-seed patterns are redacted.
+Log-line sanitization is applied before writing recent-app-log.txt.
+```
+
+MVP boundaries:
+
+```text
+No automatic upload.
+No Support Center integration.
+No remote monitoring.
+No background collection.
+No backend/app_realtime.py changes.
+No licensing API changes.
+No Direct Realtime audio flow changes.
+No provider adapter changes.
+No scenario runtime changes.
+No Mini Control Window runtime ownership changes.
+```
+
+Runtime validation:
+
+```text
+npm.cmd install in Desktop: OK
+node --check Desktop/electron/main.cjs: OK
+node --check Desktop/electron/preload.cjs: OK
+node --check Desktop/renderer/renderer.js: OK
+Desktop runtime export test: OK
+ZIP created through Settings -> Support & Troubleshooting: OK
+ZIP contained exactly the expected five files: OK
+Basic secret-pattern inspection of generated ZIP: OK
+No obvious API key, connection string, bearer token, or sk-* secret found in exported ZIP: OK
+```
+
+Known v1 limitation:
+
+```text
+recent-app-log.txt currently includes backend logs only.
+Renderer UI log is not included in the ZIP.
+If renderer log export is added later, local user paths and any sensitive UI log content must be sanitized first.
+```
+
+Support process rule:
+
+```text
+The user remains in control of when the package is created and whether it is sent.
+Support should ask the user to create and email the package only when needed for troubleshooting.
+```
 
 Planned future hosted API endpoints:
 
