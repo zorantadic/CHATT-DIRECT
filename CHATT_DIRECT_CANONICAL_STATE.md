@@ -1,6 +1,6 @@
 # CHATT Direct Canonical State
 
-Last updated: 2026-05-25
+Last updated: 2026-05-28
 
 This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
 
@@ -42,6 +42,9 @@ multilingual UI display support
 header language selector synchronized with Settings language selector
 floating vertical Mini Control Window when the main app is minimized
 deterministic Electron UI zoom factor 0.7 for main Desktop window
+hosted Azure Licensing API for 3-day free trial registration and validation
+free trial anti-reset protection through installId, emailHash, and deviceHash
+trial/start rate limiting
 ```
 
 This runtime is no longer the old orchestrated CHATT flow.
@@ -1209,6 +1212,8 @@ Final writable runtime files:
 <AppData>\CHATT-DIRECT\provider_config.local.json
 <AppData>\CHATT-DIRECT\instructions.json
 <AppData>\CHATT-DIRECT\scenario_presets.local.json
+<AppData>\CHATT-DIRECT\license_state.json
+<AppData>\CHATT-DIRECT\device_seed        # fallback only if Windows MachineGuid cannot be read
 <AppData>\CHATT-DIRECT\logs\
 ```
 
@@ -1820,8 +1825,6 @@ If system loopback isolation is required later, evaluate native Windows Applicat
 If false barge-in while assistant audio is active remains frequent, evaluate a controlled 300-500 ms delayed/manual barge-in strategy only after the current runtime-audio-state baseline remains stable.
 ```
 
----
-
 ## 26. Azure Licensing / Trial Runtime Baseline
 
 Licensing/trial is now an implemented commercial access layer foundation for AnswerDesk AI / CHATT Direct.
@@ -1953,7 +1956,7 @@ The hosted licensing backend is authoritative for trial/license state.
 The Desktop app may cache license state locally.
 The local cache is not authoritative.
 The 3-day free trial is registered and validated through the hosted Azure Licensing API.
-Azure Table Storage is the current MVP persistence layer for trial records.
+Azure Table Storage is the current MVP persistence layer for trial records, lookup records, and trial/start rate-limit records.
 ```
 
 Current Desktop licensing state:
@@ -1996,13 +1999,24 @@ In development it is created under Desktop\.electron-userdata\.
 In packaged Windows it is expected under AppData\Roaming\answerdesk-ai\.
 ```
 
+Current Desktop device identity behavior:
+
+```text
+Desktop/electron/main.cjs generates a stable licensing deviceHash.
+On Windows, Electron main attempts to read Windows MachineGuid using reg.exe query.
+Raw MachineGuid is never stored, never logged, and never sent to Azure.
+The value sent to Azure is SHA-256("answerdesk-ai-device-v1:" + MachineGuid).
+If MachineGuid cannot be read, Electron main creates a stable fallback device_seed file under Electron userData and derives the SHA-256 deviceHash from that fallback seed.
+Existing non-empty deviceHash in license_state.json is preserved and not regenerated unnecessarily.
+```
+
 Current license cache schema:
 
 ```json
 {
   "schemaVersion": 1,
   "installId": "uuid",
-  "deviceHash": null,
+  "deviceHash": "sha256 hex string or null before backfill",
   "status": "not_registered",
   "registeredEmail": null,
   "licenseId": null,
@@ -2040,19 +2054,118 @@ licensed
 license_invalid
 license_revoked
 offline_grace
+rate_limited
 error
 ```
 
-Current trial behavior:
+Current Azure Table Storage model:
+
+```text
+Main trial/license record:
+PartitionKey = license
+RowKey = installId
+
+Email lookup:
+PartitionKey = email
+RowKey = emailHash
+
+Device lookup:
+PartitionKey = device
+RowKey = deviceHash
+
+Rate-limit records:
+PartitionKey = rate
+RowKey = trialStart:email:<emailHash>
+RowKey = trialStart:device:<deviceHash>
+```
+
+Main record fields include:
+
+```text
+installId
+registeredEmail
+emailHash
+deviceHash
+status
+trialStartedAt
+trialExpiresAt
+licenseId
+activationId
+licenseKeyLast4
+licenseActivatedAt
+lastValidatedAt
+offlineGraceExpiresAt
+checkoutUrl
+paymentProvider
+createdAt
+updatedAt
+```
+
+Trial anti-reset behavior:
 
 ```text
 Trial duration: 3 days.
 Trial email: required for Start 3-day Trial.
-trial/start creates a new trial record for a new installId.
-trial/start does not reset or extend trialStartedAt/trialExpiresAt for an existing installId.
-trial/start may update registeredEmail for an existing installId.
-validate reads the record and returns trial_active while now < trialExpiresAt.
-validate returns trial_expired when now >= trialExpiresAt.
+trial/start normalizes email and computes emailHash = SHA-256(normalizedEmail).
+trial/start receives deviceHash from Desktop; Desktop sends only the hashed value.
+trial/start checks existing trial/license state in this order:
+1. installId main record
+2. emailHash lookup
+3. deviceHash lookup
+
+If any of those identities already has a trial/license record:
+- no new trial is created
+- trialStartedAt is not reset
+- trialExpiresAt is not extended
+- existing registeredEmail is not overwritten
+- missing emailHash/deviceHash fields may be backfilled
+- missing lookup records may be created when safe
+- current status is returned based on server time and trialExpiresAt
+
+If no installId/emailHash/deviceHash match exists:
+- a new trial_active record is created
+- trialStartedAt is server time
+- trialExpiresAt is server time + 3 days
+- email and device lookup records are created
+```
+
+Current trial/start rate limiting:
+
+```text
+Endpoint:
+POST /v1/license/trial/start
+
+Limit:
+10 attempts per 1 hour
+
+Identities:
+emailHash
+deviceHash when present
+
+Storage:
+PartitionKey = rate
+RowKey = trialStart:email:<emailHash>
+RowKey = trialStart:device:<deviceHash>
+
+Fields:
+count
+windowStartedAt
+updatedAt
+
+If either emailHash or deviceHash exceeds the limit:
+ok = false
+status = rate_limited
+message = Too many trial attempts. Please try again later.
+```
+
+Current validate behavior:
+
+```text
+validate currently reads by installId.
+validate returns trial_active while server time is before trialExpiresAt.
+validate returns trial_expired when server time is at or after trialExpiresAt.
+validate returns licensed only if a stored record is already licensed.
+validate does not return emailHash or deviceHash to Desktop.
 ```
 
 Current activate behavior:
@@ -2062,6 +2175,7 @@ Payment-backed license activation is not connected yet.
 activate validates email, licenseKey, and installId.
 activate never stores or returns the raw licenseKey.
 activate stores/returns licenseKeyLast4 only.
+activate may store normalized registeredEmail, emailHash, deviceHash, and licenseKeyLast4.
 activate preserves existing trial status if a trial record exists.
 activate does not mark a record licensed yet.
 ```
@@ -2070,7 +2184,7 @@ Current access/enforcement rule:
 
 ```text
 Start Direct Realtime is intentionally not license-gated during current development and packaging validation.
-The License page, hosted licensing API, local cache, and Azure Table Storage flow are active.
+The License page, hosted licensing API, local cache, Azure Table Storage flow, anti-reset protection, and trial/start rate limiting are active.
 The enforcement call inside startDirectRealtime() remains disabled/bypassed for now.
 Do not re-enable Start Direct Realtime blocking until explicitly approved.
 Future production enforcement is expected to allow only trial_active and licensed.
@@ -2089,6 +2203,7 @@ Block Start Direct Realtime when license status is:
 - license_invalid
 - license_revoked
 - offline_grace
+- rate_limited
 - error
 ```
 
@@ -2111,6 +2226,10 @@ b61ebee Move licensing to dedicated page
 414b8c0 Add licensing API skeleton
 878eb08 Connect desktop licensing to Azure API
 6dc4ad1 Add licensing trial storage
+0963d78 Update canonical state for licensing API storage
+388e36f Add desktop licensing device hash
+2bfb801 Add trial anti-reset protection
+1fb6a01 Add trial start rate limiting
 ```
 
 Current endpoint validation results:
@@ -2120,13 +2239,25 @@ GET /v1/license/health:
   OK, returns ok:true, status:healthy.
 
 POST /v1/license/trial/start:
-  OK, creates trial_active record with trialStartedAt and trialExpiresAt.
+  OK, creates trial_active record with trialStartedAt and trialExpiresAt for a new installId/emailHash/deviceHash.
 
 POST /v1/license/validate:
   OK, reads trial record and returns trial_active while active.
 
 POST /v1/license/trial/start for same installId:
   OK, does not extend trialStartedAt/trialExpiresAt.
+
+POST /v1/license/trial/start for same emailHash with new installId:
+  OK, does not create a new trial and returns the original trial record.
+
+POST /v1/license/trial/start for same deviceHash with new installId and different email:
+  OK, does not create a new trial and returns the original trial record.
+
+POST /v1/license/trial/start for same deviceHash with different email:
+  OK, preserves the original registeredEmail and does not overwrite it.
+
+POST /v1/license/trial/start repeated 11 times for same emailHash/deviceHash:
+  OK, attempts 1-10 return trial_active; attempt 11 returns rate_limited.
 
 POST /v1/license/activate:
   OK for skeleton behavior, returns ok:false with Payment-backed license activation is not connected yet, preserves trial status, returns only licenseKeyLast4.
@@ -2183,7 +2314,6 @@ Implement production Start Direct Realtime license enforcement when approved.
 Implement trial expiration UX/countdown if desired.
 Implement license revocation/deactivation/reset device behavior.
 Implement offline grace only after explicit approval.
-Implement rate limiting / abuse protection for trial start.
 Implement storage key rotation and secret scan before production/public release.
 Add admin/customer license management only after core paid activation is defined.
 ```
