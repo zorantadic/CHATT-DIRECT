@@ -25,7 +25,7 @@ incoming language planned as transcription language hint
 packaged Windows app
 version 0.1.8 packaged installer
 minimized-app floating mini control window
-deterministic Electron UI zoom factor 0.7 applied in main window runtime
+deterministic Electron-controlled header UI zoom with default 0.7 main-window scale and persisted user preference
 ```
 Primary value:
 ```text
@@ -43,13 +43,13 @@ Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
-modern dark glass Desktop UI across Voice, Settings, and Scenarios
+modern dark/light Desktop UI across Voice, Settings, License, and Scenarios
 responsive default Desktop window size 1120 x 820 with minimum 860 x 720
-deterministic UI scale independent of Chromium persisted profile zoom state
+deterministic UI scale independent of Chromium persisted profile zoom state, with header Zoom - / + controls
 multilingual UI display support
 header language selector synchronized with Settings language selector
-floating vertical mini control window when main app is minimized
-mini control supports Start, Stop, Refresh, Repeat, Reset, Open, Session, and Activity
+floating narrowed vertical mini control window when main app is minimized
+mini control supports Start, Stop, Refresh, Repeat, Reset, Open, Session, and Activity, with centered text/status layout
 backend-authoritative 3-day trial registration
 hosted Azure Licensing API with Azure Table Storage
 free trial anti-reset protection through installId, emailHash, and deviceHash
@@ -447,11 +447,15 @@ Modern Desktop UI modernization Phase 1 Voice page: OK
 Modern Desktop UI modernization Phase 2 Settings page: OK
 Modern Desktop UI modernization Phase 3 Scenarios page: OK
 Desktop default window size 1120 x 820 and minimum 860 x 720: OK
-Desktop deterministic UI zoom factor 0.7 applied immediately and after did-finish-load: OK
+Desktop Electron-controlled UI zoom default 0.7 applied immediately and after did-finish-load: OK
+Header Zoom - / + controls apply and persist user zoom preference: OK
+Desktop Dark/Light appearance mode: OK
+Light theme contrast refinement: OK
 Dev profile zoom masking issue identified and resolved by deterministic app zoom approach: OK
 Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
 Mini Control Window opens when the main app is minimized: OK
-Mini Control Window vertical layout fits visible window: OK
+Mini Control Window narrowed vertical layout fits visible window: OK
+Mini Control Window centered text/status layout: OK
 Mini Control Window can be moved across the desktop: OK
 Mini Control Window Open restores the main app: OK
 Mini Control Window Start/Stop/Refresh/Repeat/Reset commands work through existing main renderer controls: OK
@@ -487,20 +491,20 @@ Desktop Scenarios tab loads backend scenario presets, renders compact clickable 
 Voice page displays the selected scenario name and behavior description
 Desktop UI is modernized across Voice, Settings, and Scenarios with dark glass/3D design language
 Desktop main window uses canonical 1120 x 820 default with 860 x 720 minimum
-Desktop main window applies deterministic APP_UI_ZOOM_FACTOR = 0.7 in Electron main process
+Desktop main window uses deterministic Electron-controlled UI zoom with default 0.7 and persisted user preference
 UI scale is not allowed to depend on Chromium persisted per-host zoom state
 Voice page uses Session and Activity as primary user-facing status indicators
-Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Support & Troubleshooting, Diagnostics, Auth, and Log cards
+Settings page is organized as a modern control center with Connection, Appearance, Audio Output, Provider Configuration, Session Cost Guard, Support & Troubleshooting, Diagnostics, Auth, and Log cards
 Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
 Scenario Preview displays human-readable metadata using displayDetails when available and never displays scenario.instruction
 Bottom app status bar no longer shows the redundant bottom volume mirror
-Header Backend/Provider cards removed and replaced with compact Select Language control
+Header Backend/Provider cards removed and replaced with compact Zoom and Select Language controls
 Settings Display Language and Header Select Language controls remain synchronized through shared display-language state
 Minimizing the main app opens a floating vertical Mini Control Window
 Mini Control Window is an Electron UI remote-control layer only
 Mini Control Window does not own or duplicate Direct Realtime audio, WebSocket, backend, provider, or scenario runtime
 Mini Control Window controls existing main renderer commands for Start, Stop, Refresh Instructions, Repeat Last Answer, and Reset Session
-Mini Control Window displays synchronized Session and Activity state from the main renderer
+Mini Control Window displays synchronized Session and Activity state from the main renderer and uses a narrowed centered layout
 Mini Control Window Open restores the main app and closes the mini control
 Desktop release 0.1.8 build and installer upgrade are validated
 
@@ -930,12 +934,13 @@ minimum height: 720
 Current deterministic UI zoom baseline:
 
 ```text
-APP_UI_ZOOM_FACTOR = 0.7
-Applied in Desktop/electron/main.cjs to mainWindow.webContents.
-Applied immediately after BrowserWindow creation.
-Re-applied on webContents did-finish-load.
+Default main-window UI zoom factor = 0.7.
+Header provides visible Zoom - / + controls and a percent/reset button.
+Zoom is controlled explicitly through Electron main process webContents.setZoomFactor(...).
+Zoom preference is persisted under Electron userData and re-applied on startup/did-finish-load.
 This app-level zoom is intentional and deterministic.
 It replaces accidental dependence on Chromium profile persisted zoom state.
+Touchpad/touchscreen pinch zoom and Chromium profile zoom are not the product zoom model.
 ```
 
 Root cause finding for desktop scale issue:
@@ -952,11 +957,12 @@ Current desktop scale implementation rules:
 
 ```text
 Do not use Chromium persisted profile zoom state as a product behavior.
-Do not rely on Ctrl-minus/manual zoom or Preferences per_host_zoom_levels.
+Do not rely on Ctrl-minus/manual zoom, touchpad pinch zoom, touchscreen pinch zoom, or Preferences per_host_zoom_levels.
+Use only the explicit Electron-controlled header Zoom controls for user-facing UI scale.
 Do not solve desktop scale by broad CSS rewrite unless explicitly approved.
 Keep BrowserWindow default at 1120 x 820 and minimum at 860 x 720.
-Keep APP_UI_ZOOM_FACTOR centralized in Desktop/electron/main.cjs.
-If visual scale needs future tuning, change only APP_UI_ZOOM_FACTOR first and validate before touching CSS.
+Keep default zoom behavior centralized in Desktop/electron/main.cjs and persisted via Electron userData.
+If visual scale needs future tuning, adjust the controlled zoom model first and validate before touching broad CSS.
 ```
 
 Current visual design direction:
@@ -1065,9 +1071,10 @@ Current mini control behavior:
 ```text
 When the main app is minimized, Electron opens a small floating Mini Control Window.
 The Mini Control Window is always-on-top, frameless, transparent/dark glass, not shown in the taskbar, and movable by dragging the header area.
-The Mini Control Window uses a narrow vertical layout.
+The Mini Control Window uses a narrowed vertical layout with centered title, status, and message text.
 The Mini Control Window shows Session and Activity status.
 The Mini Control Window provides Start, Stop, Refresh, Repeat, Reset, and Open controls.
+Mini Control does not include main-window Zoom controls.
 Open restores the main app and closes the Mini Control Window.
 Closing the Mini Control Window does not stop the main app or backend.
 ```
@@ -2943,4 +2950,166 @@ Cost Guard behavior
 Mini Control Window runtime ownership
 instruction refresh WebSocket message shape
 backend/app_realtime.py Realtime bridge behavior
+```
+
+
+---
+
+## 29. Desktop Appearance, Header Zoom, and Mini Control Refinement Baseline
+
+This section captures the Desktop UI refinements completed after the troubleshooting export baseline.
+
+Completed commits:
+
+```text
+2552622 Localize troubleshooting export UI
+4617607 Add light and dark appearance mode
+347f2bd Refine light theme contrast
+1db6b2f Add header UI zoom controls
+994428c Narrow mini control window
+```
+
+### Appearance mode
+
+Feature status:
+
+```text
+Implemented.
+Runtime tested.
+Committed.
+```
+
+Current behavior:
+
+```text
+Main Desktop app supports Dark and Light appearance modes.
+Dark mode remains the default and preserves the previous dark glass visual design.
+Light mode is implemented as a targeted CSS override layer, not a broad layout rewrite.
+Appearance is selected from Settings -> Connection -> Appearance.
+The renderer applies theme state through body[data-theme="dark"] or body[data-theme="light"].
+Light theme contrast was refined across Voice, License, Settings, and Scenarios pages.
+```
+
+Current implementation files:
+
+```text
+Desktop/renderer/index.html
+Desktop/renderer/renderer.js
+Desktop/renderer/styles.css
+Desktop/renderer/locales/ui.json
+```
+
+Current appearance rules:
+
+```text
+Do not change Direct Realtime audio behavior because of theme selection.
+Do not change provider/scenario/runtime state because of theme selection.
+Do not apply theme through Electron BrowserWindow zoom or Chromium profile settings.
+Do not treat Mini Control appearance as part of the main app theme until explicitly designed.
+```
+
+### Header UI zoom controls
+
+Feature status:
+
+```text
+Implemented.
+Runtime tested.
+Committed.
+```
+
+Current behavior:
+
+```text
+Main Desktop header contains visible Zoom controls:
+Zoom - <percent> +
+
+Minus decreases main-window UI scale.
+Plus increases main-window UI scale.
+Clicking the percent/value resets zoom to the default scale.
+Zoom changes apply immediately to the main BrowserWindow.
+Zoom preference persists across app restarts.
+Default zoom remains 0.7.
+```
+
+Current implementation files:
+
+```text
+Desktop/electron/main.cjs
+Desktop/electron/preload.cjs
+Desktop/renderer/index.html
+Desktop/renderer/renderer.js
+Desktop/renderer/styles.css
+Desktop/renderer/locales/ui.json
+```
+
+Current zoom model:
+
+```text
+Zoom is controlled explicitly by Electron main process through webContents.setZoomFactor(...).
+Zoom state is exposed through preload as window.electronAPI.uiZoom.
+Zoom preference is stored under Electron userData.
+The app does not rely on Chromium persisted profile zoom state.
+Touchpad/touchscreen pinch zoom is intentionally not the supported product zoom mechanism.
+```
+
+Current zoom boundary:
+
+```text
+Do not re-enable uncontrolled Chromium/browser zoom behavior.
+Do not depend on Ctrl-plus/Ctrl-minus or per_host_zoom_levels.
+Do not add Zoom controls to Mini Control Window.
+Do not use broad CSS density rewrite to solve main-window UI scale unless explicitly approved.
+```
+
+### Mini Control narrowing
+
+Feature status:
+
+```text
+Implemented.
+Runtime tested.
+Committed.
+```
+
+Current behavior:
+
+```text
+Mini Control Window remains a remote UI layer only.
+Mini Control Window is narrower than the original 0.1.8 implementation.
+Mini Control text/status layout is centered.
+Mini Control does not include main-window Zoom controls.
+Mini Control command routing and runtime ownership remain unchanged.
+```
+
+Current implementation files:
+
+```text
+Desktop/electron/main.cjs
+Desktop/renderer/mini-control.css
+```
+
+Runtime boundaries:
+
+```text
+No Direct Realtime audio flow changed.
+No backend/app_realtime.py behavior changed.
+No provider adapter behavior changed.
+No scenario API behavior changed.
+No Mini Control ownership rule changed.
+No second WebSocket or AudioContext was introduced.
+```
+
+Validation:
+
+```text
+node --check Desktop/electron/main.cjs: OK
+node --check Desktop/electron/preload.cjs: OK
+node --check Desktop/renderer/renderer.js: OK
+node --check Desktop/renderer/mini-control.js: OK
+Desktop runtime visual test: OK
+Light/Dark mode runtime test: OK
+Header Zoom - / + runtime test: OK
+Mini Control narrowed layout runtime test: OK
+Git clean after commits.
 ```
