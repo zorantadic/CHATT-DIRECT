@@ -32,6 +32,14 @@
           </div>
         </div>
         <div class="headerCards" aria-label="Select Language" data-i18n-aria-label="header.selectLanguage">
+          <div class="headerZoomControl" aria-label="UI Zoom" data-i18n-aria-label="header.zoomLabel">
+            <span class="zoomLabel" data-i18n="header.zoomLabel">Zoom</span>
+            <button id="btnZoomOut" class="zoomButton" type="button" title="Zoom out" data-i18n-title="header.zoomOut">-</button>
+            <button id="btnZoomReset" class="zoomValueButton" type="button" title="Reset zoom" data-i18n-title="header.zoomReset">
+              <span id="uiZoomValue">70%</span>
+            </button>
+            <button id="btnZoomIn" class="zoomButton" type="button" title="Zoom in" data-i18n-title="header.zoomIn">+</button>
+          </div>
           <div class="headerLanguageControl">
             <label id="headerDisplayLanguageLabel" class="eyebrow" for="headerDisplayLanguage" data-i18n="header.selectLanguage">Select Language</label>
             <select id="headerDisplayLanguage" aria-labelledby="headerDisplayLanguageLabel">

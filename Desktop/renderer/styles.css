@@ -189,6 +189,44 @@ code {
   justify-content: flex-end;
 }
 
+.headerZoomControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(14, 25, 42, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.zoomLabel {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 0 4px 0 2px;
+}
+
+.zoomButton,
+.zoomValueButton {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+}
+
+.zoomButton {
+  min-width: 34px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.zoomValueButton {
+  min-width: 62px;
+  font-weight: 650;
+}
+
 .headerCard {
   min-width: 164px;
   padding: 12px 14px;
@@ -1996,6 +2034,16 @@ body[data-theme="light"] .tabBar::after {
 }
 
 body[data-theme="light"] .brandSubtitle {
+  color: #587090;
+}
+
+body[data-theme="light"] .headerZoomControl {
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,247,255,0.9));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 8px 20px rgba(72, 106, 151, 0.08);
+}
+
+body[data-theme="light"] .zoomLabel {
   color: #587090;
 }
 

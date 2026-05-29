@@ -31,6 +31,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     exportTroubleshootingPackage: () => ipcRenderer.invoke("support:export-troubleshooting-package"),
   },
 
+  uiZoom: {
+    get: () => ipcRenderer.invoke("ui-zoom:get"),
+    set: (value) => ipcRenderer.invoke("ui-zoom:set", value),
+    step: (direction) => ipcRenderer.invoke("ui-zoom:step", direction),
+    reset: () => ipcRenderer.invoke("ui-zoom:reset"),
+  },
+
   updates: {
     getState: () => ipcRenderer.invoke("app-update:get-state"),
     check: () => ipcRenderer.invoke("app-update:check"),

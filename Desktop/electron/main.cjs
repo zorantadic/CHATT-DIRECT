@@ -79,6 +79,7 @@ const legacyInstructionsPath = path.join(userDataDir, "instructions.local.json")
 const providerConfigPath = path.join(userDataDir, "provider_config.local.json");
 const scenarioPresetsLocalPath = path.join(userDataDir, "scenario_presets.local.json");
 const licenseStatePath = path.join(userDataDir, "license_state.json");
+const uiSettingsPath = path.join(userDataDir, "ui_settings.json");
 const deviceSeedPath = path.join(userDataDir, "device_seed");
 const backendInstallDir = app.isPackaged
   ? path.join(process.resourcesPath, "backend")
@@ -493,6 +494,70 @@ autoUpdater.on("error", (err) => {
 // ---- Instructions local-store helpers ----
 function nowIso() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+const DEFAULT_UI_ZOOM_FACTOR = 0.7;
+const MIN_UI_ZOOM_FACTOR = 0.6;
+const MAX_UI_ZOOM_FACTOR = 0.9;
+const UI_ZOOM_STEP = 0.05;
+
+function normalizeUiZoomFactor(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return DEFAULT_UI_ZOOM_FACTOR;
+  const rounded = Math.round(num / UI_ZOOM_STEP) * UI_ZOOM_STEP;
+  const clamped = Math.min(MAX_UI_ZOOM_FACTOR, Math.max(MIN_UI_ZOOM_FACTOR, rounded));
+  return Number(clamped.toFixed(2));
+}
+
+function readUiSettings() {
+  const raw = readJsonSafe(uiSettingsPath);
+  return {
+    uiZoomFactor: normalizeUiZoomFactor(raw && raw.uiZoomFactor),
+  };
+}
+
+function writeUiSettings(next) {
+  const raw = next && typeof next === "object" ? next : {};
+  const normalized = {
+    uiZoomFactor: normalizeUiZoomFactor(raw.uiZoomFactor),
+  };
+  writeJsonAtomic(uiSettingsPath, normalized);
+  return normalized;
+}
+
+function getCurrentUiZoomFactor() {
+  return readUiSettings().uiZoomFactor;
+}
+
+function buildUiZoomState() {
+  const zoomFactor = getCurrentUiZoomFactor();
+  return {
+    ok: true,
+    zoomFactor,
+    zoomPercent: Math.round(zoomFactor * 100),
+    min: MIN_UI_ZOOM_FACTOR,
+    max: MAX_UI_ZOOM_FACTOR,
+    step: UI_ZOOM_STEP,
+  };
+}
+
+function applyUiZoomFactor(value) {
+  const zoomFactor = normalizeUiZoomFactor(value);
+  const settings = writeUiSettings({ uiZoomFactor: zoomFactor });
+  if (isLiveWindow(mainWindow)) {
+    try {
+      mainWindow.webContents.setZoomFactor(settings.uiZoomFactor);
+    } catch (_) {
+      // ignore
+    }
+  }
+  return settings.uiZoomFactor;
+}
+
+function stepUiZoomFactor(direction) {
+  const current = getCurrentUiZoomFactor();
+  const delta = direction === "in" ? UI_ZOOM_STEP : direction === "out" ? -UI_ZOOM_STEP : 0;
+  return applyUiZoomFactor(current + delta);
 }
 
 function createInstallId() {
@@ -1183,6 +1248,23 @@ ipcMain.handle("support:export-troubleshooting-package", async () => {
   }
 });
 
+ipcMain.handle("ui-zoom:get", async () => buildUiZoomState());
+
+ipcMain.handle("ui-zoom:set", async (_evt, value) => {
+  applyUiZoomFactor(value);
+  return buildUiZoomState();
+});
+
+ipcMain.handle("ui-zoom:step", async (_evt, direction) => {
+  stepUiZoomFactor(direction);
+  return buildUiZoomState();
+});
+
+ipcMain.handle("ui-zoom:reset", async () => {
+  applyUiZoomFactor(DEFAULT_UI_ZOOM_FACTOR);
+  return buildUiZoomState();
+});
+
 ipcMain.handle("app-update:get-state", async () => updateState);
 
 ipcMain.handle("app-update:check", async () => {
@@ -1300,8 +1382,6 @@ ipcMain.handle("instructions:reset", async (_evt, args) => {
   const t = store[target];
   return { current: t.current, default: t.default, updatedAt: t.updatedAt };
 });
-
-const APP_UI_ZOOM_FACTOR = 0.7;
 
 let mainWindow;
 let miniControlWindow = null;
@@ -1481,9 +1561,9 @@ function createWindow() {
     },
   });
 
-  mainWindow.webContents.setZoomFactor(APP_UI_ZOOM_FACTOR);
+  mainWindow.webContents.setZoomFactor(getCurrentUiZoomFactor());
   mainWindow.webContents.on("did-finish-load", () => {
-    mainWindow.webContents.setZoomFactor(APP_UI_ZOOM_FACTOR);
+    mainWindow.webContents.setZoomFactor(getCurrentUiZoomFactor());
   });
 
   // Optional: load dev URL if explicitly provided

@@ -377,6 +377,10 @@ Do not introduce new topics.`;
   const btnProviderSave = $("btnProviderSave");
   const btnProviderReset = $("btnProviderReset");
   const providerStatusEl = $("providerStatus");
+  const btnZoomOut = $("btnZoomOut");
+  const btnZoomIn = $("btnZoomIn");
+  const btnZoomReset = $("btnZoomReset");
+  const uiZoomValueEl = $("uiZoomValue");
   const headerDisplayLanguageEl = $("headerDisplayLanguage");
   const displayLanguageEl = $("displayLanguage");
   const uiThemeEl = $("uiTheme");
@@ -443,6 +447,7 @@ Do not introduce new topics.`;
 
   let currentUpdateState = null;
   let currentLicenseState = null;
+  let currentUiZoomState = null;
   let lastUpdateProgressLogPercent = null;
 
   const SUPPORTED_DISPLAY_LANGUAGES = ["en", "es", "de", "sr"];
@@ -609,6 +614,90 @@ Do not introduce new topics.`;
     applyLocale();
     loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
     return next;
+  }
+
+  function updateUiZoomDisplay(state) {
+    const normalized = state && typeof state === "object" ? state : {};
+    const zoomPercent = Number.isFinite(Number(normalized.zoomPercent))
+      ? Math.round(Number(normalized.zoomPercent))
+      : 70;
+    const zoomFactor = Number.isFinite(Number(normalized.zoomFactor))
+      ? Number(normalized.zoomFactor)
+      : 0.7;
+    const min = Number.isFinite(Number(normalized.min)) ? Number(normalized.min) : 0.6;
+    const max = Number.isFinite(Number(normalized.max)) ? Number(normalized.max) : 0.9;
+
+    currentUiZoomState = {
+      zoomFactor,
+      zoomPercent,
+      min,
+      max,
+      step: Number.isFinite(Number(normalized.step)) ? Number(normalized.step) : 0.05,
+    };
+
+    if (uiZoomValueEl) uiZoomValueEl.textContent = `${zoomPercent}%`;
+    if (btnZoomOut) btnZoomOut.disabled = zoomFactor <= min + 0.0001;
+    if (btnZoomIn) btnZoomIn.disabled = zoomFactor >= max - 0.0001;
+    if (btnZoomReset) btnZoomReset.disabled = false;
+  }
+
+  function disableUiZoomControls() {
+    if (btnZoomOut) btnZoomOut.disabled = true;
+    if (btnZoomIn) btnZoomIn.disabled = true;
+    if (btnZoomReset) btnZoomReset.disabled = true;
+  }
+
+  async function loadUiZoomState() {
+    const api = window.electronAPI && window.electronAPI.uiZoom;
+    if (!api || typeof api.get !== "function") {
+      if (uiZoomValueEl) uiZoomValueEl.textContent = "70%";
+      disableUiZoomControls();
+      return null;
+    }
+    try {
+      const state = await api.get();
+      updateUiZoomDisplay(state);
+      return state;
+    } catch (e) {
+      if (uiZoomValueEl) uiZoomValueEl.textContent = "70%";
+      disableUiZoomControls();
+      push(`ERROR(UI zoom): ${e?.message || e}`);
+      return null;
+    }
+  }
+
+  async function stepUiZoom(direction) {
+    const api = window.electronAPI && window.electronAPI.uiZoom;
+    if (!api || typeof api.step !== "function") {
+      disableUiZoomControls();
+      push("ERROR(UI zoom): zoom API unavailable");
+      return null;
+    }
+    try {
+      const state = await api.step(direction);
+      updateUiZoomDisplay(state);
+      return state;
+    } catch (e) {
+      push(`ERROR(UI zoom): ${e?.message || e}`);
+      return null;
+    }
+  }
+
+  async function resetUiZoom() {
+    const api = window.electronAPI && window.electronAPI.uiZoom;
+    if (!api || typeof api.reset !== "function") {
+      disableUiZoomControls();
+      push("ERROR(UI zoom): zoom API unavailable");
+      return null;
+    }
+    try {
+      const state = await api.reset();
+      updateUiZoomDisplay(state);
+      return state;
+    } catch (e) {
+      push(`ERROR(UI zoom): ${e?.message || e}`);
+      return null;
+    }
   }
 
   function getUpdateApi() {
@@ -1231,8 +1320,10 @@ function loadInstructionsTargetIntoInputs() {
   loadInstructionsTargetIntoInputs();
   syncDisplayLanguageControls(getDisplayLanguage());
   setUiTheme(getUiTheme());
+  updateUiZoomDisplay({ zoomFactor: 0.7, zoomPercent: 70, min: 0.6, max: 0.9, step: 0.05 });
   applyLocale();
   loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
+  loadUiZoomState().catch(() => {});
   loadProviderUi().catch(() => {});
   refreshUpdateState().catch(() => {});
   updateLicenseButtons();
@@ -3808,6 +3899,21 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
   if (headerDisplayLanguageEl) {
     headerDisplayLanguageEl.addEventListener("change", () => {
       setDisplayLanguage(headerDisplayLanguageEl.value);
+    });
+  }
+  if (btnZoomOut) {
+    btnZoomOut.addEventListener("click", () => {
+      stepUiZoom("out");
+    });
+  }
+  if (btnZoomIn) {
+    btnZoomIn.addEventListener("click", () => {
+      stepUiZoom("in");
+    });
+  }
+  if (btnZoomReset) {
+    btnZoomReset.addEventListener("click", () => {
+      resetUiZoom();
     });
   }
   if (uiThemeEl) {
