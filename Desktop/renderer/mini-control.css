@@ -187,3 +187,14 @@ button.danger {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.miniTitle,
+.miniSubtitle,
+.statusLabel,
+.statusCard strong,
+.miniMessage {
+  text-align: center;
+}
+
+.statusCard {
+  text-align: center;
+}
