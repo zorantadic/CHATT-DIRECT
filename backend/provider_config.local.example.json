@@ -25,6 +25,13 @@
       "incomingLanguage": "en",
       "outgoingLanguage": "en",
       "apiKey": ""
+    },
+    "google-gemini-live": {
+      "model": "gemini-3.1-flash-live-preview",
+      "voice": "",
+      "incomingLanguage": "en",
+      "outgoingLanguage": "en",
+      "apiKey": ""
     }
   }
 }
