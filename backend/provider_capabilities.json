@@ -290,8 +290,17 @@
       "runtimeProtocol": "gemini-live",
       "modelLabel": "Gemini Live model",
       "defaultModel": "gemini-3.1-flash-live-preview",
-      "defaultVoice": "",
-      "supportedVoices": [],
+      "defaultVoice": "Kore",
+      "supportedVoices": [
+        "Puck",
+        "Charon",
+        "Kore",
+        "Fenrir",
+        "Aoede",
+        "Leda",
+        "Orus",
+        "Zephyr"
+      ],
       "defaultIncomingLanguage": "en",
       "defaultOutgoingLanguage": "en",
       "supportedIncomingLanguages": [

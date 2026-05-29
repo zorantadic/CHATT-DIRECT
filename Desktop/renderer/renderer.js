@@ -113,9 +113,7 @@ Do not introduce new topics.`;
   }
   function updateEndpointSummaryUi() {
     const httpHost = getRealtimeHttpHost();
-    const wsRaw = ($("rtWs")?.value || DEFAULTS.REALTIME_WS).toString().trim();
-    let wsPath = "/voice/ws";
-    try { wsPath = new URL(wsRaw).pathname || "/voice/ws"; } catch {}
+    const wsPath = getEffectiveRuntimeRoute(getSelectedProviderId());
     if (bottomBackendEl) bottomBackendEl.textContent = httpHost;
     if (bottomWsEl) bottomWsEl.textContent = wsPath;
     if (settingsDiagBackendEl) settingsDiagBackendEl.textContent = httpHost;
@@ -1496,28 +1494,54 @@ function getRealtimeRate() {
   const uiSettings = (realtimeRateEl?.value || "").toString().trim();
   return normalizeRealtimeRate(uiVoice || uiSettings || loadStrLS(LS_REALTIME_RATE, DEFAULT_REALTIME_RATE));
 }
-function buildVoiceWsUrl(baseWsUrl, rate) {
+function getEffectiveRuntimeRoute(providerId) {
+  const caps = providerCapabilitiesState?.providers?.[providerId];
+  const rawRoute = (
+    caps?.runtimeRoute ||
+    (providerId === "google-gemini-live" ? "/gemini/voice/ws" : "/voice/ws")
+  ).toString().trim();
+  if (!rawRoute) return "/voice/ws";
+  return rawRoute.startsWith("/") ? rawRoute : `/${rawRoute}`;
+}
+function buildVoiceWsUrl(baseWsUrl, rate, providerId) {
   const base = (baseWsUrl || "").toString().trim().replace(/\/+$/, "");
   const r = normalizeRealtimeRate(rate);
+  const route = getEffectiveRuntimeRoute(providerId);
   try {
     const u = new URL(base);
+    u.pathname = route;
     u.searchParams.set("engine", "realtime");
     u.searchParams.set("rate", r);
     return u.toString();
   } catch {
-    const sep = base.includes("?") ? "&" : "?";
-    return `${base}${sep}engine=realtime&rate=${encodeURIComponent(r)}`;
+    const normalizedBase = base.replace(/(\/voice\/ws|\/gemini\/voice\/ws)(?=$|\?)/, "");
+    const withRoute = `${normalizedBase}${route}`;
+    const sep = withRoute.includes("?") ? "&" : "?";
+    return `${withRoute}${sep}engine=realtime&rate=${encodeURIComponent(r)}`;
   }
+}
+function voiceWsLogPath(voiceWsUrl) {
+  const raw = (voiceWsUrl || "").toString().trim();
+  if (!raw) return "/voice/ws";
+  try {
+    const u = new URL(raw, window.location.href);
+    return u.pathname || "/voice/ws";
+  } catch {}
+  const path = raw.split(/[?#]/, 1)[0];
+  if (path.includes("/gemini/voice/ws")) return "/gemini/voice/ws";
+  if (path.includes("/voice/ws")) return "/voice/ws";
+  return path.startsWith("/") ? path : "/voice/ws";
 }
 
 function directRealtimeCfg() {
   const rate = getRealtimeRate();
+  const providerId = getSelectedProviderId();
   const rtWsBase = $("rtWs").value.replace(/\/+$/, "");
   return {
     REALTIME_HTTP: $("rtHttp").value.replace(/\/+$/, ""),
     REALTIME_WS: rtWsBase,
     REALTIME_RATE: rate,
-    VOICE_WS: buildVoiceWsUrl(rtWsBase, rate),
+    VOICE_WS: buildVoiceWsUrl(rtWsBase, rate, providerId),
   };
 }
   // ------------------------------
@@ -3426,6 +3450,12 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
         push(`ERROR(Realtime): ${msg.message || "unknown error"}`);
         return;
       }
+      if (msg.type === "interrupted") {
+        push(msg.message || "Realtime generation interrupted");
+        try { stopAudioNow(); } catch {}
+        setAssistantSpeaking(false);
+        return;
+      }
       if (msg.type === "agent_done") {
         setAssistantSpeaking(false);
         if (directRealtimeActive || directRealtimeStarting) {
@@ -3686,7 +3716,7 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
       directSource.connect(directNode);
       setDirectStatusOn(true);
       startCostGuardTimer();
-      push("Direct Realtime streaming started (loopback PCM16@24k mono -> /voice/ws).");
+      push(`Direct Realtime streaming started (loopback PCM16@24k mono -> ${voiceWsLogPath(rtWs?.url || directRealtimeCfg().VOICE_WS)}).`);
     } catch (e) {
       push(`ERROR(Direct Realtime start): ${e?.message || e}`);
       await stopDirectRealtime({ closeRealtime: true, silent: true });

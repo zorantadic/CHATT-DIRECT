@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from gemini_live_router import router as gemini_live_router
 from providers import get_realtime_provider_adapter
 from provider_config import get_active_provider_config
 
@@ -51,6 +52,7 @@ CHANNELS = int(os.getenv("AUDIO_CHANNELS", "1"))
 ALLOWED_RATES: set[str] = {"1", "0.9", "0.8"}
 
 app = FastAPI()
+app.include_router(gemini_live_router)
 
 # NOTE: CORS applies to HTTP routes. WebSocket origin checks are not handled by CORSMiddleware,
 # but keeping origins consistent with desktop/web helps with any fetches and diagnostics.

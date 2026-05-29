@@ -40,19 +40,59 @@ class GoogleGeminiLiveAdapter(RealtimeProviderAdapter):
             provider_config.get("model")
             or os.getenv("GOOGLE_GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview")
         ).strip() or "gemini-3.1-flash-live-preview"
+        if not model.startswith("models/"):
+            model = f"models/{model}"
+
+        selected_voice = str(provider_config.get("voice") or "Kore").strip() or "Kore"
+        safe_instructions = (instructions or "").strip()
+        normalized_rate = str(voice_rate or "1").strip()
+        if normalized_rate == "1.0":
+            normalized_rate = "1"
+
+        pacing_rule = ""
+        if normalized_rate == "0.9":
+            pacing_rule = (
+                "VOICE PACING RULE:\n"
+                "Speak slightly slower than normal while keeping a natural conversational pace. "
+                "Use short pauses between sentences."
+            )
+        elif normalized_rate == "0.8":
+            pacing_rule = (
+                "VOICE PACING RULE:\n"
+                "Speak slowly and clearly. Use a calm pace, noticeable pauses between sentences, "
+                "and slightly longer pauses inside complex sentences."
+            )
+
+        if pacing_rule:
+            safe_instructions = f"{safe_instructions}\n\n{pacing_rule}" if safe_instructions else pacing_rule
 
         return {
             "setup": {
                 "model": model,
+                "generationConfig": {
+                    "responseModalities": ["AUDIO"],
+                    "speechConfig": {
+                        "voiceConfig": {
+                            "prebuiltVoiceConfig": {
+                                "voiceName": selected_voice,
+                            }
+                        }
+                    },
+                },
+                "realtimeInputConfig": {
+                    "automaticActivityDetection": {
+                        "disabled": False,
+                        "prefixPaddingMs": 500,
+                        "silenceDurationMs": 1500,
+                    },
+                    "activityHandling": "START_OF_ACTIVITY_INTERRUPTS",
+                },
                 "systemInstruction": {
                     "parts": [
                         {
-                            "text": (instructions or "").strip(),
+                            "text": safe_instructions,
                         }
                     ]
-                },
-                "generationConfig": {
-                    "responseModalities": ["AUDIO"],
                 },
             }
         }
