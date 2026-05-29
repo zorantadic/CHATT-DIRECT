@@ -18,6 +18,13 @@
       "incomingLanguage": "en",
       "outgoingLanguage": "en",
       "apiKey": ""
+    },
+    "xai-grok-realtime": {
+      "model": "grok-voice-think-fast-1.0",
+      "voice": "eve",
+      "incomingLanguage": "en",
+      "outgoingLanguage": "en",
+      "apiKey": ""
     }
   }
 }

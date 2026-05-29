@@ -1367,6 +1367,25 @@ function loadInstructionsTargetIntoInputs() {
     if (selectedValue) selectEl.value = selectedValue;
   }
 
+  function populateProviderActiveOptions() {
+    if (!providerActiveEl) return;
+    const providers = providerCapabilitiesState?.providers;
+    if (!providers || typeof providers !== "object") return;
+
+    providerActiveEl.innerHTML = "";
+    for (const [providerId, caps] of Object.entries(providers)) {
+      const opt = document.createElement("option");
+      opt.value = providerId;
+      opt.textContent = (
+        caps?.displayName ||
+        caps?.label ||
+        caps?.name ||
+        providerId
+      ).toString().trim();
+      providerActiveEl.appendChild(opt);
+    }
+  }
+
   function getSelectedProviderId() {
     return (providerActiveEl?.value || "azure-openai-realtime").toString();
   }
@@ -1379,7 +1398,7 @@ function loadInstructionsTargetIntoInputs() {
   function providerDisplayName(providerId) {
     const caps = providerCapabilitiesState?.providers?.[providerId];
     if (!caps) return "";
-    return (caps.label || caps.name || providerId || "").toString().trim();
+    return (caps.displayName || caps.label || caps.name || providerId || "").toString().trim();
   }
 
   function updateProviderSummaryUi() {
@@ -1459,6 +1478,7 @@ function loadInstructionsTargetIntoInputs() {
       providerConfigState = await cfgRes.json();
 
       const active = providerConfigState.activeProvider || providerCapabilitiesState.defaultProvider || "azure-openai-realtime";
+      populateProviderActiveOptions();
       if (providerActiveEl) providerActiveEl.value = active;
       applyProviderUi(active);
       setProviderStatus("Provider config loaded");
