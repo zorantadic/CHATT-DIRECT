@@ -10,16 +10,77 @@ contextBridge.exposeInMainWorld("electronAPI", {
   instructionsWrite: (payload) => ipcRenderer.invoke("instructions:write", payload),
   instructionsPath: () => ipcRenderer.invoke("instructions:path"),
 
-  instructionProfilesRead: () => ipcRenderer.invoke("instructionProfiles:read"),
-  instructionProfilesWrite: (payload) => ipcRenderer.invoke("instructionProfiles:write", payload),
-  instructionProfilesPath: () => ipcRenderer.invoke("instructionProfiles:path"),
-
   // Preferred API (target-based, web-like semantics)
   instructions: {
     paths: () => ipcRenderer.invoke("instructions:paths"),
-    profilesGet: () => ipcRenderer.invoke("instructions:profilesGet"),
     get: (target) => ipcRenderer.invoke("instructions:get", { target }),
     put: (target, current) => ipcRenderer.invoke("instructions:put", { target, current }),
     reset: (target) => ipcRenderer.invoke("instructions:reset", { target }),
+  },
+
+  license: {
+    getState: () => ipcRenderer.invoke("license:get-state"),
+    getCachePath: () => ipcRenderer.invoke("license:get-cache-path"),
+    startTrial: (payload) => ipcRenderer.invoke("license:start-trial", payload),
+    validate: () => ipcRenderer.invoke("license:validate"),
+    activate: (payload) => ipcRenderer.invoke("license:activate", payload),
+    openCheckout: () => ipcRenderer.invoke("license:open-checkout"),
+  },
+
+  support: {
+    exportTroubleshootingPackage: () => ipcRenderer.invoke("support:export-troubleshooting-package"),
+  },
+
+  uiZoom: {
+    get: () => ipcRenderer.invoke("ui-zoom:get"),
+    set: (value) => ipcRenderer.invoke("ui-zoom:set", value),
+    step: (direction) => ipcRenderer.invoke("ui-zoom:step", direction),
+    reset: () => ipcRenderer.invoke("ui-zoom:reset"),
+  },
+
+  updates: {
+    getState: () => ipcRenderer.invoke("app-update:get-state"),
+    check: () => ipcRenderer.invoke("app-update:check"),
+    download: () => ipcRenderer.invoke("app-update:download"),
+    quitAndInstall: () => ipcRenderer.invoke("app-update:quit-and-install"),
+    onStatus: (callback) => {
+      const listener = (_event, payload) => {
+        if (typeof callback === "function") callback(payload);
+      };
+      ipcRenderer.on("app-update:status", listener);
+      return () => ipcRenderer.removeListener("app-update:status", listener);
+    },
+  },
+
+  miniControl: {
+    sendCommand: (command) => ipcRenderer.invoke("mini-control:command", command),
+    openMainWindow: () => ipcRenderer.invoke("mini-control:open-main"),
+    close: () => ipcRenderer.invoke("mini-control:close"),
+    publishStatus: (payload) => ipcRenderer.invoke("mini-control:status", payload),
+    requestStatus: () => ipcRenderer.invoke("mini-control:request-status"),
+
+    onCommand: (callback) => {
+      const listener = (_event, payload) => {
+        if (typeof callback === "function") callback(payload);
+      };
+      ipcRenderer.on("mini-control:command", listener);
+      return () => ipcRenderer.removeListener("mini-control:command", listener);
+    },
+
+    onStatus: (callback) => {
+      const listener = (_event, payload) => {
+        if (typeof callback === "function") callback(payload);
+      };
+      ipcRenderer.on("mini-control:status", listener);
+      return () => ipcRenderer.removeListener("mini-control:status", listener);
+    },
+
+    onStatusRequest: (callback) => {
+      const listener = (_event, payload) => {
+        if (typeof callback === "function") callback(payload);
+      };
+      ipcRenderer.on("mini-control:request-status", listener);
+      return () => ipcRenderer.removeListener("mini-control:request-status", listener);
+    },
   },
 });

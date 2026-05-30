@@ -13,7 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app_realtime.py .
 COPY audio_utils.py .
 COPY instructions.json .
-COPY instruction_profiles.json .
 #COPY .env .
 
 EXPOSE 50505

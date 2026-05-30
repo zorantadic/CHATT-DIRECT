@@ -1,34 +1,9 @@
 version: "3.9"
 
 services:
-  speech:
-    image: chatt-speech
-    ports:
-      - "50507:50507"
-    env_file:
-      - backend/.env
-
-  orchestrator:
-    image: chatt-orchestrator
-    ports:
-      - "50506:50506"
-    env_file:
-      - backend/.env
-    depends_on:
-      - speech
-
   realtime:
     image: chatt-realtime
     ports:
       - "50505:50505"
     env_file:
       - backend/.env
-    depends_on:
-      - orchestrator
-
-  manual:
-    image: chatt-manual
-    ports:
-      - "50605:50605"
-    env_file:
-      - manual-backend/.env

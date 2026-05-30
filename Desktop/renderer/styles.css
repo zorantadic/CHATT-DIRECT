@@ -1,0 +1,2300 @@
+:root {
+  --bg-0: #050912;
+  --bg-1: #08111f;
+  --bg-2: #0d1828;
+  --panel: rgba(13, 24, 40, 0.82);
+  --panel-strong: rgba(16, 29, 48, 0.94);
+  --line: rgba(152, 181, 220, 0.18);
+  --line-strong: rgba(119, 164, 255, 0.34);
+  --text: #e9f1ff;
+  --muted: #95a4ba;
+  --muted-2: #6f7d91;
+  --blue: #2d7dff;
+  --blue-2: #21d4ff;
+  --green: #33d17a;
+  --amber: #f8c14a;
+  --red: #ff5c6c;
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.42);
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 20% 8%, rgba(41, 126, 255, 0.18), transparent 34rem),
+    radial-gradient(circle at 88% 18%, rgba(32, 213, 255, 0.12), transparent 26rem),
+    linear-gradient(135deg, #050812 0%, #08121f 45%, #04070e 100%);
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent 80%);
+}
+
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(22, 38, 61, 0.95), rgba(11, 20, 34, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: linear-gradient(180deg, rgba(30, 52, 82, 0.95), rgba(13, 25, 42, 0.95));
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(8, 16, 28, 0.82);
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(45, 125, 255, 0.72);
+  box-shadow: 0 0 0 3px rgba(45, 125, 255, 0.16);
+}
+
+input[type="range"] {
+  height: 6px;
+  padding: 0;
+  accent-color: var(--blue);
+}
+
+input[type="checkbox"] {
+  width: auto;
+}
+
+label {
+  min-width: 160px;
+  color: var(--muted);
+}
+
+code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: #cfe2ff;
+  background: rgba(255,255,255,0.08);
+}
+
+.appShell {
+  position: relative;
+  width: min(100%, 1440px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 22px 24px 14px;
+}
+
+.appHeader {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.brandBlock {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brandMark {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(45, 125, 255, 0.75);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(33, 212, 255, 0.16), transparent 58%),
+    rgba(7, 16, 30, 0.92);
+  box-shadow: 0 0 26px rgba(45, 125, 255, 0.34), inset 0 0 22px rgba(33, 212, 255, 0.1);
+}
+
+.brandMark::before {
+  content: "";
+  position: absolute;
+  inset: 16px 12px;
+  background:
+    linear-gradient(90deg, transparent 0 8%, var(--blue-2) 8% 14%, transparent 14% 24%, var(--blue) 24% 30%, transparent 30% 42%, var(--blue-2) 42% 49%, transparent 49% 62%, var(--blue) 62% 68%, transparent 68% 80%, var(--blue-2) 80% 86%, transparent 86%);
+  filter: drop-shadow(0 0 8px rgba(33, 212, 255, 0.9));
+}
+
+.brandTitle {
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.brandSubtitle {
+  margin-top: 2px;
+  color: #c6d4ec;
+  font-size: 17px;
+}
+
+.headerCards {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.headerZoomControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(14, 25, 42, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.zoomLabel {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 0 4px 0 2px;
+}
+
+.zoomButton,
+.zoomValueButton {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+}
+
+.zoomButton {
+  min-width: 34px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.zoomValueButton {
+  min-width: 62px;
+  font-weight: 650;
+}
+
+.headerCard {
+  min-width: 164px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(14, 25, 42, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.headerCard strong {
+  display: block;
+  margin-top: 3px;
+  font-weight: 600;
+}
+
+.statusDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 14px rgba(51, 209, 122, 0.65);
+  vertical-align: middle;
+}
+
+.bottomDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 12px rgba(45, 125, 255, 0.56);
+}
+
+body[data-session="off"] .statusDot {
+  background: var(--muted-2);
+  box-shadow: none;
+}
+
+body[data-session="starting"] .statusDot,
+body[data-session="reconnecting"] .statusDot {
+  background: var(--amber);
+  box-shadow: 0 0 14px rgba(248, 193, 74, 0.58);
+}
+
+.nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 220px));
+  gap: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(5, 11, 21, 0.48);
+  overflow: hidden;
+}
+
+.nav button {
+  min-height: 56px;
+  border: 0;
+  border-right: 1px solid rgba(152, 181, 220, 0.08);
+  border-radius: 0;
+  background: transparent;
+  color: #dbe7fb;
+  font-size: 16px;
+}
+
+.nav button:last-child {
+  border-right: 0;
+}
+
+.nav button.active {
+  color: #ffffff;
+  background: linear-gradient(90deg, rgba(45, 125, 255, 0.32), rgba(45, 125, 255, 0.08));
+  box-shadow: inset 0 -3px 0 var(--blue), 0 16px 30px rgba(45, 125, 255, 0.18);
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+}
+
+.voiceDashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.voiceStack,
+.voiceSide {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.glassPanel,
+.box {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(18, 31, 50, 0.88), rgba(9, 17, 30, 0.9)),
+    rgba(10, 18, 31, 0.86);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.voiceMainCard {
+  padding: 20px;
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.panelIcon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(45, 125, 255, 0.12);
+  box-shadow: inset 0 0 18px rgba(45, 125, 255, 0.14);
+}
+
+.panelIcon::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 9px;
+  width: 6px;
+  height: 16px;
+  border: 2px solid #8ec2ff;
+  border-radius: 999px;
+}
+
+.panelIcon::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 25px;
+  width: 14px;
+  height: 8px;
+  border-bottom: 2px solid #8ec2ff;
+  border-radius: 0 0 999px 999px;
+}
+
+.panelHeader h2,
+.panelHeader h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.panelSub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.scenarioSummary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid rgba(152, 181, 220, 0.12);
+  border-radius: 8px;
+  background: rgba(5, 11, 21, 0.42);
+}
+
+.scenarioLabel {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.scenarioName {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.scenarioDescription {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.statusPillRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.pill::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+}
+
+.ok {
+  color: #69f29f;
+  background: rgba(28, 137, 74, 0.15);
+  border-color: rgba(65, 229, 133, 0.3);
+}
+
+.bad {
+  color: #ff8b96;
+  background: rgba(151, 32, 45, 0.16);
+  border-color: rgba(255, 92, 108, 0.3);
+}
+
+.warn {
+  color: #ffd779;
+  background: rgba(168, 116, 21, 0.16);
+  border-color: rgba(248, 193, 74, 0.3);
+}
+
+.costGuardNotice {
+  display: none;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 193, 74, 0.45);
+  color: #ffe1a3;
+  background: rgba(100, 70, 12, 0.28);
+  font-size: 13px;
+}
+
+.costGuardNotice.active {
+  display: block;
+}
+
+.costGuardNotice.bad {
+  border-color: rgba(255, 92, 108, 0.45);
+  color: #ffb4ba;
+  background: rgba(128, 25, 37, 0.3);
+}
+
+.aiVisual {
+  position: relative;
+  min-height: 180px;
+  margin: 10px 0 20px;
+  display: grid;
+  place-items: center;
+}
+
+.waveform {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  height: 96px;
+  opacity: 0.8;
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0 9px,
+      rgba(45, 125, 255, 0.78) 9px 11px,
+      transparent 11px 17px),
+    linear-gradient(90deg, transparent, rgba(45, 125, 255, 0.3), rgba(51, 209, 122, 0.28), transparent);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 38%, #000 62%, transparent 100%);
+  filter: drop-shadow(0 0 14px rgba(45, 125, 255, 0.36));
+  transform: scaleY(0.34);
+}
+
+.waveform::before,
+.waveform::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0 15px,
+      rgba(33, 212, 255, 0.55) 15px 18px,
+      transparent 18px 26px);
+  transform: scaleY(1.7);
+  opacity: 0.55;
+}
+
+.waveform::after {
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0 13px,
+      rgba(51, 209, 122, 0.64) 13px 16px,
+      transparent 16px 24px);
+  transform: translateX(42%) scaleY(1.55);
+}
+
+.aiCore {
+  position: relative;
+  z-index: 1;
+  width: 116px;
+  height: 116px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(33, 212, 255, 0.76);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(33, 212, 255, 0.16), rgba(45, 125, 255, 0.08) 55%, rgba(5, 11, 21, 0.95) 56%),
+    rgba(7, 14, 25, 0.96);
+  box-shadow:
+    0 0 0 9px rgba(45, 125, 255, 0.16),
+    0 0 34px rgba(45, 125, 255, 0.56),
+    inset 0 0 24px rgba(33, 212, 255, 0.16);
+}
+
+.aiCore::before {
+  content: "";
+  width: 22px;
+  height: 34px;
+  border: 4px solid #dbe9ff;
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgba(219, 233, 255, 0.45);
+}
+
+.aiCore::after {
+  content: "";
+  position: absolute;
+  left: 43px;
+  top: 66px;
+  width: 30px;
+  height: 18px;
+  border-bottom: 4px solid #dbe9ff;
+  border-radius: 0 0 999px 999px;
+}
+
+body[data-session="on"] .aiCore,
+body[data-session="starting"] .aiCore,
+body[data-session="reconnecting"] .aiCore {
+  animation: corePulse 2.4s ease-in-out infinite;
+}
+
+body[data-activity="speaking"] .aiCore {
+  border-color: rgba(51, 209, 122, 0.82);
+  box-shadow:
+    0 0 0 9px rgba(51, 209, 122, 0.12),
+    0 0 34px rgba(51, 209, 122, 0.48),
+    inset 0 0 24px rgba(51, 209, 122, 0.14);
+}
+
+body[data-session="on"] .waveform,
+body[data-session="reconnecting"] .waveform,
+body[data-activity="listening"] .waveform,
+body[data-activity="speaking"] .waveform {
+  animation: waveDrift 7s linear infinite;
+}
+
+body[data-activity="speaking"] .waveform {
+  filter: drop-shadow(0 0 14px rgba(51, 209, 122, 0.42));
+}
+
+@keyframes corePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes waveDrift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 80px 0, 0 0; }
+}
+
+.voiceControls {
+  display: grid;
+  gap: 14px;
+}
+
+.controlRow {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.controlRow label {
+  min-width: 0;
+  color: #d9e6fb;
+  font-weight: 600;
+}
+
+.controlHint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rateSelect {
+  max-width: 180px;
+}
+
+.volumeValue {
+  min-width: 70px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: center;
+  background: rgba(7, 14, 25, 0.82);
+}
+
+.outputControl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.quickControls {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(152, 181, 220, 0.12);
+  border-radius: 10px;
+  background: rgba(5, 11, 21, 0.36);
+}
+
+.quickControlsHeader {
+  margin-bottom: 12px;
+  color: #d9e6fb;
+  font-weight: 650;
+}
+
+.quickControlsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.primaryAction {
+  border-color: rgba(45, 125, 255, 0.65);
+  background: linear-gradient(180deg, #2f83ff, #1559e8);
+  box-shadow: 0 14px 28px rgba(45, 125, 255, 0.28), inset 0 1px 0 rgba(255,255,255,0.16);
+}
+
+.dangerAction {
+  color: #ffd3d7;
+}
+
+.sideCard {
+  padding: 18px;
+}
+
+.sideCard h3 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.statusTable {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(152, 181, 220, 0.12);
+  border-radius: 8px;
+  background: rgba(5, 11, 21, 0.34);
+}
+
+.statusRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, auto);
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(152, 181, 220, 0.1);
+}
+
+.statusRow:last-child {
+  border-bottom: 0;
+}
+
+.statusLabel {
+  color: var(--muted);
+}
+
+.statusValue {
+  text-align: right;
+  color: #e8f0ff;
+}
+
+.activityCard {
+  min-height: 210px;
+}
+
+.activityList {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  color: #dce8fb;
+  font-size: 13px;
+}
+
+.activityItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+  color: var(--muted);
+}
+
+.activityItem::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 10px rgba(45, 125, 255, 0.7);
+}
+
+.appBottomBar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 12px 16px;
+}
+
+.bottomItem {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.bottomLabel {
+  display: block;
+  color: #dce8fb;
+  font-size: 12px;
+}
+
+.bottomValue {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #58a1ff;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottomVolume {
+  display: none;
+}
+
+.settingsDashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settingsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.licensePage {
+  display: grid;
+  gap: 16px;
+  max-width: 920px;
+}
+
+.licensePageHeader h2 {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+
+.settingsCard {
+  padding: 16px;
+}
+
+.providerSettingsCard {
+  border-color: rgba(45, 125, 255, 0.32);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 125, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(18, 31, 50, 0.9), rgba(9, 17, 30, 0.94));
+}
+
+.costGuardCard {
+  border-color: rgba(248, 193, 74, 0.28);
+}
+
+.licenseSettingsCard {
+  border-color: rgba(78, 214, 151, 0.26);
+}
+
+.settingsCardHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.settingsCardHeader.compact {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 12px;
+}
+
+.settingsCardHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.settingsIcon {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(45, 125, 255, 0.12);
+  box-shadow: inset 0 0 18px rgba(45, 125, 255, 0.16), 0 0 18px rgba(45, 125, 255, 0.12);
+}
+
+.settingsIcon::before,
+.settingsIcon::after {
+  content: "";
+  position: absolute;
+}
+
+.settingsIconLink::before {
+  inset: 12px;
+  border: 3px solid #75adff;
+  border-left-color: transparent;
+  border-radius: 999px;
+  transform: rotate(-35deg);
+}
+
+.settingsIconAudio::before {
+  left: 12px;
+  top: 13px;
+  width: 18px;
+  height: 16px;
+  border: 3px solid #75adff;
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+}
+
+.settingsIconAudio::after {
+  left: 9px;
+  top: 25px;
+  width: 5px;
+  height: 10px;
+  border: 2px solid #75adff;
+  border-radius: 4px;
+  box-shadow: 20px 0 0 -1px transparent, 20px 0 0 0 #75adff;
+}
+
+.settingsIconShield {
+  background: rgba(248, 193, 74, 0.12);
+}
+
+.settingsIconShield::before {
+  left: 12px;
+  top: 9px;
+  width: 18px;
+  height: 22px;
+  border: 3px solid var(--amber);
+  border-radius: 12px 12px 16px 16px;
+  clip-path: polygon(50% 0, 100% 18%, 86% 82%, 50% 100%, 14% 82%, 0 18%);
+}
+
+.settingsIconProvider::before {
+  left: 12px;
+  top: 11px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #75adff;
+  transform: rotate(30deg);
+}
+
+.settingsIconDiag::before {
+  left: 9px;
+  top: 18px;
+  width: 24px;
+  height: 4px;
+  background: #75adff;
+  box-shadow: 0 0 12px rgba(117, 173, 255, 0.6);
+}
+
+.settingsIconDiag::after {
+  left: 18px;
+  top: 10px;
+  width: 4px;
+  height: 22px;
+  background: #75adff;
+  box-shadow: 0 0 12px rgba(117, 173, 255, 0.6);
+}
+
+.settingsBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settingsBadge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.providerGrid {
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.licenseInputGrid {
+  margin-top: 14px;
+}
+
+.settingsGridRow {
+  display: contents;
+}
+
+.settingsGrid label,
+.settingsLabel {
+  min-width: 0;
+  color: #c8d6ed;
+  font-size: 13px;
+}
+
+.settingsReadonly {
+  display: grid;
+  gap: 4px;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(8, 16, 28, 0.62);
+}
+
+.settingsMuted {
+  color: var(--muted-2);
+  font-size: 12px;
+}
+
+.settingsActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.twoActions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.licenseActions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settingsStatusText {
+  min-height: 18px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settingsStatusText.ok {
+  color: #bdf6d3;
+}
+
+.settingsStatusText.warn {
+  color: #ffe0a3;
+}
+
+.settingsStatusText.bad {
+  color: #ffb9c1;
+}
+
+.audioSafetyBox {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(152, 181, 220, 0.14);
+  border-radius: 8px;
+  background: rgba(5, 11, 21, 0.36);
+}
+
+.audioSafetyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.audioSafetyTitle {
+  color: #d9e6fb;
+  font-weight: 700;
+}
+
+.audioSafetyStatus {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.audioSafetyActions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.audioSafetyMessage {
+  padding: 9px 10px;
+  border: 1px solid rgba(152, 181, 220, 0.12);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(8, 16, 28, 0.62);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.audioSafetyMessage.ok {
+  color: #bff3d1;
+  border-color: rgba(51, 209, 122, 0.28);
+  background: rgba(51, 209, 122, 0.08);
+}
+
+.audioSafetyMessage.warn {
+  color: #ffe8b8;
+  border-color: rgba(255, 194, 102, 0.28);
+  background: rgba(255, 194, 102, 0.08);
+}
+
+.audioSafetyMessage.bad {
+  color: #ffd3d7;
+  border-color: rgba(255, 92, 122, 0.28);
+  background: rgba(255, 92, 122, 0.08);
+}
+
+.switchControl {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  width: 54px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.switchControl input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switchControl span {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 26px;
+  border: 1px solid rgba(45, 125, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(8, 16, 28, 0.86);
+}
+
+.switchControl span::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.switchControl input:checked + span {
+  background: rgba(45, 125, 255, 0.72);
+}
+
+.switchControl input:checked + span::before {
+  transform: translateX(22px);
+  background: #ffffff;
+}
+
+.settingsInfoLine {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(152, 181, 220, 0.12);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(5, 11, 21, 0.34);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.audioRouteVisual {
+  display: grid;
+  grid-template-columns: 56px minmax(80px, 1fr) 56px;
+  gap: 14px;
+  align-items: center;
+  margin: 14px 10px 0;
+}
+
+.routeHeadphones,
+.routeTarget {
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(45, 125, 255, 0.62);
+  border-radius: 50%;
+  background: rgba(45, 125, 255, 0.08);
+  box-shadow: 0 0 22px rgba(45, 125, 255, 0.22), inset 0 0 14px rgba(45, 125, 255, 0.12);
+}
+
+.routeLine {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--blue), var(--green));
+  box-shadow: 0 0 12px rgba(45, 125, 255, 0.5);
+}
+
+.routeTarget {
+  border-color: rgba(51, 209, 122, 0.62);
+  box-shadow: 0 0 22px rgba(51, 209, 122, 0.2), inset 0 0 14px rgba(51, 209, 122, 0.12);
+}
+
+.authInlinePanel,
+.settingsLogPanel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(152, 181, 220, 0.12);
+}
+
+.diagnosticsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  gap: 18px;
+  align-items: center;
+}
+
+.settingsStatusTable {
+  margin-top: 0;
+}
+
+.diagnosticSeal {
+  width: 112px;
+  height: 112px;
+  margin: 0 auto;
+  border: 2px solid rgba(51, 209, 122, 0.75);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(51, 209, 122, 0.14), transparent 58%),
+    rgba(5, 11, 21, 0.5);
+  box-shadow: 0 0 34px rgba(51, 209, 122, 0.28), inset 0 0 24px rgba(51, 209, 122, 0.12);
+}
+
+body[data-session="off"] #settingsDiagWs {
+  color: var(--muted);
+}
+
+.box {
+  padding: 16px;
+  margin-top: 14px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(5, 11, 21, 0.32);
+}
+
+.card strong {
+  display: block;
+}
+
+.card textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.scenarioPage {
+  display: grid;
+  gap: 16px;
+}
+
+.scenarioPageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(45, 125, 255, 0.18), transparent 20rem),
+    linear-gradient(180deg, rgba(18, 31, 50, 0.9), rgba(8, 15, 28, 0.92));
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.scenarioPageHeader h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.scenarioHeaderBadges,
+.scenarioBadgeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.scenarioLayout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.82fr) minmax(380px, 1.18fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.scenarioColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.scenarioPanel {
+  position: relative;
+  overflow: visible;
+  padding: 15px;
+}
+
+.scenarioPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent 36%, rgba(45, 125, 255, 0.05));
+  mask-image: linear-gradient(#000, transparent 55%);
+}
+
+.selectedScenarioPanel {
+  border-color: rgba(45, 125, 255, 0.34);
+  background:
+    radial-gradient(circle at 88% 10%, rgba(45, 125, 255, 0.2), transparent 12rem),
+    linear-gradient(180deg, rgba(17, 32, 53, 0.92), rgba(7, 15, 28, 0.94));
+}
+
+.currentInstructionsPanel {
+  border-color: rgba(45, 125, 255, 0.42);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(33, 212, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(18, 31, 50, 0.94), rgba(6, 13, 25, 0.96));
+}
+
+.defaultInstructionsPanel {
+  border-color: rgba(119, 164, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(14, 26, 44, 0.86), rgba(7, 14, 26, 0.92));
+}
+
+.instructionStatePanel {
+  border-color: rgba(51, 209, 122, 0.22);
+}
+
+.scenarioPanelHeader {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scenarioPanelHeader.compact {
+  margin-bottom: 10px;
+}
+
+.scenarioPanelHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.scenarioKicker,
+.scenarioHint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scenarioKicker {
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.scenarioOrbIcon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(45, 125, 255, 0.55);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(33, 212, 255, 0.2), transparent 58%),
+    rgba(6, 14, 27, 0.88);
+  box-shadow: 0 0 28px rgba(45, 125, 255, 0.28), inset 0 0 20px rgba(33, 212, 255, 0.12);
+}
+
+.scenarioOrbIcon::before,
+.scenarioOrbIcon::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  height: 3px;
+  border-radius: 999px;
+  background: #8fc4ff;
+  box-shadow: 0 0 12px rgba(45, 125, 255, 0.75);
+}
+
+.scenarioOrbIcon::before {
+  top: 17px;
+}
+
+.scenarioOrbIcon::after {
+  top: 28px;
+}
+
+.scenarioDescriptionText {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 12px;
+  color: #c8d7ee;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scenarioBadge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.scenarioBadge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.scenarioBadgeBlue {
+  color: #8fc4ff;
+  border-color: rgba(45, 125, 255, 0.38);
+  background: rgba(45, 125, 255, 0.14);
+}
+
+.scenarioBadgeGreen {
+  color: #72f3a6;
+  border-color: rgba(51, 209, 122, 0.34);
+  background: rgba(51, 209, 122, 0.13);
+}
+
+.scenarioBadgeAmber {
+  color: #ffd779;
+  border-color: rgba(248, 193, 74, 0.36);
+  background: rgba(168, 116, 21, 0.16);
+}
+
+.scenarioBadgeRed {
+  color: #ff9aa4;
+  border-color: rgba(255, 92, 108, 0.36);
+  background: rgba(151, 32, 45, 0.16);
+}
+
+.scenarioCards {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.scenarioCard.card {
+  margin: 0;
+}
+
+.scenarioCard {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 5px 9px;
+  width: 100%;
+  min-height: 78px;
+  padding: 10px;
+  text-align: left;
+  border: 1px solid rgba(152, 181, 220, 0.15);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(17, 30, 49, 0.82), rgba(7, 14, 26, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 24px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+
+.scenarioCard:hover {
+  border-color: rgba(119, 164, 255, 0.42);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 14px 28px rgba(0,0,0,0.24);
+}
+
+.scenarioCard.active {
+  border-color: rgba(45, 125, 255, 0.9);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(33, 212, 255, 0.16), transparent 7rem),
+    linear-gradient(180deg, rgba(31, 65, 116, 0.58), rgba(9, 21, 41, 0.94));
+  box-shadow: 0 0 0 1px rgba(45, 125, 255, 0.28), 0 14px 34px rgba(45, 125, 255, 0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.scenarioCardIcon {
+  grid-row: 1 / span 2;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(143, 196, 255, 0.4);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.32), rgba(33, 212, 255, 0.08)),
+    rgba(5, 11, 21, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.scenarioCard.active .scenarioCardIcon {
+  border-color: rgba(51, 209, 122, 0.52);
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.42), rgba(51, 209, 122, 0.16)),
+    rgba(5, 11, 21, 0.64);
+}
+
+.scenarioCardTitle {
+  min-width: 0;
+  color: #eef5ff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.scenarioCardState {
+  color: #83b7ff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.scenarioCard.active .scenarioCardState {
+  color: #72f3a6;
+}
+
+.scenarioLibraryPanel {
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.scenarioLibraryPreview {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 114px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(119, 164, 255, 0.5);
+  border-radius: 10px;
+  color: var(--text);
+  background: #07111f;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 12px 30px rgba(0,0,0,0.26);
+  backdrop-filter: none;
+}
+
+.scenarioPreviewTitle {
+  margin-bottom: 7px;
+  color: #f3f8ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scenarioPreviewMeta,
+.scenarioPreviewText {
+  color: #b7c7de;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scenarioPreviewText {
+  margin-top: 6px;
+}
+
+.scenarioDetailRows {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+}
+
+.scenarioDetailRow {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid rgba(152, 181, 220, 0.11);
+  border-radius: 8px;
+  background: rgba(5, 11, 21, 0.38);
+}
+
+.scenarioDetailRow span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scenarioDetailRow strong {
+  min-width: 0;
+  color: #dce9fb;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.currentInstructionsPanel textarea,
+.defaultInstructionsPanel textarea {
+  position: relative;
+  z-index: 1;
+  border-color: rgba(119, 164, 255, 0.24);
+  color: #dbe9ff;
+  background:
+    linear-gradient(180deg, rgba(4, 10, 20, 0.92), rgba(3, 8, 16, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), inset 0 0 24px rgba(45, 125, 255, 0.05);
+  font-size: 12px;
+  line-height: 1.46;
+  resize: vertical;
+}
+
+.currentInstructionsPanel textarea {
+  min-height: 230px;
+  height: clamp(230px, 30vh, 315px);
+}
+
+.defaultInstructionsPanel textarea {
+  min-height: 132px;
+  height: clamp(132px, 18vh, 190px);
+  color: #aebed4;
+  background:
+    linear-gradient(180deg, rgba(4, 10, 20, 0.78), rgba(3, 8, 16, 0.88));
+}
+
+.instructionMetaLine {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  margin: 10px 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.instructionMetaLine strong {
+  color: #cfe0f7;
+  font-weight: 650;
+}
+
+.instructionActions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.instructionActions button {
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 10px;
+  white-space: normal;
+}
+
+.scenarioPrimaryAction {
+  border-color: rgba(45, 125, 255, 0.52);
+  background: linear-gradient(180deg, rgba(45, 125, 255, 0.44), rgba(17, 49, 96, 0.88));
+}
+
+.scenarioRefreshAction {
+  border-color: rgba(51, 209, 122, 0.32);
+  background: linear-gradient(180deg, rgba(34, 70, 61, 0.82), rgba(10, 31, 31, 0.92));
+}
+
+.scenarioDangerAction {
+  border-color: rgba(255, 92, 108, 0.42);
+  background: linear-gradient(180deg, rgba(92, 31, 44, 0.82), rgba(39, 12, 21, 0.94));
+}
+
+.instructionStatus {
+  position: relative;
+  z-index: 1;
+  min-height: 18px;
+  margin-top: 10px;
+}
+
+.logbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0 10px;
+}
+
+.logbar label {
+  min-width: auto;
+}
+
+.logbar input[type="text"] {
+  width: min(420px, 100%);
+}
+
+.logbar .spacer {
+  flex: 1 1 auto;
+}
+
+pre#log {
+  height: 320px;
+  margin-top: 10px;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #cfe0f7;
+  background: rgba(3, 8, 16, 0.78);
+}
+
+@media (max-width: 1080px) {
+  .appHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .headerCards {
+    justify-content: flex-start;
+  }
+
+  .voiceDashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .appBottomBar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settingsDashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .scenarioLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .scenarioRightColumn {
+    order: 2;
+  }
+}
+
+@media (max-width: 860px) {
+  .appShell {
+    padding: 18px 16px 12px;
+  }
+
+  .nav {
+    grid-template-columns: 1fr;
+  }
+
+  .controlRow,
+  .quickControlsGrid,
+  .instructionActions,
+  .appBottomBar {
+    grid-template-columns: 1fr;
+  }
+
+  .scenarioPageHeader,
+  .scenarioPanelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .scenarioHeaderBadges,
+  .scenarioBadgeRow {
+    justify-content: flex-start;
+  }
+
+  .scenarioCards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .scenarioDetailRow {
+    grid-template-columns: 1fr;
+  }
+
+  .outputControl,
+  .bottomVolume {
+    grid-template-columns: 1fr;
+  }
+
+  .statusRow {
+    grid-template-columns: 1fr;
+  }
+
+  .statusValue {
+    text-align: left;
+  }
+
+  .settingsCardHeader,
+  .settingsGrid,
+  .providerGrid,
+  .settingsActions,
+  .providerActions,
+  .licenseActions,
+  .twoActions,
+  .diagnosticsLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .settingsBadge {
+    justify-self: start;
+  }
+}
+
+.currentInstructionsPanel textarea,
+.defaultInstructionsPanel textarea {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(92, 149, 230, 0.75) rgba(7, 14, 26, 0.92);
+}
+
+.currentInstructionsPanel textarea::-webkit-scrollbar,
+.defaultInstructionsPanel textarea::-webkit-scrollbar {
+  width: 10px;
+}
+
+.currentInstructionsPanel textarea::-webkit-scrollbar-track,
+.defaultInstructionsPanel textarea::-webkit-scrollbar-track {
+  background: rgba(7, 14, 26, 0.92);
+}
+
+.currentInstructionsPanel textarea::-webkit-scrollbar-thumb,
+.defaultInstructionsPanel textarea::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(92, 149, 230, 0.9), rgba(39, 74, 124, 0.95));
+  border-radius: 999px;
+  border: 2px solid rgba(7, 14, 26, 0.92);
+}
+
+.instructionStatePanel {
+  display: none;
+}
+
+.scenarioDetailsPanel {
+  display: none;
+}
+
+body[data-theme="light"] {
+  --bg-0: #eef4fb;
+  --bg-1: #f6f9fe;
+  --bg-2: #dde8f7;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: rgba(255, 255, 255, 0.94);
+  --line: rgba(113, 146, 193, 0.24);
+  --line-strong: rgba(45, 125, 255, 0.44);
+  --text: #16304f;
+  --muted: #587090;
+  --muted-2: #7286a1;
+  --shadow: 0 18px 42px rgba(72, 106, 151, 0.18);
+}
+
+body[data-theme="light"] {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(45, 125, 255, 0.14), transparent 34rem),
+    radial-gradient(circle at 84% 18%, rgba(67, 177, 255, 0.12), transparent 26rem),
+    linear-gradient(135deg, #edf4fb 0%, #f7fbff 46%, #e9f1fa 100%);
+}
+
+body[data-theme="light"]::before {
+  background:
+    linear-gradient(rgba(70, 114, 173, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(70, 114, 173, 0.05) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.35), transparent 80%);
+}
+
+body[data-theme="light"] button {
+  color: #173251;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 4px 14px rgba(82, 122, 174, 0.08);
+}
+
+body[data-theme="light"] button:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(248, 252, 255, 1), rgba(228, 239, 252, 1));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 8px 18px rgba(82, 122, 174, 0.12);
+}
+
+body[data-theme="light"] input,
+body[data-theme="light"] select,
+body[data-theme="light"] textarea {
+  color: #173251;
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(113, 146, 193, 0.3);
+}
+
+body[data-theme="light"] .glassPanel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(247,251,255,0.86));
+  box-shadow: var(--shadow);
+}
+
+body[data-theme="light"] .appBottomBar {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(240,247,255,0.88));
+  border-color: rgba(113, 146, 193, 0.24);
+}
+
+body[data-theme="light"] .settingsReadonly {
+  color: #173251;
+  background: rgba(255, 255, 255, 0.76);
+  border-color: rgba(113, 146, 193, 0.28);
+}
+
+body[data-theme="light"] .statusTable {
+  background: rgba(255, 255, 255, 0.52);
+  border-color: rgba(113, 146, 193, 0.22);
+}
+
+body[data-theme="light"] .settingsLogPanel {
+  border-top-color: rgba(113, 146, 193, 0.18);
+}
+
+body[data-theme="light"] .log {
+  color: #1b3553;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.94), rgba(241,247,255,0.94));
+  border-color: rgba(113, 146, 193, 0.24);
+}
+
+body[data-theme="light"] .scenarioCard {
+  color: #173251;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.94), rgba(241,247,255,0.88));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 10px 24px rgba(72, 106, 151, 0.1);
+}
+
+body[data-theme="light"] .scenarioCard:hover {
+  box-shadow: 0 14px 28px rgba(72, 106, 151, 0.12);
+}
+
+body[data-theme="light"] .scenarioLibraryPreview,
+body[data-theme="light"] .scenarioPreviewCard {
+  color: #173251;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(113, 146, 193, 0.34);
+  box-shadow: 0 10px 26px rgba(72, 106, 151, 0.1);
+}
+
+body[data-theme="light"] .instructionEditor,
+body[data-theme="light"] .currentInstructionsPanel textarea,
+body[data-theme="light"] .defaultInstructionsPanel textarea,
+body[data-theme="light"] textarea {
+  color: #173251;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(243,248,255,0.96));
+  border-color: rgba(113, 146, 193, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 6px 18px rgba(72, 106, 151, 0.06);
+}
+
+body[data-theme="light"] .selectedScenarioInfo,
+body[data-theme="light"] .scenarioSummary,
+body[data-theme="light"] .selectedScenarioPanel,
+body[data-theme="light"] .scenarioDetailRow,
+body[data-theme="light"] .scenarioPanel,
+body[data-theme="light"] .quickControls,
+body[data-theme="light"] .audioSafetyBox,
+body[data-theme="light"] .scenarioHero {
+  color: #173251;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.94), rgba(242,248,255,0.9));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 12px 28px rgba(72, 106, 151, 0.1);
+}
+
+body[data-theme="light"] .audioSafetyMessage {
+  color: #173251;
+  border-color: rgba(113, 146, 193, 0.24);
+  background: rgba(234, 242, 252, 0.92);
+}
+
+body[data-theme="light"] .audioSafetyMessage.ok {
+  color: #16613d;
+  border-color: rgba(51, 209, 122, 0.28);
+  background: rgba(221, 247, 232, 0.92);
+}
+
+body[data-theme="light"] .audioSafetyMessage.warn,
+body[data-theme="light"] .settingsInfoLine {
+  color: #6f5418;
+  border-color: rgba(232, 184, 78, 0.28);
+  background: rgba(255, 246, 221, 0.92);
+}
+
+body[data-theme="light"] .audioSafetyMessage.bad {
+  color: #9f2f3d;
+  border-color: rgba(255, 92, 108, 0.24);
+  background: rgba(255, 235, 238, 0.92);
+}
+
+body[data-theme="light"] .tabBar,
+body[data-theme="light"] .nav,
+body[data-theme="light"] .navTabs {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,247,255,0.9));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 10px 24px rgba(72, 106, 151, 0.08);
+}
+
+body[data-theme="light"] .tabBar::after {
+  background: linear-gradient(90deg, rgba(45, 125, 255, 0.08), rgba(45, 125, 255, 0));
+}
+
+body[data-theme="light"] .brandSubtitle {
+  color: #587090;
+}
+
+body[data-theme="light"] .headerZoomControl {
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,247,255,0.9));
+  border-color: rgba(113, 146, 193, 0.24);
+  box-shadow: 0 8px 20px rgba(72, 106, 151, 0.08);
+}
+
+body[data-theme="light"] .zoomLabel {
+  color: #587090;
+}
+
+body[data-theme="light"] .quickControlsHeader {
+  color: #375170;
+}
+
+body[data-theme="light"] .nav button {
+  color: #375170;
+  border-right-color: rgba(113, 146, 193, 0.18);
+}
+
+body[data-theme="light"] .nav button.active {
+  color: #173251;
+  background: linear-gradient(90deg, rgba(45, 125, 255, 0.18), rgba(45, 125, 255, 0.05));
+  box-shadow: inset 0 -3px 0 var(--blue), 0 10px 22px rgba(45, 125, 255, 0.12);
+}
+
+body[data-theme="light"] .scenarioHero h2,
+body[data-theme="light"] .scenarioHero .panelSub,
+body[data-theme="light"] .scenarioPreviewTitle,
+body[data-theme="light"] .scenarioDescriptionText,
+body[data-theme="light"] .scenarioPreviewMeta,
+body[data-theme="light"] .scenarioPreviewText,
+body[data-theme="light"] .scenarioDetailRow strong,
+body[data-theme="light"] .scenarioCardTitle,
+body[data-theme="light"] .scenarioCard .scenarioName,
+body[data-theme="light"] .scenarioCard .scenarioAction,
+body[data-theme="light"] .statusValue,
+body[data-theme="light"] .statusLabel,
+body[data-theme="light"] .settingsMuted,
+body[data-theme="light"] .panelSub,
+body[data-theme="light"] .mono,
+body[data-theme="light"] .appHeader .muted {
+  color: #173251;
+}
+
+body[data-theme="light"] label,
+body[data-theme="light"] .settingsLabel,
+body[data-theme="light"] .audioSafetyTitle {
+  color: #375170;
+}
+
+body[data-theme="light"] .settingsMuted {
+  color: #587090;
+}
+
+body[data-theme="light"] .statusLabel,
+body[data-theme="light"] .panelSub,
+body[data-theme="light"] .appHeader .muted,
+body[data-theme="light"] .scenarioPreviewMeta,
+body[data-theme="light"] .scenarioPreviewText,
+body[data-theme="light"] .scenarioDetailRow span,
+body[data-theme="light"] .scenarioDescriptionText {
+  color: #587090;
+}
+
+body[data-theme="light"] .scenarioCardState,
+body[data-theme="light"] .scenarioCard .scenarioAction {
+  color: #2f67b1;
+}
+
+body[data-theme="light"] .pill {
+  color: #173251;
+  border-color: rgba(113, 146, 193, 0.34);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+body[data-theme="light"] .pill.ok {
+  color: #16613d;
+  border-color: rgba(51, 149, 96, 0.32);
+  background: rgba(221, 247, 232, 0.96);
+}
+
+body[data-theme="light"] .pill.warn {
+  color: #7a5a13;
+  border-color: rgba(232, 184, 78, 0.36);
+  background: rgba(255, 246, 221, 0.96);
+}
+
+body[data-theme="light"] .pill.bad {
+  color: #9f2f3d;
+  border-color: rgba(255, 92, 108, 0.32);
+  background: rgba(255, 235, 238, 0.96);
+}
+
+body[data-theme="light"] .settingsBadge {
+  color: #173251;
+  border-color: rgba(113, 146, 193, 0.34);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+body[data-theme="light"] .settingsBadge.ok {
+  color: #16613d;
+  border-color: rgba(51, 149, 96, 0.34);
+  background: rgba(221, 247, 232, 0.96);
+}
+
+body[data-theme="light"] .settingsBadge.warn {
+  color: #7a5a13;
+  border-color: rgba(232, 184, 78, 0.38);
+  background: rgba(255, 246, 221, 0.96);
+}
+
+body[data-theme="light"] .settingsBadge.bad {
+  color: #9f2f3d;
+  border-color: rgba(255, 92, 108, 0.34);
+  background: rgba(255, 235, 238, 0.96);
+}
+
+body[data-theme="light"] .scenarioCard.active {
+  border-color: rgba(45, 125, 255, 0.62);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(33, 212, 255, 0.12), transparent 7rem),
+    linear-gradient(180deg, rgba(225, 239, 255, 0.95), rgba(244, 249, 255, 0.96));
+  box-shadow: 0 0 0 1px rgba(45, 125, 255, 0.18), 0 14px 30px rgba(45, 125, 255, 0.12);
+}
+
+body[data-theme="light"] .scenarioCard.active .scenarioCardTitle,
+body[data-theme="light"] .scenarioCard.active .scenarioName {
+  color: #173251;
+}
+
+body[data-theme="light"] .scenarioCard.active .scenarioCardState,
+body[data-theme="light"] .scenarioBadge.active {
+  color: #16613d;
+}
+
+body[data-theme="light"] .scenarioBadge,
+body[data-theme="light"] .scenarioBadgeBlue {
+  color: #2f67b1;
+  border-color: rgba(45, 125, 255, 0.26);
+  background: rgba(226, 238, 255, 0.92);
+}
+
+body[data-theme="light"] .scenarioBadge.active,
+body[data-theme="light"] .scenarioBadgeGreen {
+  color: #16613d;
+  border-color: rgba(51, 209, 122, 0.24);
+  background: rgba(222, 247, 231, 0.92);
+}
+
+body[data-theme="light"] .scenarioBadge.dirty,
+body[data-theme="light"] .scenarioBadgeAmber {
+  color: #7c5c10;
+  border-color: rgba(232, 184, 78, 0.28);
+  background: rgba(255, 245, 214, 0.94);
+}
+
+body[data-theme="light"] .scenarioBadgeRed {
+  color: #9f2f3d;
+  border-color: rgba(255, 92, 108, 0.24);
+  background: rgba(255, 234, 238, 0.94);
+}
+
+body[data-theme="light"] .scenarioCardIcon {
+  border-color: rgba(82, 137, 204, 0.34);
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.14), rgba(33, 212, 255, 0.04)),
+    rgba(255, 255, 255, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+}
+
+body[data-theme="light"] .scenarioCard.active .scenarioCardIcon {
+  border-color: rgba(51, 209, 122, 0.34);
+  background:
+    linear-gradient(135deg, rgba(45, 125, 255, 0.18), rgba(51, 209, 122, 0.08)),
+    rgba(244, 250, 255, 0.92);
+}
+
+body[data-theme="light"] .appBottomBar {
+  color: #173251;
+}
+
+body[data-theme="light"] .appBottomBar .bottomLabel,
+body[data-theme="light"] .appBottomBar .statusLabel {
+  color: #587090;
+}
+
+body[data-theme="light"] .appBottomBar .bottomValue,
+body[data-theme="light"] .appBottomBar .statusValue,
+body[data-theme="light"] .appBottomBar a {
+  color: #2f67b1;
+}
+
+body[data-theme="light"] .scenarioHero {
+  color: #173251;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 125, 255, 0.12), transparent 20rem),
+    linear-gradient(180deg, rgba(255,255,255,0.96), rgba(238,246,255,0.94));
+  border-color: rgba(113, 146, 193, 0.28);
+  box-shadow: 0 14px 32px rgba(72, 106, 151, 0.12);
+}
+
+body[data-theme="light"] .scenarioHero h2 {
+  color: #173251;
+}
+
+body[data-theme="light"] .scenarioHero .panelSub {
+  color: #587090;
+}
+
+body[data-theme="light"] .diagnosticSeal {
+  border-color: rgba(51, 149, 96, 0.42);
+  background:
+    radial-gradient(circle, rgba(51, 209, 122, 0.18), rgba(225, 247, 237, 0.72) 58%, rgba(255,255,255,0.92));
+  box-shadow: 0 0 22px rgba(51, 149, 96, 0.18), inset 0 0 18px rgba(51, 209, 122, 0.12);
+}
+
+body[data-theme="light"] .routeLine {
+  background: linear-gradient(90deg, rgba(76, 136, 214, 0.32), rgba(45, 125, 255, 0.68), rgba(76, 136, 214, 0.32));
+  box-shadow: 0 0 10px rgba(45, 125, 255, 0.12);
+}
+
+body[data-theme="light"] .scenarioHero {
+  color: #173251;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 125, 255, 0.12), transparent 20rem),
+    linear-gradient(180deg, rgba(255,255,255,0.97), rgba(238,246,255,0.95)) !important;
+  border-color: rgba(113, 146, 193, 0.28);
+  box-shadow: 0 14px 32px rgba(72, 106, 151, 0.12);
+}
+
+body[data-theme="light"] .scenarioHero h2 {
+  color: #173251;
+}
+
+body[data-theme="light"] .scenarioHero .panelSub {
+  color: #587090;
+}
+
+body[data-theme="light"] .volumeValue {
+  color: #173251;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(113, 146, 193, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 4px 12px rgba(72, 106, 151, 0.08);
+}
+
+body[data-theme="light"] .scenarioPageHeader {
+  color: #173251;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 125, 255, 0.12), transparent 20rem),
+    linear-gradient(180deg, rgba(255,255,255,0.97), rgba(238,246,255,0.95)) !important;
+  border-color: rgba(113, 146, 193, 0.28);
+  box-shadow: 0 14px 32px rgba(72, 106, 151, 0.12);
+}
+
+body[data-theme="light"] .scenarioPageHeader h2 {
+  color: #173251;
+}
+
+body[data-theme="light"] .scenarioPageHeader .panelSub {
+  color: #587090;
+}

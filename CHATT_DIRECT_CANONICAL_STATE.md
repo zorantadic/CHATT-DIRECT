@@ -1,95 +1,74 @@
-CHATT Canonical Project State
+# CHATT Direct Canonical State
+
 Last updated: 2026-05-29
-This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
-Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
-For detailed Direct Realtime runtime implementation details, use:
+
+This file is the current Direct Realtime runtime canonical state for the `CHATT-DIRECT` repository.
+
+Use this file before making changes to Desktop runtime behavior, backend Realtime behavior, audio capture/playback, instruction flow, runtime configuration, packaging, or cleanup that can affect the Direct Realtime application.
+
+For project-level repository state and workflow rules, also use:
+
 ```text
-CHATT_DIRECT_CANONICAL_STATE.md
+CHATT_CANONICAL_PROJECT_STATE.md
 ```
+
 ---
-1. Project Identity
-`CHATT-DIRECT` is now a Windows/Electron Direct Realtime voice application.
-The project is no longer the old multi-service CHATT architecture.
-Current product direction:
+
+## 1. Runtime Identity
+
+`CHATT-DIRECT` is a Windows/Electron Direct Realtime voice application.
+
+Canonical runtime direction:
+
 ```text
-Windows Electron desktop app
+Electron Desktop app
 Direct Realtime voice
+single active backend service
 multi-provider Realtime adapter runtime
 Azure OpenAI Realtime and OpenAI Realtime support
 Azure OpenAI Realtime uses gpt-realtime-2 through the OpenAI-compatible /openai/v1/realtime endpoint
-BYOK provider/API configuration
-capability-driven provider setup
-selected provider voice applied in Realtime session.update
+loopback/system/browser audio input
+selected provider voice in Realtime session.update
 outgoing language steering through final Realtime instructions
 incoming language planned as transcription language hint
-packaged Windows app
-version 0.1.8 packaged installer
-minimized-app floating mini control window
-deterministic Electron UI zoom factor 0.7 applied in main window runtime
-```
-Primary value:
-```text
-stable Direct Realtime voice workflow
-low latency
-headphones/output-device routing
-clean local setup
-user-owned provider credentials
-real provider connection validation
-capability-driven voice/language/region setup
-multilingual conversation stabilization
-workflow-specific voice assistant use cases
+selected headphones/output device playback
+BYOK provider/API configuration
 scenario preset based behavior selection
 Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
-modern dark glass Desktop UI across Voice, Settings, and Scenarios
-responsive default Desktop window size 1120 x 820 with minimum 860 x 720
-deterministic UI scale independent of Chromium persisted profile zoom state
 multilingual UI display support
 header language selector synchronized with Settings language selector
-floating vertical mini control window when main app is minimized
-mini control supports Start, Stop, Refresh, Repeat, Reset, Open, Session, and Activity
-backend-authoritative 3-day trial registration
-hosted Azure Licensing API with Azure Table Storage
+floating vertical Mini Control Window when the main app is minimized
+deterministic Electron UI zoom factor 0.7 for main Desktop window
+hosted Azure Licensing API for 3-day free trial registration and validation
 free trial anti-reset protection through installId, emailHash, and deviceHash
 trial/start rate limiting
 user-initiated local troubleshooting package export
 ```
+
+This runtime is no longer the old orchestrated CHATT flow.
+
+Do not reintroduce:
+
+```text
+STT backend
+Orchestrator backend
+Agent1 runtime path
+Control WebSocket
+TTS engine path
+Manual answer backend
+Frontend/Vite runtime
+Full Pipeline Test flow
+```
+
 ---
-2. Canonical File Roles
-This file:
-```text
-CHATT_CANONICAL_PROJECT_STATE.md
-```
-Purpose:
-```text
-project-level canonical state
-repository direction
-active vs removed architecture
-current workflow
-cleanup baseline
-work rules
-next-step guardrails
-```
-Detailed Direct runtime file:
-```text
-CHATT_DIRECT_CANONICAL_STATE.md
-```
-Purpose:
-```text
-Direct Realtime runtime details
-Desktop/backend runtime flow
-audio capture rule
-port 50505 backend
-Realtime configuration
-worklet naming issue
-runtime validation baseline
-```
-Both files are current.
----
-3. Current Active Architecture
-Canonical active runtime:
+
+## 2. Current Canonical Runtime Flow
+
+Active Direct Realtime flow:
+
 ```text
 Electron Desktop app
 -> loopback/system/browser audio capture
@@ -99,100 +78,21 @@ Electron Desktop app
 -> Azure provider uses OpenAI-compatible /openai/v1/realtime for gpt-realtime-2
 -> provider-specific session.update payload
 -> selected provider voice applied in session.update
--> outgoing language rule appended to final session instructions
+-> outgoing language rule appended to effective instructions
 -> provider VAD/interruption behavior
 -> audio response
 -> Desktop playback pipeline
 -> selected headphones/output device
 ```
-Only active backend service:
-```text
-backend/app_realtime.py
-port 50505
-```
-Active local endpoints:
-```text
-Realtime HTTP
-http://127.0.0.1:50505
 
-Realtime WS
-ws://127.0.0.1:50505/voice/ws
-```
----
-4. Active Repository Areas
-Current active project root:
+Only one backend service is canonical for active runtime:
+
 ```text
-C:\Projects\chatt-direct
+backend/app_realtime.py on port 50505
 ```
-Active Desktop app:
-```text
-C:\Projects\chatt-direct\Desktop
-```
-Active backend:
-```text
-C:\Projects\chatt-direct\backend
-```
-Important active files:
-```text
-Desktop/package.json
-Desktop/package-lock.json
-Desktop/electron/main.cjs
-Desktop/electron/preload.cjs
-Desktop/renderer/index.html
-Desktop/renderer/renderer.js
-Desktop/renderer/styles.css
-Desktop/renderer/mini-control.html
-Desktop/renderer/mini-control.css
-Desktop/renderer/mini-control.js
-Desktop/renderer/stt-worklet-processor.js
-backend/app_realtime.py
-backend/audio_utils.py
-backend/instructions.json
-backend/provider_capabilities.json
-backend/provider_config.py
-backend/provider_config.local.example.json
-backend/scenario_presets.json
-backend/scenario_presets.local.json   # generated locally and ignored by Git
-backend/providers/base.py
-backend/providers/__init__.py
-backend/providers/azure_openai_realtime.py
-backend/providers/openai_realtime.py
-backend/.env.example
-backend/requirements.txt
-docker-compose.yml
-start_all.ps1
-stop_all.ps1
-CHATT_CANONICAL_PROJECT_STATE.md
-CHATT_DIRECT_CANONICAL_STATE.md
-```
-Important note:
-```text
-Desktop/renderer/stt-worklet-processor.js has a legacy filename but is still used by Direct Realtime audio capture.
-Do not delete or rename it without first confirming all AudioWorklet registrations and processor names.
-```
-Current Direct worklet usage:
-```text
-new URL("stt-worklet-processor.js", window.location.href)
-processor name: direct-realtime-pcm16-24k
-```
----
-5. Removed / Deprecated Architecture
-The following architecture is no longer active and must not be reintroduced without explicit design approval:
-```text
-STT backend
-Orchestrator backend
-Agent1 runtime path
-Control WebSocket
-TTS engine path
-Manual answer backend
-Frontend/Vite app
-Azure Static Web Apps deployment flow
-Full Pipeline Test flow
-legacy renderer STT runtime path
-legacy renderer Orchestrator runtime path
-legacy renderer Control WS path
-```
-Inactive ports:
+
+The active runtime does not use:
+
 ```text
 50506
 50507
@@ -200,51 +100,147 @@ Inactive ports:
 5173
 5174
 ```
-Removed runtime/deployment artifacts include:
-```text
-backend/speech_server.py
-backend/Dockerfile.speech
-backend/Dockerfile.manual
-backend/Dockerfile.orchestrator
-backend/speech_server.py.bak
-backend/manual_answers.json
-backend/instruction_profiles.json
-Azure Static Web Apps YAML workflow files
-```
+
 ---
-6. Current Local Startup
-Backend startup:
+
+## 3. Critical Audio Rule
+
+Direct Realtime input must use loopback/system/browser audio capture.
+
+Do not introduce microphone capture.
+
+Forbidden active input path:
+
+```text
+navigator.mediaDevices.getUserMedia
+microphone input
+new microphone permission flow
+```
+
+Canonical input path:
+
+```text
+electronAPI.enableLoopbackAudio()
+navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+stop/remove video tracks immediately
+use only returned system audio track
+```
+
+---
+
+## 4. Local Paths
+
+Project root:
+
+```text
+C:\Projects\chatt-direct
+```
+
+Desktop app:
+
+```text
+C:\Projects\chatt-direct\Desktop
+```
+
+Backend:
+
+```text
+C:\Projects\chatt-direct\backend
+```
+
+GitHub repo:
+
+```text
+https://github.com/zorantadic/CHATT-DIRECT
+```
+
+Canonical branch:
+
+```text
+main
+```
+
+Safety branch created before the large cleanup:
+
+```text
+backup-before-single-engine-realtime-cleanup
+```
+
+---
+
+## 5. Active Backend Service
+
+Run backend from:
+
 ```powershell
 cd C:\Projects\chatt-direct\backend
 .\.venv\Scripts\Activate.ps1
 python -m uvicorn app_realtime:app --host 127.0.0.1 --port 50505 --log-level info
 ```
-Desktop startup:
+
+Expected local HTTP endpoint:
+
+```text
+http://127.0.0.1:50505
+```
+
+Expected Realtime WebSocket:
+
+```text
+ws://127.0.0.1:50505/voice/ws
+```
+
+The backend is single-engine Realtime only.
+
+---
+
+## 6. Desktop Startup
+
+Run Desktop from:
+
 ```powershell
 cd C:\Projects\chatt-direct\Desktop
 npm start
 ```
-Optional helper script:
-```powershell
-cd C:\Projects\chatt-direct
-.\start_all.ps1
-```
-Current helper scripts are reduced to Direct Realtime backend only:
+
+The Desktop app owns:
+
 ```text
-start_all.ps1 -> starts 50505 only
-stop_all.ps1  -> stops 50505 only
+session state
+loopback/system audio capture
+Realtime start/stop controls
+instruction UI
+scenario selection/display
+compact clickable scenario cards
+scenario hover details popup
+Realtime rate selection
+playback pipeline
+playback volume
+output device routing
+listening/speaking indicators
+reset-session guard behavior
+floating Mini Control Window lifecycle and command forwarding
+main window baseline and deterministic UI zoom application
 ```
+
 ---
-7. Configuration Model
+
+## 7. Active Runtime Configuration
+
 Backend runtime configuration comes from:
+
 ```text
 C:\Projects\chatt-direct\backend\.env
 ```
+
 Committed non-secret template:
+
 ```text
 C:\Projects\chatt-direct\backend\.env.example
 ```
-Current relevant Direct Realtime fallback/default settings:
+
+Current relevant Direct Realtime template values:
+
 ```env
 AZURE_OPENAI_ENDPOINT=https://agentfield.cognitiveservices.azure.com
 AZURE_OPENAI_KEY=<your-azure-openai-key>
@@ -265,67 +261,117 @@ PORT=50505
 DEBUG=false
 ```
 
-Active provider configuration is saved locally in:
-```text
-backend/provider_config.local.json
-```
-
-Provider capability lists are defined in:
-```text
-backend/provider_capabilities.json
-```
-
-Current capability-driven setup includes:
-```text
-Azure OpenAI Realtime regions
-Azure default model gpt-realtime-2
-OpenAI/Azure voice lists
-Incoming language list
-Outgoing language list
-```
-
-This generated provider config file is ignored by Git and may contain user-owned provider credentials.
 Do not commit real secrets.
-The Desktop settings currently use only:
+
+Desktop active endpoint settings:
+
 ```text
 Realtime HTTP
+http://127.0.0.1:50505
+
 Realtime WS
-Realtime rate
-Playback volume
-Output device
-Session Cost Guard controls
-Scenario & Instructions controls
-modern dark glass Settings control-center layout
+ws://127.0.0.1:50505/voice/ws
 ```
-There are no active Desktop settings for:
+
+Desktop no longer has active settings for:
+
 ```text
 STT WS base
 Orchestrator HTTP
 Control WS base
-TTS engine
+TTS engine selector
 Manual backend
 Frontend/Vite
 ```
+
 ---
-8. Critical Audio Rule
-Direct Realtime input must use loopback/system/browser audio capture.
-Do not introduce microphone capture.
-Forbidden active input path:
+
+## 8. Current Direct Runtime Files
+
+Important active Desktop files:
+
 ```text
-navigator.mediaDevices.getUserMedia
-microphone input
-new microphone permission flow
+Desktop/package.json
+Desktop/electron/main.cjs
+Desktop/electron/preload.cjs
+Desktop/renderer/index.html
+Desktop/renderer/renderer.js
+Desktop/renderer/styles.css
+Desktop/renderer/mini-control.html
+Desktop/renderer/mini-control.css
+Desktop/renderer/mini-control.js
+Desktop/renderer/stt-worklet-processor.js
 ```
-Canonical input path:
+
+Important active backend files:
+
 ```text
-electronAPI.enableLoopbackAudio()
-navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-stop/remove video tracks immediately
-use only returned system audio track
+backend/app_realtime.py
+backend/audio_utils.py
+backend/instructions.json
+backend/provider_capabilities.json
+backend/provider_config.py
+backend/provider_config.local.example.json
+backend/scenario_presets.json
+backend/scenario_presets.local.json   # generated locally and ignored by Git
+backend/providers/base.py
+backend/providers/__init__.py
+backend/providers/azure_openai_realtime.py
+backend/providers/openai_realtime.py
+backend/.env.example
+backend/requirements.txt
 ```
+
+Runtime helper files:
+
+```text
+docker-compose.yml
+start_all.ps1
+stop_all.ps1
+```
+
+Current helper scope:
+
+```text
+docker-compose.yml -> active Realtime backend only
+start_all.ps1    -> starts 50505 only
+stop_all.ps1     -> stops 50505 only
+```
+
 ---
-9. Current Desktop Behaviors To Preserve
+
+## 9. Known Naming Issue
+
+`Desktop/renderer/stt-worklet-processor.js` still exists and is tracked.
+
+Do not delete it blindly.
+
+Reason:
+
+```text
+The filename is legacy, but the file is still used by Direct Realtime audio capture.
+```
+
+Current Direct Realtime worklet registration uses:
+
+```text
+new URL("stt-worklet-processor.js", window.location.href)
+processor name: direct-realtime-pcm16-24k
+```
+
+Possible future cleanup:
+
+```text
+Rename/split stt-worklet-processor.js to a Direct Realtime worklet name
+only after confirming all AudioWorklet registrations and processor names.
+```
+
+---
+
+## 10. Desktop Features To Preserve
+
 Keep these working:
+
 ```text
 Start Direct Realtime
 Stop Direct Realtime
@@ -349,15 +395,52 @@ Mini Control Window when the main app is minimized
 Mini Control Window commands: Start, Stop, Refresh, Repeat, Reset, Open
 Mini Control Window status sync: Session and Activity
 ```
+
 Reset behavior:
+
 ```text
 If Direct Realtime is running, Reset session must not stop runtime.
 It must log that Reset is skipped and tell the user to stop Direct Realtime first.
 After Stop, Reset session may create a new session ID.
 ```
+
 ---
-10. Completed Cleanup Baseline
+
+## 11. Removed Runtime Paths
+
+The following runtime paths have been removed from the active Direct implementation:
+
+```text
+legacy STT WebSocket runtime path
+legacy Orchestrator HTTP transcript path
+legacy Control WebSocket path
+legacy SEND_TO_REALTIME path
+legacy Full Pipeline Test path
+legacy TTS engine selection/runtime switching
+legacy instruction profile backend dependency
+legacy hidden Desktop controls
+legacy endpoint settings writes for STT/Orchestrator/Control
+```
+
+Removed backend/deployment artifacts include:
+
+```text
+backend/speech_server.py
+backend/Dockerfile.speech
+backend/Dockerfile.manual
+backend/Dockerfile.orchestrator
+backend/speech_server.py.bak
+backend/manual_answers.json
+backend/instruction_profiles.json
+obsolete Azure Static Web Apps YAML workflow files
+```
+
+---
+
+## 12. Cleanup Milestones
+
 Completed cleanup includes:
+
 ```text
 Removed legacy backend/orchestrator module
 Removed legacy frontend/Vite app
@@ -375,33 +458,18 @@ Removed dead legacy Desktop UI wiring
 Removed legacy renderer runtime paths for STT, Orchestrator, Control WS, and Full Pipeline Test
 Removed backend/speech_server.py
 Removed backend/Dockerfile.speech
-Removed backend/Dockerfile.manual
-Removed backend/Dockerfile.orchestrator
-Removed backend/speech_server.py.bak
-Removed backend/manual_answers.json
-Removed backend/instruction_profiles.json
 Reduced docker-compose.yml to active Realtime backend only
 Reduced start_all.ps1 and stop_all.ps1 to port 50505 only
 Removed obsolete Azure Static Web Apps YAML workflow files
 Removed obsolete frontend/manual-frontend gitignore exceptions
 ```
-Recent cleanup commits include:
-```text
-Remove unused legacy backend artifacts
-Guard legacy hidden control initialization
-Decouple direct realtime config from legacy cfg
-Remove legacy hidden desktop controls
-Remove legacy endpoint settings writes
-Remove dead legacy desktop UI wiring
-Prevent reset from stopping active direct realtime
-Remove legacy renderer runtime paths
-Remove obsolete YAML workflow files
-Remove legacy STT and orchestrator runtime artifacts
-Remove obsolete frontend gitignore exceptions
-```
+
 ---
-11. Current Validation State
+
+## 13. Validation Baseline
+
 Confirmed after cleanup:
+
 ```text
 python -m py_compile backend/app_realtime.py: OK
 node --check Desktop/renderer/renderer.js: OK
@@ -410,18 +478,8 @@ Desktop app runtime test: OK
 Direct Realtime voice test: OK
 Azure OpenAI Realtime runtime test: OK
 OpenAI Realtime runtime test: OK
-OpenAI Realtime provider produced better natural voice quality during local testing
-Start Direct Realtime: OK
-Stop Direct Realtime: OK
-Reset session while Direct Realtime is running: skipped without closing runtime
-Reset session after Stop: creates a new session
-Direct Realtime worked normally after final cleanup
-Provider Adapter / Runtime Integration: OK
-Saved provider config drives runtime provider selection: OK
 Provider-specific session.update payload handling: OK
-OpenAI Realtime session.type and audio.input.turn_detection schema compatibility: OK
-Real provider network connection test for OpenAI Realtime: OK
-Real provider network connection test for Azure OpenAI Realtime: OK
+OpenAI Realtime session schema compatibility: OK
 Expanded provider capability lists for regions, voices, and languages: OK
 Capability-driven Provider Configuration dropdowns: OK
 Provider save/load persistence for selected voice/language/region: OK
@@ -432,6 +490,11 @@ Azure gpt-realtime-2 runtime test through /openai/v1/realtime: OK
 Azure OpenAI-compatible session.update schema: OK
 Outgoing language rule appended to final Realtime instructions: OK
 Outgoing language runtime behavior test: OK
+Start Direct Realtime: OK
+Stop Direct Realtime: OK
+Reset session while Direct Realtime is running: skipped without closing runtime
+Reset session after Stop: creates a new session
+Direct Realtime worked normally after final cleanup
 Scenario presets backend API: OK
 Scenario active selection persistence: OK
 Scenario per-scenario instruction override API: OK
@@ -448,7 +511,7 @@ Modern Desktop UI modernization Phase 2 Settings page: OK
 Modern Desktop UI modernization Phase 3 Scenarios page: OK
 Desktop default window size 1120 x 820 and minimum 860 x 720: OK
 Desktop deterministic UI zoom factor 0.7 applied immediately and after did-finish-load: OK
-Dev profile zoom masking issue identified and resolved by deterministic app zoom approach: OK
+Development profile persisted zoom masking issue identified and neutralized by deterministic app zoom: OK
 Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
 Mini Control Window opens when the main app is minimized: OK
 Mini Control Window vertical layout fits visible window: OK
@@ -464,9 +527,31 @@ Installer 0.1.8 installed and upgraded over prior installation successfully: OK
 Old backup folders and old installer artifacts cleaned: OK
 Git clean after 0.1.8 release validation: OK
 ```
+
+Before committing runtime changes, always run at minimum:
+
+```powershell
+cd C:\Projects\chatt-direct
+node --check .\Desktop\electron\main.cjs
+node --check .\Desktop\renderer\renderer.js
+git status --short
+git diff --name-status
+git diff --stat
+```
+
+For backend changes, also run:
+
+```powershell
+cd C:\Projects\chatt-direct
+python -m py_compile backend/app_realtime.py backend/provider_config.py backend/providers/base.py backend/providers/azure_openai_realtime.py backend/providers/openai_realtime.py
+```
+
 ---
-12. Current Known Good State
-Current known good local state:
+
+## 14. Current Stable Baseline
+
+Current stable runtime baseline:
+
 ```text
 CHATT Direct is a Windows/Electron Direct Realtime voice app
 Backend is Realtime-only on app_realtime.py port 50505
@@ -477,6 +562,8 @@ Desktop renderer no longer contains active STT/Orchestrator/Control/Full Pipelin
 backend/speech_server.py and backend/Dockerfile.speech are removed
 Docker/start/stop runtime helpers are reduced to Direct Realtime 50505
 Desktop runtime and voice flow were tested and worked after cleanup
+OpenAI Realtime runtime worked and produced better natural voice quality during local testing
+Real websocket provider network tests passed for OpenAI and Azure
 Provider capability lists are expanded and rendered correctly in Desktop settings
 Provider save/load persistence is confirmed
 Selected provider voice is passed into Realtime session.update and works for OpenAI/Azure
@@ -553,146 +640,10 @@ a0ac25c Fix desktop package JSON encoding
 Set desktop window baseline and UI zoom
 ```
 ```
----
-13. Remaining Cleanup Work
-Known remaining cleanup is documentation-only unless a new scan proves otherwise:
-```text
-README_SETUP.txt may need Direct-only rewrite
-SETUP.md may need Direct-only rewrite
-```
-Runtime cleanup is complete for the currently verified Direct Realtime baseline.
-Before further cleanup, run:
-```powershell
-cd C:\Projects\chatt-direct
-
-git status --short
-git diff --name-status
-git grep -n "speech_server\|50507\|50506\|/stt/ws\|orchestrator\|manual_answers\|instruction_profiles\|TTS\|tts\|frontend\|manual-backend\|manual-frontend" -- .
-```
-Interpret broad grep results carefully. Some terms may appear in dependency hashes or documentation; do not treat a broad grep result as proof of active runtime usage.
----
-14. Provider Adapter / Runtime Integration Baseline
-
-Completed provider work:
-
-```text
-Provider Setup UI skeleton
-Provider save UI and region dropdown
-Provider test UI validation
-Provider configuration API
-Provider configuration schema
-Realtime provider adapter structure
-Azure Realtime provider adapter
-OpenAI Realtime provider adapter
-Runtime provider selection from saved config
-Saved Azure provider config at runtime
-Saved OpenAI provider config at runtime
-Provider-specific session.update payload handling
-Realtime provider error message normalization
-Adapter-level provider config test
-Real Realtime provider websocket network connection test
-Expanded provider capability lists
-Selected provider voice applied in Realtime session.update
-Outgoing language rule added to final Realtime instructions
-```
-
-Current supported active providers:
-
-```text
-azure-openai-realtime
-openai-realtime
-```
-
-Current runtime adapter files:
-
-```text
-backend/providers/base.py
-backend/providers/__init__.py
-backend/providers/azure_openai_realtime.py
-backend/providers/openai_realtime.py
-```
-
-Current provider configuration files:
-
-```text
-backend/provider_capabilities.json
-backend/provider_config.py
-backend/provider_config.local.example.json
-backend/provider_config.local.json   # generated locally and ignored by Git
-```
-
-Current provider API endpoints:
-
-```text
-GET  /v1/provider/capabilities
-GET  /v1/provider/config
-POST /v1/provider/config
-GET  /v1/provider/active
-POST /v1/provider/test
-```
-
-Current provider test behavior:
-
-```text
-POST /v1/provider/test performs required-field validation first.
-If required fields are present, it performs a real Realtime websocket network probe.
-The probe opens the configured provider websocket and closes immediately.
-The probe does not send audio.
-The probe does not send session.update.
-The probe does not start Direct Realtime.
-```
-
-Confirmed provider test results:
-
-```text
-OpenAI Realtime websocket connection succeeded.
-Azure OpenAI Realtime websocket connection succeeded.
-```
-
-Current provider runtime behavior:
-
-```text
-/voice/ws reads activeProvider from saved provider config.
-The selected adapter builds provider URL and auth headers.
-The selected adapter builds provider-specific session.update payload.
-Selected provider voice is included in session.update.
-Outgoing language is appended to final Realtime instructions as a language rule.
-Desktop audio routing remains unchanged.
-Loopback/system/browser audio remains the only allowed input source.
-PCM16 24k mono audio path remains unchanged.
-```
-
-Important OpenAI compatibility finding:
-
-```text
-OpenAI Realtime requires session.type = "realtime".
-OpenAI VAD config belongs under session.audio.input.turn_detection.
-OpenAI does not accept Azure-style session.turn_detection.
-```
-
-Important Azure compatibility finding:
-
-```text
-Azure OpenAI Realtime now uses the OpenAI-compatible /openai/v1/realtime endpoint for gpt-realtime-2.
-Azure provider no longer uses the legacy voice-agent/realtime URL for the current gpt-realtime-2 path.
-Azure provider uses the OpenAI-compatible session.update shape with session.type = "realtime".
-OpenAI provider uses the selected saved voice in session.audio.output.voice.
-Azure provider uses the selected saved voice as the OpenAI-compatible audio output voice string.
-Outgoing language is not a separate Realtime API field in this project; it is applied through instructions.
-Incoming language is planned as a transcription language hint to stabilize input language recognition.
-```
 
 Recent provider integration commits:
 
 ```text
-Add realtime provider adapter structure
-Add Azure realtime provider adapter
-Use Azure realtime provider adapter in voice runtime
-Select realtime provider from saved config
-Use saved config for Azure realtime provider
-Enable OpenAI realtime provider factory
-Use saved config for OpenAI realtime provider
-Normalize realtime provider error messages
 Add provider-specific realtime session payload handling
 Add adapter-level provider config test
 Add realtime provider network connection test
@@ -707,85 +658,224 @@ Add session cost guard warning timer
 Stop direct realtime on session cost guard limits
 ```
 
----
-15. Language Steering Baseline
+Before continuing in a new session, run:
 
-Current language design:
+```powershell
+cd C:\Projects\chatt-direct
+
+git status --short
+git diff --name-status
+git grep -n "speech_server\|50507\|50506\|/stt/ws\|orchestrator\|manual_answers\|instruction_profiles\|TTS\|tts\|frontend\|manual-backend\|manual-frontend" -- .
+```
+
+Interpret broad grep results carefully. Some terms may appear in dependency hashes or documentation; do not treat a broad grep result as proof of active runtime usage.
+
+
+---
+
+
+## 15. Provider Configuration and Runtime Adapter Baseline
+
+Provider configuration is now part of the Direct runtime setup surface and drives the active Realtime runtime session.
+
+Current supported setup/runtime providers:
+
+```text
+Azure OpenAI Realtime
+OpenAI Realtime
+```
+
+Runtime rule:
+
+```text
+Only one Realtime voice provider can be active at a time.
+Provider/model/language changes must not be applied while Direct Realtime is running.
+```
+
+Current Desktop Settings tab includes Provider Configuration with:
+
+```text
+Active provider
+Region dropdown for Azure OpenAI Realtime
+Endpoint
+API version
+Deployment / model name
+Voice
+Incoming language
+Outgoing language
+API key
+Test connection
+Save provider
+Reset provider settings placeholder
+```
+
+Current provider backend files:
+
+```text
+backend/provider_capabilities.json
+backend/provider_config.local.example.json
+backend/provider_config.py
+backend/provider_config.local.json   # generated locally and ignored by Git
+backend/providers/base.py
+backend/providers/__init__.py
+backend/providers/azure_openai_realtime.py
+backend/providers/openai_realtime.py
+```
+
+Current provider backend API endpoints:
+
+```text
+GET  /v1/provider/capabilities
+GET  /v1/provider/config
+POST /v1/provider/config
+GET  /v1/provider/active
+POST /v1/provider/test
+```
+
+Current Test connection behavior:
+
+```text
+POST /v1/provider/test performs required-field validation first.
+If required fields are present, it performs a real async Realtime websocket network probe.
+The probe opens the configured provider websocket and closes immediately.
+The probe does not send audio.
+The probe does not send session.update.
+The probe does not start Direct Realtime.
+```
+
+Confirmed provider network test results:
+
+```text
+OpenAI Realtime websocket connection succeeded.
+Azure OpenAI Realtime websocket connection succeeded.
+```
+
+Current runtime provider behavior:
+
+```text
+/voice/ws reads activeProvider from saved provider config.
+The selected adapter builds provider URL and authentication headers.
+The selected adapter builds provider-specific session.update payload.
+Selected provider voice is included in session.update.
+Outgoing language is appended to effective Realtime instructions before session.update.
+Desktop audio routing remains unchanged.
+Loopback/system/browser audio remains the only allowed input source.
+PCM16 24k mono audio path remains unchanged.
+```
+
+Provider-specific session.update rules:
+
+```text
+Azure OpenAI Realtime now uses the OpenAI-compatible /openai/v1/realtime endpoint for gpt-realtime-2.
+Azure OpenAI Realtime uses session.type = "realtime".
+Azure OpenAI Realtime VAD configuration is under session.audio.input.turn_detection.
+OpenAI Realtime uses session.type = "realtime".
+OpenAI Realtime VAD configuration is under session.audio.input.turn_detection.
+OpenAI Realtime does not accept Azure-style session.turn_detection.
+OpenAI provider uses selected saved voice in session.audio.output.voice.
+Azure provider uses selected saved voice as the OpenAI-compatible audio output voice string.
+Outgoing language is not sent as a separate Realtime API field; it is applied through final session instructions.
+Incoming language is planned as provider-specific transcription language hint.
+```
+
+Current local config storage:
+
+```text
+backend/provider_config.local.json
+```
+
+Packaging requirement:
+
+```text
+Before packaged Windows app release, provider settings must be stored in a user-specific app data location, not inside the installed app folder or repository backend folder.
+Target pattern: Electron app.getPath("userData") / Windows AppData.
+```
+
+Language control:
+
+```text
+Incoming language and Outgoing language are explicit Setup settings.
+Default: English incoming, English outgoing.
+Dropdown values must be loaded from the selected provider capability profile.
+Do not guess supported provider languages.
+```
+
+Canonical language design:
 
 ```text
 Modern Realtime voice models are multilingual.
-The project problem is not whether the model can speak multiple languages.
-The project problem is stabilizing input language recognition and response language behavior.
-```
+The project problem is stabilizing language behavior, not adding translation mode.
 
-Canonical language meanings:
-
-```text
 incomingLanguage
 = transcription language hint
-= tells the model which language to expect in the incoming audio
-= speech recognition guidance, not response language control
+= tells the model which language to expect in incoming audio
+= speech recognition guidance
 
 outgoingLanguage
 = response language guidance
-= appended to the final session instructions
+= appended to final Realtime session instructions
 = tells the model which language to answer in
 ```
 
-Current implemented behavior:
+Implemented outgoing language behavior:
 
 ```text
-Outgoing language is appended to effective Realtime instructions before session.update.
-Existing instruction text remains unchanged in the Instruction tab.
-The final session instruction sent to the model is:
-current instruction + outgoing language rule.
-Changing Outgoing language requires Save provider so the backend reads the saved provider config.
+The editable Instruction tab text is not modified.
+Before session.update, backend creates effective instructions:
+current instruction + LANGUAGE RULE for selected outgoingLanguage.
+Changing Outgoing language requires Save provider.
+Refresh Instructions resends the effective instruction with the saved outgoingLanguage rule.
 ```
 
-Current planned behavior:
+Planned incoming language behavior:
 
 ```text
-Incoming language should be added as provider-specific transcription language hint.
-Do not treat incomingLanguage as translation mode.
-Do not treat outgoingLanguage as a separate Realtime API language field unless provider documentation confirms it.
+Add incomingLanguage to session.update as provider-specific transcription language hint.
+Do not route this through translation mode.
+Do not use microphone input.
+Do not change the loopback/system/browser audio flow.
 ```
 
-Do not introduce translation endpoint/runtime unless explicitly approved.
+Current capability values:
+
+```text
+Azure default model: gpt-realtime-2
+Azure regions: Canada Central, Central US, East US 2, France Central, Sweden Central, South India
+Voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar
+Incoming language: full supported dropdown list from provider_capabilities.json
+Outgoing language: full supported dropdown list from provider_capabilities.json
+```
+
+Current known provider UX limitation:
+
+```text
+Desktop Test connection UI may show a generic pass/fail label.
+The backend API returns the detailed provider/network message.
+```
 
 ---
-16. Scenario Presets Baseline
 
-Scenario presets are now part of the product direction.
+---
 
-Current scenario preset architecture:
+## 16. Scenario Presets Runtime Baseline
 
-```text
-install default file = read-only built-in template
-runtime local file = user-editable scenario state
-```
+Scenario presets are now supported as a Direct Realtime behavior selection layer.
 
-Current default scenario template file:
+Current backend scenario files:
 
 ```text
 backend/scenario_presets.json
+backend/scenario_presets.local.json   # generated locally and ignored by Git
 ```
 
-Current local runtime scenario file for Phase 1 local/dev:
-
-```text
-backend/scenario_presets.local.json
-```
-
-The local runtime file is generated/seeded on first use and ignored by Git.
-
-Current backend scenario environment variables:
+Current scenario path variables:
 
 ```env
 SCENARIO_PRESETS_PATH=scenario_presets.local.json
 SCENARIO_PRESETS_DEFAULT_PATH=scenario_presets.json
 ```
 
-Current backend scenario API:
+Current scenario API:
 
 ```text
 GET    /v1/scenarios
@@ -794,44 +884,68 @@ POST   /v1/scenarios/instruction
 DELETE /v1/scenarios/instruction/{scenario_id}
 ```
 
-Current behavior:
+Current first-run behavior:
 
 ```text
-Backend reads SCENARIO_PRESETS_PATH.
-If SCENARIO_PRESETS_PATH does not exist, backend seeds it from SCENARIO_PRESETS_DEFAULT_PATH.
-Backend does not overwrite the local scenario file once it exists.
-Desktop Scenarios UI loads backend scenarios from GET /v1/scenarios.
-Desktop Scenarios UI renders compact clickable backend scenario cards.
-Hovering over a scenario card shows a human-readable details popup built from scenario metadata.
-The hover popup is informational only and does not select or modify the scenario.
-Selecting a scenario card or dropdown item loads the selected scenario instruction into the existing instruction editor.
-If a scenario has userInstruction, Desktop loads userInstruction as Current Instructions.
-Scenario Default Instructions remains the original scenario instruction from the scenario template.
-Desktop calls POST /v1/scenarios/active to persist activeScenarioId in the local scenario runtime state.
-Desktop Save stores edited Current Instructions as scenario.userInstruction in the local scenario runtime state by calling POST /v1/scenarios/instruction.
-Desktop Reset to scenario default deletes scenario.userInstruction by calling DELETE /v1/scenarios/instruction/{scenario_id} and restores Current Instructions to the original scenario instruction.
-Voice page displays the selected scenario name and behavior description.
-Refresh Instructions continues to send the current backend instruction state to the active Realtime session.
+If SCENARIO_PRESETS_PATH does not exist, backend seeds/copies from SCENARIO_PRESETS_DEFAULT_PATH.
+After the local file exists, backend reads the local file for runtime scenario state.
+The local file is not committed.
+The install/default file is treated as read-only template content.
 ```
 
-Per-scenario instruction override fields in scenario_presets.local.json:
+Current Desktop behavior:
 
 ```text
-instruction
+Scenarios tab loads GET /v1/scenarios.
+Scenario cards display backend scenario presets when available.
+Scenario cards are compact and show only the scenario name plus Selected / Click to select state.
+Hovering over or focusing a scenario card updates the Scenario Preview slot inside the Scenario Library panel.
+Scenario Preview shows scenario name, category, displayDetails when available, and recommendedUse.
+If displayDetails is missing, Scenario Preview falls back to shortDescription.
+Scenario Preview does not show the model-facing instruction prompt.
+Scenario Preview is informational only and does not select or modify the scenario.
+Scenario dropdown displays backend scenario presets when available.
+Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
+Selecting a scenario card or dropdown item loads scenario.userInstruction into Current Instructions when present; otherwise it loads scenario.instruction.
+Scenario Default Instructions always shows the original scenario.instruction.
+Desktop calls POST /v1/scenarios/active to persist activeScenarioId in the local scenario runtime state.
+Desktop Save calls POST /v1/scenarios/instruction to store edited Current Instructions as scenario.userInstruction for the selected scenario.
+Desktop Reset to scenario default calls DELETE /v1/scenarios/instruction/{scenario_id}, removes scenario.userInstruction, and restores Current Instructions to scenario.instruction.
+Voice page displays the selected scenario name and scenario behavior.
+Refresh Instructions still sends the current backend instruction state to the active Realtime session.
+```
+
+Per-scenario instruction override model:
+
+```text
+scenario.instruction
 = original/default scenario prompt
-= preserved built-in scenario behavior
-= used for Scenario Default Instructions
+= read-only template behavior from the scenario definition
+= shown as Scenario Default Instructions
 
-userInstruction
-= optional user-edited prompt override for that scenario
-= used as Current Instructions when present
-= stored only in the local runtime scenario file
+scenario.userInstruction
+= optional user-edited scenario prompt override
+= stored in scenario_presets.local.json
+= loaded as Current Instructions when present
+= saved through POST /v1/scenarios/instruction
+= removed through DELETE /v1/scenarios/instruction/{scenario_id}
 
-userInstructionUpdatedAt
+scenario.userInstructionUpdatedAt
 = timestamp for the userInstruction override
 ```
 
-Implemented default scenarios include:
+Runtime instruction selection rule:
+
+```text
+if scenario.userInstruction exists:
+  Current Instructions = scenario.userInstruction
+  Scenario Default Instructions = scenario.instruction
+else:
+  Current Instructions = scenario.instruction
+  Scenario Default Instructions = scenario.instruction
+```
+
+Current implemented default scenarios include:
 
 ```text
 Direct Answer
@@ -848,44 +962,15 @@ Cloud Architecture Advisor
 Interview Answer Mode
 ```
 
-Current Desktop UI direction:
+This scenario layer must not change:
 
 ```text
-Instructions tab is renamed to Scenarios.
-Page title is Scenario & Instructions.
-Existing instruction editor remains the editing surface.
-Scenario cards are populated from backend scenarios when available.
-Scenario cards are compact and display only the scenario name plus Selected / Click to select state.
-Hovering over or focusing a scenario card updates the Scenario Preview slot inside the Scenario Library panel.
-Scenario Preview shows name, category, displayDetails when available, and recommendedUse.
-If displayDetails is missing, Scenario Preview falls back to shortDescription.
-Scenario Preview does not show the technical/model-facing instruction prompt.
-Scenario Preview is informational only; clicking the card remains the only selection action.
-Scenario preset dropdown is populated from backend scenarios when available.
-Legacy hardcoded presets are hidden when backend scenarios exist and remain only as fallback when backend scenarios are unavailable.
-Voice page shows Selected Scenario and Scenario behavior.
-Future scenario metadata should add displayDetails for richer human-readable popup text while keeping instruction as the model-facing prompt.
-```
-
-Final packaged app direction:
-
-```text
-<install>\backend\scenario_presets.json = read-only default templates
-<AppData>\CHATT-DIRECT\scenario_presets.local.json = user-editable runtime scenario file
-<AppData>\CHATT-DIRECT\instructions.json = user-editable active instructions file
-<AppData>\CHATT-DIRECT\provider_config.local.json = user provider configuration
-<AppData>\CHATT-DIRECT\logs\ = runtime logs
-```
-
-Do not:
-
-```text
-write to install default scenario file at runtime
-overwrite user local scenario file during app update
-mix scenario runtime state with provider config
-change audio flow because of scenarios
-change provider runtime because of scenarios
-change Realtime session behavior because of scenarios
+loopback/system/browser audio input
+selected headphones/output-device playback
+provider runtime selection
+Realtime provider adapter behavior
+Realtime WebSocket path
+instruction refresh WebSocket message shape
 ```
 
 Prompt migration rule:
@@ -901,140 +986,95 @@ Scenario UX rule:
 
 ```text
 Scenario card content is intentionally compact.
-Scenario card hover details use human-readable metadata, not the model-facing instruction prompt.
-Future scenario_presets.json may add displayDetails to separate product-facing explanation from model-facing instructions.
+Scenario Preview uses human-readable metadata, not the model-facing instruction prompt.
+displayDetails is the preferred richer human-readable Scenario Preview text.
+shortDescription remains the fallback when displayDetails is missing.
+```
+
+Final packaged app direction:
+
+```text
+<install>\backend\scenario_presets.json
+<AppData>\CHATT-DIRECT\scenario_presets.local.json
+<AppData>\CHATT-DIRECT\instructions.json
+<AppData>\CHATT-DIRECT\provider_config.local.json
+<AppData>\CHATT-DIRECT\logs\
 ```
 
 ---
-17. Modern Desktop UI Baseline
 
-Modern Desktop UI modernization is complete across the three active pages.
 
-Completed UI modernization commits:
+---
 
-```text
-Modernize desktop voice UI
-Modernize desktop settings UI
-Modernize desktop scenarios UI
-```
+## 17. Desktop Window Baseline and Deterministic UI Zoom
 
-Current Desktop window sizing:
+The Desktop main window size and visual scale are now part of the Direct runtime baseline.
+
+Current BrowserWindow baseline in `Desktop/electron/main.cjs`:
 
 ```text
-default width: 1120
-default height: 820
-minimum width: 860
-minimum height: 720
+width: 1120
+height: 820
+minWidth: 860
+minHeight: 720
 ```
 
 Current deterministic UI zoom baseline:
 
 ```text
 APP_UI_ZOOM_FACTOR = 0.7
-Applied in Desktop/electron/main.cjs to mainWindow.webContents.
-Applied immediately after BrowserWindow creation.
+Applied to mainWindow.webContents immediately after BrowserWindow creation.
 Re-applied on webContents did-finish-load.
-This app-level zoom is intentional and deterministic.
-It replaces accidental dependence on Chromium profile persisted zoom state.
 ```
 
-Root cause finding for desktop scale issue:
+Root cause finding:
 
 ```text
-The installed app was not incorrectly zoomed.
-The old development profile under Desktop/.electron-userdata contained a persisted Chromium per-host zoom entry around -2.0.
-That persisted dev-profile zoom made npm start appear visually correct and masked the true default UI scale.
-After resetting/renaming Desktop/.electron-userdata, development mode matched the installed app and appeared larger.
-The accepted fix is deterministic Electron app zoom, not CSS rewrite and not user-profile persisted zoom.
+The installed Windows app was not incorrectly zoomed.
+The old development Electron profile under Desktop/.electron-userdata had a persisted Chromium per-host zoom entry around -2.0.
+That persisted zoom made npm start appear visually smaller and masked the true app scale.
+After renaming/resetting Desktop/.electron-userdata, development mode matched the installed app and appeared larger.
+The accepted product fix is deterministic Electron app zoom, not persisted Chromium profile zoom and not broad CSS rewrite.
 ```
 
-Current desktop scale implementation rules:
+Implementation rule:
 
 ```text
-Do not use Chromium persisted profile zoom state as a product behavior.
-Do not rely on Ctrl-minus/manual zoom or Preferences per_host_zoom_levels.
-Do not solve desktop scale by broad CSS rewrite unless explicitly approved.
-Keep BrowserWindow default at 1120 x 820 and minimum at 860 x 720.
+Do not rely on Chromium Preferences per_host_zoom_levels.
+Do not solve this with user instructions to Ctrl-minus / Ctrl-plus.
+Do not use broad CSS density rewrite for this specific scale issue unless explicitly approved.
 Keep APP_UI_ZOOM_FACTOR centralized in Desktop/electron/main.cjs.
-If visual scale needs future tuning, change only APP_UI_ZOOM_FACTOR first and validate before touching CSS.
+If scale must be tuned later, adjust APP_UI_ZOOM_FACTOR first and validate dev + installed app before changing renderer CSS.
 ```
 
-Current visual design direction:
+Validation baseline:
 
 ```text
-dark navy / black glassmorphism
-subtle 3D depth
-layered gradients
-soft blue and green glow accents
-rounded glass cards
-premium Windows desktop application look
-professional AI control-console feeling
-responsive dashboard layout
+node --check Desktop/electron/main.cjs: OK
+node --check Desktop/renderer/renderer.js: OK
+Only Desktop/electron/main.cjs changed for the accepted patch.
+No CSS files changed.
+No renderer.js, index.html, backend, provider, scenario, or audio/runtime files changed.
+Runtime visual test with APP_UI_ZOOM_FACTOR = 0.7: OK
+Git clean after commit: OK
 ```
 
-Current Voice page layout:
+Boundaries:
 
 ```text
-modern Voice Session dashboard
-Session and Activity are the main user-facing status indicators
-AI contact visual with mic/core ring and waveform-style decoration
-right-side Realtime Status and Activity cards
-selected scenario visibility
-bottom app status bar
+This change is Desktop visual scale only.
+It does not change loopback/system audio capture.
+It does not change Realtime WebSocket behavior.
+It does not change provider adapters or session.update payloads.
+It does not change scenarios, instruction flow, Cost Guard, or Mini Control Window command ownership.
 ```
-
-Current Settings page layout:
-
-```text
-modern Settings control center
-Connection card
-Audio Output card
-Session Cost Guard card
-Provider Configuration card as the primary setup area
-Diagnostics card
-Auth and Log cards retained where present
-```
-
-Current Scenarios page layout:
-
-```text
-Scenario & Instructions page
-Selected Scenario card
-Scenario Library with compact scenario cards
-Scenario Preview slot inside the Scenario Library panel
-Current Instructions as the primary editor surface
-Scenario Default Instructions as read-only/template-style preview
-Instruction State and redundant Scenario Details are hidden/removed from visible workflow
-```
-
-Scenario Preview behavior:
-
-```text
-Hovering or focusing a scenario card updates the Scenario Preview slot.
-Mouse leave or blur returns the preview to the selected scenario or neutral state.
-Preview content uses scenario.name, scenario.category, scenario.displayDetails, and scenario.recommendedUse.
-If displayDetails is missing, preview falls back to scenario.shortDescription.
-The preview never shows scenario.instruction because that is the model-facing prompt.
-Scenario card click remains the only scenario selection action.
-```
-
-UI implementation boundaries:
-
-```text
-These UI modernization phases did not change Direct Realtime audio capture/playback.
-They did not change getLoopbackStream.
-They did not change AudioWorklet registration or processor behavior.
-They did not change WebSocket audio send/receive logic.
-They did not change provider adapter behavior.
-They did not change scenario API behavior.
-They did not change Cost Guard runtime logic.
-```
-
 
 ---
-18. Mini Control Window and 0.1.8 Release Baseline
 
-Mini Control Window is now part of the Desktop UI baseline.
+
+## 18. Mini Control Window and 0.1.8 Release Baseline
+
+Mini Control Window is part of the Direct Desktop runtime UI baseline.
 
 Completed commits:
 
@@ -1052,32 +1092,38 @@ Desktop/renderer/mini-control.css
 Desktop/renderer/mini-control.js
 ```
 
-Current Electron integration:
+Electron integration:
 
 ```text
-Desktop/electron/main.cjs owns miniControlWindow lifecycle.
-Desktop/electron/preload.cjs exposes electronAPI.miniControl.
-Desktop/renderer/renderer.js remains the only owner of Direct Realtime runtime controls.
+Desktop/electron/main.cjs owns the miniControlWindow BrowserWindow lifecycle.
+Desktop/electron/preload.cjs exposes window.electronAPI.miniControl.
+Desktop/renderer/renderer.js remains the only owner of Direct Realtime Start/Stop/Refresh/Repeat/Reset behavior.
 ```
 
 Current mini control behavior:
 
 ```text
 When the main app is minimized, Electron opens a small floating Mini Control Window.
-The Mini Control Window is always-on-top, frameless, transparent/dark glass, not shown in the taskbar, and movable by dragging the header area.
+The Mini Control Window is always-on-top, frameless, transparent/dark glass, skipped from taskbar, and movable by dragging the header area.
 The Mini Control Window uses a narrow vertical layout.
 The Mini Control Window shows Session and Activity status.
 The Mini Control Window provides Start, Stop, Refresh, Repeat, Reset, and Open controls.
 Open restores the main app and closes the Mini Control Window.
-Closing the Mini Control Window does not stop the main app or backend.
+Closing the Mini Control Window does not stop the main app, backend, audio session, or provider session.
 ```
 
-Current command routing:
+Command routing:
 
 ```text
-Mini Control Window sends IPC commands to Electron main.
-Electron main forwards supported mini-control commands to the existing main renderer.
-The main renderer maps commands to existing buttons:
+Mini Control Window -> electronAPI.miniControl.sendCommand(command)
+preload.cjs -> ipcRenderer.invoke("mini-control:command", command)
+main.cjs -> mainWindow.webContents.send("mini-control:command", { command })
+renderer.js -> existing main button click / existing runtime function path
+```
+
+Current command mapping:
+
+```text
 start   -> btnStart
 stop    -> btnStop
 refresh -> btnInstrRefresh
@@ -1085,23 +1131,24 @@ repeat  -> btnRepeatLastAnswer
 reset   -> btnResetSession
 ```
 
+Status synchronization:
+
+```text
+renderer.js publishes Session and Activity state through electronAPI.miniControl.publishStatus(...).
+main.cjs forwards status payloads to mini-control.html.
+mini-control.js updates Session, Activity, and disabled button states.
+Session and Activity values remain owned by the main renderer.
+```
+
 Runtime ownership rule:
 
 ```text
 Mini Control Window is a remote UI layer only.
-It must not create a second WebSocket.
-It must not create a second audio context.
-It must not directly call backend Realtime APIs.
-It must not own Direct Realtime state.
-It must not duplicate provider/scenario/instruction runtime logic.
-```
-
-Status synchronization:
-
-```text
-The main renderer publishes Session and Activity state to the Mini Control Window through IPC.
-Mini Control Window status follows the existing visible Session and Activity state.
-Start/Stop/Refresh/Repeat/Reset disabled state follows the existing main renderer button state.
+It must not open a second Direct Realtime WebSocket.
+It must not create a second AudioContext.
+It must not call backend Realtime APIs directly.
+It must not own provider/runtime/scenario/instruction state.
+It must not bypass the existing main renderer buttons or runtime guards.
 ```
 
 Release validation:
@@ -1111,56 +1158,56 @@ node --check Desktop/electron/main.cjs: OK
 node --check Desktop/electron/preload.cjs: OK
 node --check Desktop/renderer/renderer.js: OK
 node --check Desktop/renderer/mini-control.js: OK
-Desktop runtime test: OK
+Runtime test: OK
 Mini Control Window opens on minimize: OK
-Mini Control Window vertical layout fits: OK
-Mini Control Window can be moved: OK
-Open restores full app: OK
+Mini Control Window vertical layout fits visible window: OK
+Mini Control Window can be moved across the desktop: OK
+Open restores main app: OK
 Start/Stop/Refresh/Repeat/Reset work from Mini Control Window: OK
-Session and Activity sync: OK
+Session and Activity status sync: OK
 Desktop version 0.1.8: OK
-Desktop package.json / package-lock.json UTF-8 without BOM: OK
+package.json and package-lock.json UTF-8 without BOM: OK
 Electron build 0.1.8: OK
-Installer generated: dist\AnswerDesk AI Setup 0.1.8.exe
-Installer upgrade over previous installed version: OK
-Old local backup folders cleaned: OK
-Old installer artifacts 0.1.5, 0.1.6, and 0.1.7 removed from dist: OK
+Installer created: dist\AnswerDesk AI Setup 0.1.8.exe
+Installer 0.1.8 upgrade over previous installed version: OK
+Old backup folders and old installer artifacts cleaned: OK
 Git clean after validation: OK
 ```
 
-Design boundary:
+Boundaries:
 
 ```text
-Do not change Direct Realtime audio capture/playback because of Mini Control Window.
-Do not change backend app_realtime.py because of Mini Control Window.
-Do not change provider adapters because of Mini Control Window.
+Do not change loopback/system audio capture because of Mini Control Window.
+Do not change app_realtime.py because of Mini Control Window.
+Do not change Realtime provider adapters because of Mini Control Window.
 Do not change scenario APIs because of Mini Control Window.
-Do not remove main renderer ownership of Start/Stop/Refresh/Repeat/Reset.
+Do not remove or bypass existing main renderer Start/Stop/Refresh/Repeat/Reset handlers.
 ```
 
 ---
-19. Phase 2 AppData / userData Runtime Plan
+
+## 19. Phase 2 AppData / userData Runtime Plan
 
 Phase 2 objective:
 
 ```text
-Prepare CHATT-DIRECT for packaged Windows app behavior where installed application files are read-only and all user/runtime files are stored under the user profile.
+Move packaged runtime/user state out of the install/backend folder and into Electron userData/AppData.
 ```
 
-Canonical storage rule:
+Canonical packaged app storage rule:
 
 ```text
-Install folder = static application code and read-only templates
-AppData/userData = writable user/runtime state
+Install folder = read-only application files and default templates.
+AppData/userData = writable runtime/user files.
 ```
 
-Final packaged runtime user folder:
+Final user data folder:
 
 ```text
 <AppData>\CHATT-DIRECT\
 ```
 
-Final user/runtime files:
+Final writable runtime files:
 
 ```text
 <AppData>\CHATT-DIRECT\provider_config.local.json
@@ -1171,7 +1218,7 @@ Final user/runtime files:
 <AppData>\CHATT-DIRECT\logs\
 ```
 
-Static install/backend files:
+Final read-only install/template files:
 
 ```text
 <install>\backend\provider_capabilities.json
@@ -1181,7 +1228,7 @@ Static install/backend files:
 <install>\backend\providers\
 ```
 
-Required backend path variables for packaged runtime:
+Backend must receive explicit paths from Electron in packaged runtime:
 
 ```env
 PROVIDER_CONFIG_PATH=<AppData>\CHATT-DIRECT\provider_config.local.json
@@ -1193,58 +1240,55 @@ SCENARIO_PRESETS_DEFAULT_PATH=<install>\backend\scenario_presets.json
 PORT=50505
 ```
 
-Phase 2 implementation direction:
+Electron main process responsibilities for Phase 2:
 
 ```text
-Electron main process owns app.getPath("userData").
-Electron main process creates the CHATT-DIRECT user data folder.
-Electron main process seeds or migrates required user/runtime files when missing.
-Electron main process starts the backend child process with explicit env path variables.
-Renderer continues to use localhost endpoints.
-Backend continues to own provider, instruction, scenario, and Realtime APIs.
+Use app.getPath("userData") as the root user data location.
+Create the CHATT-DIRECT user runtime folder if needed.
+Seed or migrate runtime files before backend startup.
+Start the backend as a child process with explicit env path variables.
+Keep backend stdout/stderr available for diagnostics/logging.
+Stop backend when Desktop exits.
 ```
 
-First-run behavior:
+First-run seed/migration rules:
 
 ```text
-If provider_config.local.json does not exist in AppData:
-  seed from provider_config.local.example.json or allow backend fallback to template.
+provider_config.local.json:
+  Create from provider_config.local.example.json if missing, or let backend fallback create equivalent initial state.
 
-If instructions.json does not exist in AppData:
-  seed from current instruction default logic or migrate existing Electron local instruction store.
+instructions.json:
+  Use the existing instruction default/preset behavior.
+  If an older Electron instructions.local.json exists and instructions.json does not, migrate or normalize it.
 
-If scenario_presets.local.json does not exist in AppData:
-  seed from install/backend/scenario_presets.json.
-
-Do not overwrite existing AppData files on application update.
+scenario_presets.local.json:
+  If missing, seed from install/backend/scenario_presets.json.
+  Never overwrite an existing user scenario file on app update.
 ```
 
-Important risk to resolve in Phase 2:
+Phase 2 must preserve existing runtime behavior:
 
 ```text
-The current local/dev app can have two instruction stores:
-- Electron local instruction store
-- backend instructions.json
-
-Phase 2 must unify final packaged runtime around:
-<AppData>\CHATT-DIRECT\instructions.json
+Desktop still connects to http://127.0.0.1:50505 and ws://127.0.0.1:50505/voice/ws.
+Loopback/system/browser audio remains the only input source.
+Microphone input remains forbidden.
+Provider runtime selection remains backend/provider adapter owned.
+Outgoing language remains instruction-level steering.
+Incoming language remains planned as transcription language hint.
+Scenario selection remains instruction behavior selection.
 ```
 
 Phase 2 must not change:
 
 ```text
-loopback/system/browser audio capture
-microphone prohibition
-provider adapter behavior
-Realtime WebSocket path
-selected output/headphones playback
+provider adapter Realtime schemas
+audio capture/playback pipeline
 instruction refresh WebSocket message shape
-scenario behavior model
-outgoing language rule behavior
-incoming language plan
+scenario API shape unless explicitly approved
+manual/STT/TTS/Orchestrator/Agent1 legacy paths
 ```
 
-Phase 2 validation requirements:
+Phase 2 validation commands:
 
 ```powershell
 cd C:\Projects\chatt-direct
@@ -1257,91 +1301,131 @@ git diff --name-status
 git diff --stat
 ```
 
-Runtime validation:
+Phase 2 runtime validation:
 
 ```text
-Desktop starts backend or reports a clear backend startup failure.
-GET /v1/provider/config works through localhost.
-GET /v1/instructions works through localhost.
-GET /v1/scenarios works through localhost.
+Desktop starts backend or gives a clear backend startup error.
+Provider config API works through localhost.
+Instructions API works through localhost.
+Scenarios API works through localhost.
 POST /v1/scenarios/instruction persists userInstruction to AppData scenario runtime state.
 DELETE /v1/scenarios/instruction/{scenario_id} removes userInstruction from AppData scenario runtime state.
-Provider save persists to AppData.
-Instruction save persists to AppData.
-Scenario local file is created in AppData if missing.
-Start Direct Realtime still works with loopback/system audio only.
+Provider save writes to AppData.
+Instruction save writes to AppData.
+Scenario local runtime file is created in AppData if missing.
+Start Direct Realtime still works.
+Stop Direct Realtime still works.
+Reset session guard still works.
 ```
 
----
-20. Session Cost Guard Baseline
 
-Session Cost Guard is now part of the Direct Realtime runtime cost-protection layer.
+## 20. Session Cost Guard Runtime Baseline
 
-Current implemented behavior:
+Session Cost Guard is part of the Desktop renderer runtime layer.
+
+Current UI location:
 
 ```text
-Settings -> Connection + Audio Settings includes:
-- Auto-stop if idle: Off / 5 / 10 / 15 minutes
-- Warn before auto-stop: checkbox
-- Hard max session duration: Off / 15 / 30 / 60 minutes
+Settings -> Connection + Audio Settings
 ```
 
-Persistence:
+Current controls:
 
 ```text
-Cost Guard settings are stored in renderer localStorage:
+Auto-stop if idle: Off / 5 / 10 / 15 minutes
+Warn before auto-stop: checked/unchecked
+Hard max session duration: Off / 15 / 30 / 60 minutes
+```
+
+Persistence keys:
+
+```text
 chatt.costGuard.idleMinutes
 chatt.costGuard.warnBeforeStop
 chatt.costGuard.maxSessionMinutes
 ```
 
+Runtime state:
+
+```text
+directSessionStartedAt
+directLastSpeechStartedAt
+costGuardTimer
+costGuardLastIdleWarnAt
+costGuardLastMaxWarnAt
+```
+
 Runtime behavior:
 
 ```text
-directSessionStartedAt records successful Start Direct Realtime time.
-directLastSpeechStartedAt records the latest provider/server VAD input_audio_buffer.speech_started event.
-A lightweight renderer setInterval checks limits every 5 seconds.
-Warning messages are written to the Desktop log through push(...).
-Idle auto-stop triggers when now - directLastSpeechStartedAt >= selected idle limit.
-Hard max auto-stop triggers when now - directSessionStartedAt >= selected max duration.
-Both stop paths call the existing stopDirectRealtime({ closeRealtime: true }) flow.
+directSessionStartedAt is set when Direct Realtime start begins.
+directLastSpeechStartedAt is initialized from directSessionStartedAt and then updated whenever the renderer receives input_audio_buffer.speech_started.
+Cost Guard timer starts after Direct Realtime successfully starts.
+Cost Guard timer stops inside the existing stopDirectRealtime flow.
+checkCostGuard runs periodically and evaluates idle and hard max limits.
+Warning logs are emitted only when Warn before auto-stop is enabled.
+Idle limit reached calls stopDirectRealtime({ closeRealtime: true }).
+Hard max session duration reached calls stopDirectRealtime({ closeRealtime: true }).
 ```
 
-Confirmed behavior:
+Confirmed runtime test:
 
 ```text
-Idle warning appears approximately 30 seconds before the idle limit.
-Idle limit reached logs a clear message and stops Direct Realtime.
-Local audio playback stops immediately.
-Realtime WebSocket closes cleanly with direct-realtime-stop.
-New speech_started activity resets the idle timer.
-Hard max session duration does not reset on speech activity.
+Idle warning appeared approximately 30 seconds before a 5-minute idle limit.
+Idle limit reached logged the stop reason.
+Audio stopped immediately.
+Direct Realtime stopped.
+Realtime WebSocket closed cleanly with reason direct-realtime-stop.
 ```
 
 Design boundaries:
 
 ```text
-Do not use audio frame/chunk activity as the idle signal.
+Idle is based only on input_audio_buffer.speech_started.
+Do not use audio chunk/frame activity as idle signal.
 Do not add microphone input.
-Do not change AudioWorklet, sample rate, PCM format, WebSocket audio append, provider adapter payloads, or backend app_realtime.py for Cost Guard.
+Do not change AudioWorklet, PCM format, sample rate, WebSocket audio append, provider adapter payloads, or backend app_realtime.py for Cost Guard.
 Cost Guard belongs to Connection + Audio Settings, not Provider Configuration.
 ```
 
 Next candidate improvements:
 
 ```text
-Cost Guard UX: countdown/status in UI, remaining time display, toast/modal warning instead of log-only warning.
-Stability and cost: auto-stop or protection when app is minimized/inactive, pause/resume behavior, reconnect policy review.
+Cost Guard UX improvement:
+- countdown/status in UI
+- remaining time display
+- toast/modal warning instead of log-only warning
+
+Stability and cost improvement:
+- protection when app is minimized/inactive
+- pause/resume behavior
+- reconnect policy review
 ```
 
+## 21. Remaining Work
+
+Known remaining cleanup is documentation-only unless a new scan proves otherwise:
+
+```text
+README_SETUP.txt may need Direct-only rewrite
+SETUP.md may need Direct-only rewrite
+```
+
+Runtime cleanup is complete for the currently verified Direct Realtime baseline.
+
 ---
-21. Commercial Direction
+
+## 22. Commercial Direction
+
 Preferred commercial packaging model:
+
 ```text
 Windows app sold as a packaged desktop application
 Customer brings their own provider/API key
 ```
+
 Product value should focus on:
+
 ```text
 stable Direct Realtime voice workflow
 low latency
@@ -1350,9 +1434,13 @@ clean setup
 BYOK privacy/control
 workflow-specific use cases
 ```
+
 ---
-22. Work Process Rules
-For all future project work:
+
+## 23. Work Rules
+
+For all future work:
+
 ```text
 Analyze first
 Plan second
@@ -1362,19 +1450,20 @@ No commit before diff review and runtime validation
 Always specify exact folder/path for commands
 Use one or two tasks at a time
 ```
+
 For Codex work:
+
 ```text
 Create backup branch before large refactors
 Run git status --short after Codex
 Inspect git diff --name-status and git diff --stat
 Do not commit unreviewed runtime-generated changes
 Restore accidental runtime changes before commit
-``````
 
 
 ---
 
-23. Simplified Voice Status Indicators Baseline
+## 24. Simplified Voice Status Indicators Runtime Baseline
 
 Commit:
 
@@ -1382,71 +1471,89 @@ Commit:
 d94ee70 Simplify voice status indicators
 ```
 
-Current Voice page status model:
+The Voice page now exposes simplified user-facing runtime status:
 
 ```text
-The Voice page now uses two user-facing status indicators:
-- Session
-- Activity
+Session: OFF / STARTING / ON / RECONNECTING
+Activity: Idle / Listening / Speaking
 ```
 
-User-facing Session states:
+Visible DOM elements:
 
 ```text
-Session: OFF
-Session: STARTING
-Session: ON
-Session: RECONNECTING
+sessionStatus
+activityStatus
 ```
 
-User-facing Activity states:
+Hidden technical DOM elements preserved:
 
 ```text
-Activity: Idle
-Activity: Listening
-Activity: Speaking
+sttStatus
+rtStatus
+listenStatus
+speakStatus
 ```
 
-Implementation rule:
+Runtime mapping:
 
 ```text
-The old technical indicators remain in the DOM as hidden compatibility/diagnostic elements.
-They must continue to be updated by the renderer logic.
+setDirectStatusOn(false)
+  -> hidden sttStatus = DIRECT: OFF
+  -> visible sessionStatus = Session: OFF
+
+setDirectStatusOn(false, "DIRECT: STARTING")
+  -> hidden sttStatus = DIRECT: STARTING
+  -> visible sessionStatus = Session: STARTING
+
+setDirectStatusOn(true)
+  -> hidden sttStatus = DIRECT: ON
+  -> visible sessionStatus = Session: ON
+
+setRealtimeStatus("ON")
+  -> hidden rtStatus = REALTIME: ON
+  -> visible sessionStatus = Session: ON
+
+setRealtimeStatus("RECONNECTING")
+  -> hidden rtStatus = REALTIME: RECONNECTING
+  -> visible sessionStatus = Session: RECONNECTING
+
+setRealtimeStatus("OFF")
+  -> hidden rtStatus = REALTIME: OFF
+  -> visible sessionStatus = Session: OFF only when Direct Realtime is not active/starting
 ```
 
-Hidden technical indicators preserved:
+Activity mapping:
 
 ```text
-sttStatus     = DIRECT technical status
-rtStatus      = REALTIME websocket technical status
-listenStatus  = low-level listening/speech-detected activity
-speakStatus   = low-level assistant speaking activity
+setListeningIndicator(true)
+  -> hidden listenStatus = active/ok
+  -> visible activityStatus = Activity: Listening unless assistant speaking is active
+
+setListeningIndicator(false)
+  -> hidden listenStatus = inactive/bad
+  -> visible activityStatus = Activity: Idle unless assistant speaking is active
+
+setSpeakingIndicator(true)
+  -> hidden speakStatus = active/ok
+  -> visible activityStatus = Activity: Speaking
+
+setSpeakingIndicator(false)
+  -> hidden speakStatus = inactive/bad
+  -> visible activityStatus = Activity: Idle unless listening is active
 ```
 
-Current UX behavior:
+Current UI rule:
 
 ```text
-Normal users see Session and Activity only.
-DIRECT, REALTIME, LISTENING, and SPEAKING are hidden from the normal Voice page UI.
-The hidden technical indicators remain available for troubleshooting/debug compatibility.
+The normal Voice page UI should show only Session and Activity.
+The older DIRECT / REALTIME / LISTENING / SPEAKING pills are hidden but intentionally retained.
 ```
 
-Session state behavior:
+Diagnostic compatibility rule:
 
 ```text
-Direct Realtime starting shows Session: STARTING.
-Direct Realtime active / Realtime connected shows Session: ON.
-Realtime websocket reconnecting shows Session: RECONNECTING.
-Stopped or inactive Direct Realtime shows Session: OFF.
-```
-
-Activity state behavior:
-
-```text
-No current input/output activity shows Activity: Idle.
-Detected incoming speech shows Activity: Listening.
-Assistant audio playback shows Activity: Speaking.
-Speaking has priority over Listening when both internal signals overlap.
+Do not remove sttStatus, rtStatus, listenStatus, or speakStatus from the DOM or renderer logic without a separate diagnostics/debug UI decision.
+They remain useful for troubleshooting Direct Realtime capture, websocket connectivity, input speech detection, and assistant playback state.
 ```
 
 Validation:
@@ -1454,19 +1561,22 @@ Validation:
 ```text
 node --check Desktop/renderer/renderer.js: OK
 Runtime test: OK
-Voice page displays Session and Activity correctly.
-Start Direct Realtime: Session STARTING -> ON.
-Incoming speech: Activity Listening.
-Assistant response playback: Activity Speaking.
-Stop Direct Realtime: Session OFF and Activity Idle.
-Git clean after commit.
+Initial state shows Session: OFF and Activity: Idle.
+Start Direct Realtime shows Session: STARTING then Session: ON.
+Incoming audio/speech detection shows Activity: Listening.
+Assistant output playback shows Activity: Speaking.
+Stop Direct Realtime returns to Session: OFF and Activity: Idle.
 ```
 
-Design boundary:
+Boundaries:
 
 ```text
-Do not remove hidden technical status elements without a separate diagnostics design.
-Do not change audio capture/playback, Realtime websocket flow, provider logic, scenario logic, or Cost Guard logic for this UI simplification.
+This change is UI status simplification only.
+It does not change loopback/system audio capture.
+It does not change Realtime websocket behavior.
+It does not change provider adapters or session.update payloads.
+It does not change Cost Guard behavior.
+It does not change scenario/instruction behavior.
 
 ```
 
@@ -1716,7 +1826,7 @@ If system loopback isolation is required later, evaluate native Windows Applicat
 If false barge-in while assistant audio is active remains frequent, evaluate a controlled 300-500 ms delayed/manual barge-in strategy only after the current runtime-audio-state baseline remains stable.
 ```
 
-## 26. Azure Licensing / Trial Implementation Baseline
+## 26. Azure Licensing / Trial Runtime Baseline
 
 Licensing/trial is now an implemented commercial access layer foundation for AnswerDesk AI / CHATT Direct.
 
@@ -2626,7 +2736,7 @@ These are separate email paths.
 
 
 
-## 28. Desktop Troubleshooting Package Export Baseline
+## 28. Desktop Troubleshooting Package Export Runtime Baseline
 
 
 This section captures the implemented local support package export capability in the Windows/Electron Desktop app.
@@ -2947,9 +3057,9 @@ backend/app_realtime.py Realtime bridge behavior
 
 ---
 
-## 29. Gemini Live Runtime, Provider Auto-Save, and Language Capability Baseline
+## 29. Gemini Live Runtime and Provider Language Runtime Baseline
 
-This section captures the provider/runtime work completed in the 2026-05-29 session.
+This section captures the Direct Realtime runtime changes completed in the 2026-05-29 session.
 
 Completed commits:
 
@@ -2960,9 +3070,9 @@ e21a596 Improve Gemini voice pacing instructions
 9293f71 Update provider language capability lists
 ```
 
-### Current provider set
+### Active provider set
 
-The Direct Realtime provider surface now includes:
+Current Direct Realtime provider IDs:
 
 ```text
 azure-openai-realtime
@@ -2971,81 +3081,108 @@ xai-grok-realtime
 google-gemini-live
 ```
 
-Current provider/runtime files include:
+Runtime files added/used for Gemini:
 
 ```text
-backend/provider_capabilities.json
-backend/provider_config.py
-backend/provider_config.local.example.json
-backend/provider_config.local.json   # generated locally and ignored by Git
+backend/gemini_live_router.py
+backend/gemini_audio.py
+backend/providers/google_gemini_live.py
+```
+
+Provider runtime files now include:
+
+```text
 backend/providers/base.py
 backend/providers/__init__.py
 backend/providers/azure_openai_realtime.py
 backend/providers/openai_realtime.py
 backend/providers/xai_grok_realtime.py
 backend/providers/google_gemini_live.py
-backend/gemini_audio.py
-backend/gemini_live_router.py
 ```
 
-Runtime route rules:
+### Runtime routes
+
+OpenAI-compatible provider route:
 
 ```text
-OpenAI-compatible providers use:
 ws://127.0.0.1:50505/voice/ws
+```
 
-Gemini Live uses:
+Gemini provider route:
+
+```text
 ws://127.0.0.1:50505/gemini/voice/ws
 ```
 
-Desktop route selection:
+Desktop routing rule:
 
 ```text
-Desktop/renderer/renderer.js builds the runtime WebSocket route from provider capabilities.
-If a provider defines runtimeRoute, that route is used.
-Gemini uses /gemini/voice/ws.
+Desktop/renderer/renderer.js resolves the active provider route from provider capabilities.
+If a provider defines runtimeRoute, the Desktop uses that route.
+Gemini defines /gemini/voice/ws.
 OpenAI-compatible providers use /voice/ws.
 ```
 
-### Gemini Live runtime support
+### Gemini Live bridge behavior
 
-Gemini Live is implemented as a provider-specific runtime bridge.
-
-Current Gemini runtime files:
+Current Gemini runtime flow:
 
 ```text
-backend/gemini_live_router.py
-backend/gemini_audio.py
-backend/providers/google_gemini_live.py
+Electron Desktop app
+-> loopback/system/browser audio capture
+-> /gemini/voice/ws on backend/app_realtime.py FastAPI app
+-> backend/gemini_live_router.py
+-> Google Gemini Live upstream WebSocket
+-> Gemini setup payload from backend/providers/google_gemini_live.py
+-> Gemini setupComplete gate
+-> Gemini audio input stream
+-> Gemini audio output stream
+-> Desktop playback pipeline
+-> selected headphones/output device
 ```
 
-Current Gemini integration behavior:
+Current Gemini setup behavior:
 
 ```text
-backend/app_realtime.py includes the Gemini router.
-Gemini has a dedicated /gemini/voice/ws WebSocket route.
-The Desktop still owns loopback/system/browser audio capture.
-The Desktop sends audio to the route selected for the active provider.
-The Gemini router opens the upstream Gemini Live WebSocket.
-The Gemini adapter builds the Gemini setup payload.
-The Gemini router waits for setupComplete before sending audio upstream.
-Gemini server messages may arrive as text or bytes; the router decodes bytes as UTF-8 JSON before processing.
-Desktop PCM16 mono 24 kHz input is converted for Gemini upstream audio through backend/gemini_audio.py where required.
-Gemini audio output is forwarded back to Desktop through the existing playback pipeline.
+Root Gemini payload key remains setup.
+Model is normalized to models/<model> if needed.
+Selected voice is sent through generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName.
+Empty voice falls back to Kore.
+responseModalities includes AUDIO.
+systemInstruction is sent as Gemini Content parts.
+Gemini-native realtimeInputConfig is used for activity detection and interruption.
 ```
 
-Gemini setup shape:
+Gemini input/output audio handling:
 
 ```text
-Root setup payload remains "setup".
-Gemini model names are normalized to models/<model> when needed.
-generationConfig.responseModalities includes AUDIO.
-speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName uses selected provider voice, defaulting to Kore when empty.
-systemInstruction uses Gemini Content parts.
-realtimeInputConfig configures Gemini-native activity detection and interruption behavior.
+Desktop still captures PCM16 mono 24 kHz loopback/system audio.
+backend/gemini_audio.py performs PCM16 mono 24 kHz to 16 kHz conversion for Gemini upstream audio where required.
+Gemini output audio is forwarded to the existing Desktop audio playback path.
+Desktop playback ownership remains unchanged.
 ```
 
-Current Gemini-native VAD and interruption configuration:
+### Gemini setupComplete and upstream message handling
+
+Important runtime finding:
+
+```text
+A terminal Gemini setup test received setupComplete and audio.
+The app initially did not see setupComplete because Gemini upstream messages may arrive as bytes frames.
+The Gemini router was updated to decode UTF-8 bytes frames and parse JSON.
+```
+
+Current rule:
+
+```text
+Do not skip bytes frames from Gemini upstream.
+If bytes decode/JSON parse fails, log one low-volume diagnostic and ignore the frame.
+Wait for setupComplete before sending audio upstream.
+```
+
+### Gemini-native barge-in / interruption
+
+Gemini VAD/interruption config:
 
 ```text
 realtimeInputConfig.automaticActivityDetection.disabled = false
@@ -3054,92 +3191,104 @@ realtimeInputConfig.automaticActivityDetection.silenceDurationMs = 1500
 realtimeInputConfig.activityHandling = START_OF_ACTIVITY_INTERRUPTS
 ```
 
-Gemini barge-in/interruption flow:
+Canonical Gemini barge-in flow:
 
 ```text
 1. User/system audio starts while Gemini is speaking.
 2. Gemini automaticActivityDetection detects start of activity.
-3. Gemini START_OF_ACTIVITY_INTERRUPTS interrupts the active response.
-4. Gemini returns serverContent.interrupted = true.
-5. backend/gemini_live_router.py sends Desktop event type=interrupted.
-6. Desktop/renderer/renderer.js handles type=interrupted by calling stopAudioNow() and clearing assistant speaking state.
-7. Existing Desktop playback buffer is cleared.
-8. Gemini continues processing the new input.
-```
-
-Important boundary:
-
-```text
-Gemini interruption must not use fake OpenAI input_audio_buffer.speech_started events.
-Gemini interruption must use Gemini-native serverContent.interrupted mapping.
-OpenAI/Azure/Grok barge-in behavior remains unchanged.
-```
-
-### Gemini voice pacing / rate behavior
-
-Gemini Live does not currently have a confirmed OpenAI-like numeric speech speed field in the project implementation.
-
-Current Gemini rate rule:
-
-```text
-rate 1 / 1.0:
-  no Gemini pacing override is added
-
-rate 0.9:
-  add runtime voice delivery override as systemInstruction.parts[1]
-
-rate 0.8:
-  add stronger runtime voice delivery override as systemInstruction.parts[1]
-```
-
-Gemini instruction composition rule:
-
-```text
-systemInstruction.parts[0] = scenario/runtime instructions
-systemInstruction.parts[1] = Gemini runtime voice delivery override, only for rate 0.9 or 0.8
+3. START_OF_ACTIVITY_INTERRUPTS interrupts the current Gemini response.
+4. Gemini emits serverContent.interrupted = true.
+5. backend/gemini_live_router.py sends Desktop event:
+   { "type": "interrupted", "message": "Gemini generation interrupted" }
+6. Desktop/renderer/renderer.js handles interrupted by:
+   stopAudioNow()
+   setAssistantSpeaking(false)
+7. Local playback buffer is cleared.
+8. Gemini continues listening and prepares the next response.
 ```
 
 Do not:
 
 ```text
-Do not write Gemini pacing text into scenario_presets.json.
-Do not write Gemini pacing text into scenario_presets.local.json.
-Do not display Gemini pacing override as a scenario edit.
-Do not append Gemini pacing text into the same large scenario string.
-Do not apply this Gemini parts[] pattern to OpenAI/Azure unless separately designed.
+Do not fake OpenAI input_audio_buffer.speech_started for Gemini.
+Do not send OpenAI response.cancel to Gemini unless a future Gemini-specific documented equivalent is implemented.
+Do not change OpenAI/Azure/Grok barge-in behavior because of Gemini.
 ```
 
-### Provider auto-save before Start
+### Gemini rate / voice pacing behavior
 
-Desktop now protects against starting the wrong provider after a dropdown change.
+Gemini does not currently use a confirmed numeric OpenAI-like speed field in this project.
 
-Current behavior:
+Current Gemini rate mapping:
 
 ```text
-Desktop tracks providerConfigDirty.
-Changing Active Provider or any provider setting marks provider config dirty.
-Start Direct Realtime checks providerConfigDirty before opening the Realtime WebSocket.
-If dirty, Desktop automatically saves the currently selected provider UI config through POST /v1/provider/config.
-If auto-save succeeds, Start continues.
-If auto-save fails, Start is blocked and a clear error is logged.
-Manual Save Provider remains available for explicit provider setting changes.
+rate 1 / 1.0:
+  no pacing override part
+
+rate 0.9:
+  systemInstruction.parts[0] = scenario/runtime instructions
+  systemInstruction.parts[1] = moderate Runtime Voice Delivery Override
+
+rate 0.8:
+  systemInstruction.parts[0] = scenario/runtime instructions
+  systemInstruction.parts[1] = stronger Runtime Voice Delivery Override
+```
+
+Instruction composition rule:
+
+```text
+Scenario/runtime instructions remain authoritative for model behavior.
+Gemini voice delivery override controls only spoken delivery/cadence.
+The override must not change answer length, role, silence rules, or scenario behavior.
+```
+
+Storage rule:
+
+```text
+Do not write Gemini rate/pacing override into scenario files.
+Do not store Gemini rate/pacing override as scenario.userInstruction.
+Do not show Gemini rate/pacing override as the scenario prompt.
+Add the override only at Gemini session setup time.
+```
+
+### Provider config auto-save before Start
+
+Current Desktop start rule:
+
+```text
+If providerConfigDirty is false:
+  Start proceeds normally.
+
+If providerConfigDirty is true:
+  Desktop logs that provider config changed.
+  Desktop saves the currently selected provider UI config through POST /v1/provider/config.
+  If save succeeds, Start continues.
+  If save fails, Start is blocked and an error is logged.
 ```
 
 Dirty triggers:
 
 ```text
-Active Provider dropdown
-Region
-Endpoint
-API version
-Model
-Voice
-Incoming language
-Outgoing language
-API key
+Active Provider dropdown change
+Region change
+Endpoint change
+API version change
+Model change
+Voice change
+Incoming language change
+Outgoing language change
+API key change
 ```
 
-### Provider-specific language capability lists
+Important behavior:
+
+```text
+Save Provider remains available for manual save.
+Auto-save only protects Start Direct Realtime from using stale saved provider config.
+Auto-save happens before the Realtime WebSocket opens.
+```
+
+### Provider language dropdowns
 
 Provider language dropdowns are now provider-specific and come from:
 
@@ -3147,7 +3296,21 @@ Provider language dropdowns are now provider-specific and come from:
 backend/provider_capabilities.json
 ```
 
-Canonical code standard:
+Provider language rules:
+
+```text
+Azure OpenAI Realtime and OpenAI Realtime:
+  incoming and outgoing lists use the OpenAI/Azure supported language set.
+
+Grok Realtime:
+  incoming and outgoing lists use the Grok-specific supported language set.
+
+Gemini Live:
+  incoming list includes Gemini output languages plus named input-only understanding languages.
+  outgoing list includes only languages offered for Gemini spoken/audio response.
+```
+
+Code standard:
 
 ```text
 Chinese = zh
@@ -3160,53 +3323,20 @@ Serbian = sr
 Bosnian = bs
 ```
 
-Language list rules:
+Gemini input-only rule:
 
 ```text
-OpenAI / Azure OpenAI:
-  supportedIncomingLanguages = supportedOutgoingLanguages
-  list contains the full OpenAI/Azure language set defined in backend/provider_capabilities.json
-
-Grok:
-  supportedIncomingLanguages = supportedOutgoingLanguages
-  list contains the Grok-specific language set defined in backend/provider_capabilities.json
-
-Gemini:
-  supportedIncomingLanguages = Gemini voice-output languages plus additional input-only understanding languages
-  supportedOutgoingLanguages = only languages offered for Gemini audio answer output
+Input-only languages are allowed in Gemini Incoming language.
+Input-only languages must not be listed in Gemini Outgoing language unless separately validated for spoken audio output.
 ```
 
-Gemini input-only languages must not appear in the Gemini outgoing dropdown unless separately validated for audio output.
-
-Examples of Gemini input-only additions:
-
-```text
-Swahili
-Zulu
-Icelandic
-Basque
-Galician
-Georgian
-Armenian
-Khmer
-Lao
-Amharic
-Kazakh
-Azerbaijani
-Mongolian
-Nepali
-Sinhala
-```
-
-Validation performed:
+Validation:
 
 ```text
 cmd /c "python -m json.tool backend/provider_capabilities.json > NUL": OK
-Desktop UI provider language dropdown test: OK
-Azure/OpenAI list differs from Grok and Gemini lists: OK
-Grok list excludes languages not in the Grok list and includes Telugu: OK
-Gemini outgoing excludes input-only languages such as Swahili/Zulu/Icelandic: OK
-Gemini incoming includes input-only languages such as Swahili/Zulu/Icelandic: OK
+Desktop provider language dropdown runtime test: OK
+Azure/OpenAI, Grok, and Gemini lists differ as expected: OK
+Gemini incoming/outgoing split works in UI: OK
 ```
 
 ### Session validation summary
@@ -3214,22 +3344,26 @@ Gemini incoming includes input-only languages such as Swahili/Zulu/Icelandic: OK
 Validated during this session:
 
 ```text
-Gemini Live direct setup test returned setupComplete and audio.
-Gemini route connects and streams Desktop audio frames.
-Gemini setupComplete handling works after byte-frame JSON decoding support.
-Gemini Live route waits for setupComplete before sending audio.
-Gemini Live response audio works from the Desktop application.
-Gemini-native interruption/barge-in works as expected.
-Gemini rate 0.8 instruction parts formatting was verified from terminal and runtime tested.
-Provider auto-save before Start works.
-Provider-specific language dropdowns work.
-Working tree clean after commits and cleanup.
+python -m py_compile backend/app_realtime.py backend/gemini_audio.py backend/gemini_live_router.py backend/providers/google_gemini_live.py backend/provider_config.py: OK
+node --check Desktop/renderer/renderer.js: OK
+Gemini Live direct terminal setup test: OK
+Gemini setupComplete received after bytes-frame handling fix: OK
+Gemini app runtime response audio: OK
+Gemini native barge-in/interruption: OK
+Gemini rate 0.8 instruction parts output verified: OK
+Provider auto-save before Start: OK
+Provider-specific language dropdowns: OK
+Git clean after final language capability commit: OK
 ```
 
-Boundary:
+Boundaries:
 
 ```text
-These changes do not reintroduce STT, Orchestrator, Agent1, Control WS, TTS, Manual backend, Vite frontend, or microphone input.
-Loopback/system/browser audio remains the only Direct Realtime input path.
-Existing OpenAI/Azure/Grok runtime behavior remains provider-adapter owned.
+No microphone input was introduced.
+Loopback/system/browser audio remains the only Direct Realtime input.
+No STT/Orchestrator/Agent1/TTS/Manual/Vite runtime path was reintroduced.
+Desktop playback pipeline remains unchanged.
+Mini Control Window ownership remains unchanged.
+Scenario prompt storage model remains unchanged.
 ```
+

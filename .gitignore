@@ -1,4 +1,4 @@
-# Ignore everything by default
+﻿# Ignore everything by default
 *
 
 # Allow core project files
@@ -12,25 +12,27 @@
 !stop_all.ps1
 !chatt.code-workspace
 
+# Allow build/release scripts
+!scripts/
+!scripts/*.ps1
 # Allow backend and Desktop app
 !backend/
 !backend/**
 !Desktop/
 !Desktop/**
-
-# Keep already tracked web folders visible
-!frontend/
-!frontend/**
-!manual-frontend/
-!manual-frontend/**
+!apps/
+!apps/licensing-api/
+!apps/licensing-api/**
 
 # Ignore secrets / environment files
 .env
 .env.*
 **/.env
 **/.env.*
+**/local.settings.json
 !.env.example
 !backend/.env.example
+backend/provider_config.local.json
 
 # Ignore Python runtime/cache
 **/.venv/
@@ -85,3 +87,5 @@ cost_foundry.json
 cv.json
 query.json
 Desktop/.electron-userdata/
+backend/scenario_presets.local.json
+

@@ -5,7 +5,7 @@
 Write-Host "Stopping CHATT services..." -ForegroundColor Yellow
 
 # --- Ports used by CHATT ---
-$PORTS = @(50505, 50506, 50507, 50605, 5173, 5174)
+$PORTS = @(50505)
 
 foreach ($port in $PORTS) {
     $process = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |

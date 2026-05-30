@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "activeProvider": "azure-openai-realtime",
+  "providers": {
+    "azure-openai-realtime": {
+      "region": "eastus2",
+      "endpoint": "https://your-resource-name.cognitiveservices.azure.com",
+      "apiVersion": "2025-05-01-preview",
+      "model": "gpt-realtime-1.5",
+      "voice": "alloy",
+      "incomingLanguage": "en",
+      "outgoingLanguage": "en",
+      "apiKey": ""
+    },
+    "openai-realtime": {
+      "model": "gpt-realtime",
+      "voice": "alloy",
+      "incomingLanguage": "en",
+      "outgoingLanguage": "en",
+      "apiKey": ""
+    },
+    "xai-grok-realtime": {
+      "model": "grok-voice-think-fast-1.0",
+      "voice": "eve",
+      "incomingLanguage": "en",
+      "outgoingLanguage": "en",
+      "apiKey": ""
+    },
+    "google-gemini-live": {
+      "model": "gemini-3.1-flash-live-preview",
+      "voice": "Kore",
+      "incomingLanguage": "en",
+      "outgoingLanguage": "en",
+      "apiKey": ""
+    }
+  }
+}
