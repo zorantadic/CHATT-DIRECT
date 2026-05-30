@@ -52,19 +52,42 @@ class GoogleGeminiLiveAdapter(RealtimeProviderAdapter):
         pacing_rule = ""
         if normalized_rate == "0.9":
             pacing_rule = (
-                "VOICE PACING RULE:\n"
-                "Speak slightly slower than normal while keeping a natural conversational pace. "
-                "Use short pauses between sentences."
+                "RUNTIME VOICE DELIVERY OVERRIDE:\n\n"
+                "This instruction controls spoken delivery only, not answer length or content.\n\n"
+                "Keep all behavior, role, silence rules, and answer rules from the main system instruction.\n\n"
+                "When you speak, use a slower-than-normal conversational pace.\n\n"
+                "Do not rush the first words of the answer.\n\n"
+                "Pause briefly after every sentence.\n\n"
+                "Pause slightly before important points, names, numbers, acronyms, and technical terms.\n\n"
+                "Keep words clearly separated. Do not run phrases together.\n\n"
+                "Target a calm, measured delivery around 110 to 125 words per minute.\n\n"
+                "Use natural human pacing. Do not sound robotic or exaggerated."
             )
         elif normalized_rate == "0.8":
             pacing_rule = (
-                "VOICE PACING RULE:\n"
-                "Speak slowly and clearly. Use a calm pace, noticeable pauses between sentences, "
-                "and slightly longer pauses inside complex sentences."
+                "RUNTIME VOICE DELIVERY OVERRIDE:\n\n"
+                "This instruction controls spoken delivery only, not answer length or content.\n\n"
+                "Keep all behavior, role, silence rules, and answer rules from the main system instruction.\n\n"
+                "You must deliberately slow down the spoken delivery.\n\n"
+                "Before starting the answer, insert a short thinking pause.\n\n"
+                "Speak as if dictating important notes to a listener.\n\n"
+                "Keep words clearly separated. Do not run words together.\n\n"
+                "Pause after every sentence.\n\n"
+                "Pause briefly before important points, names, numbers, acronyms, and technical terms.\n\n"
+                "When explaining technical content, speak one idea at a time.\n\n"
+                "Do not compress or rush the spoken delivery, even when the answer is short.\n\n"
+                "Target a slow, easy-to-follow delivery around 90 to 105 words per minute.\n\n"
+                "If you feel you are speaking at a normal conversational speed, you are speaking too fast.\n\n"
+                "Use natural human pacing. Do not sound robotic or theatrical."
             )
 
+        system_parts = []
+        if safe_instructions:
+            system_parts.append({"text": safe_instructions})
         if pacing_rule:
-            safe_instructions = f"{safe_instructions}\n\n{pacing_rule}" if safe_instructions else pacing_rule
+            system_parts.append({"text": pacing_rule})
+        if not system_parts:
+            system_parts.append({"text": ""})
 
         return {
             "setup": {
@@ -88,11 +111,7 @@ class GoogleGeminiLiveAdapter(RealtimeProviderAdapter):
                     "activityHandling": "START_OF_ACTIVITY_INTERRUPTS",
                 },
                 "systemInstruction": {
-                    "parts": [
-                        {
-                            "text": safe_instructions,
-                        }
-                    ]
+                    "parts": system_parts
                 },
             }
         }
