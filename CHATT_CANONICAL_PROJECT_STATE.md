@@ -1,5 +1,5 @@
 CHATT Canonical Project State
-Last updated: 2026-05-28
+Last updated: 2026-05-29
 This file is the current project-level canonical state for the `CHATT-DIRECT` repository.
 Use this file before making project-wide decisions about architecture, repository cleanup, workflow, deployment, packaging, or future feature direction.
 For detailed Direct Realtime runtime implementation details, use:
@@ -25,7 +25,7 @@ incoming language planned as transcription language hint
 packaged Windows app
 version 0.1.8 packaged installer
 minimized-app floating mini control window
-deterministic Electron-controlled header UI zoom with default 0.7 main-window scale and persisted user preference
+deterministic Electron UI zoom factor 0.7 applied in main window runtime
 ```
 Primary value:
 ```text
@@ -43,13 +43,13 @@ Scenarios tab with one-click assistant behavior selection
 compact clickable scenario cards with selected-state styling
 hover details popup for scenario human-readable explanation
 Voice page selected scenario visibility
-modern dark/light Desktop UI across Voice, Settings, License, and Scenarios
+modern dark glass Desktop UI across Voice, Settings, and Scenarios
 responsive default Desktop window size 1120 x 820 with minimum 860 x 720
-deterministic UI scale independent of Chromium persisted profile zoom state, with header Zoom - / + controls
+deterministic UI scale independent of Chromium persisted profile zoom state
 multilingual UI display support
 header language selector synchronized with Settings language selector
-floating narrowed vertical mini control window when main app is minimized
-mini control supports Start, Stop, Refresh, Repeat, Reset, Open, Session, and Activity, with centered text/status layout
+floating vertical mini control window when main app is minimized
+mini control supports Start, Stop, Refresh, Repeat, Reset, Open, Session, and Activity
 backend-authoritative 3-day trial registration
 hosted Azure Licensing API with Azure Table Storage
 free trial anti-reset protection through installId, emailHash, and deviceHash
@@ -447,15 +447,11 @@ Modern Desktop UI modernization Phase 1 Voice page: OK
 Modern Desktop UI modernization Phase 2 Settings page: OK
 Modern Desktop UI modernization Phase 3 Scenarios page: OK
 Desktop default window size 1120 x 820 and minimum 860 x 720: OK
-Desktop Electron-controlled UI zoom default 0.7 applied immediately and after did-finish-load: OK
-Header Zoom - / + controls apply and persist user zoom preference: OK
-Desktop Dark/Light appearance mode: OK
-Light theme contrast refinement: OK
+Desktop deterministic UI zoom factor 0.7 applied immediately and after did-finish-load: OK
 Dev profile zoom masking issue identified and resolved by deterministic app zoom approach: OK
 Scenario Preview slot uses displayDetails fallback to shortDescription and does not show scenario.instruction: OK
 Mini Control Window opens when the main app is minimized: OK
-Mini Control Window narrowed vertical layout fits visible window: OK
-Mini Control Window centered text/status layout: OK
+Mini Control Window vertical layout fits visible window: OK
 Mini Control Window can be moved across the desktop: OK
 Mini Control Window Open restores the main app: OK
 Mini Control Window Start/Stop/Refresh/Repeat/Reset commands work through existing main renderer controls: OK
@@ -491,20 +487,20 @@ Desktop Scenarios tab loads backend scenario presets, renders compact clickable 
 Voice page displays the selected scenario name and behavior description
 Desktop UI is modernized across Voice, Settings, and Scenarios with dark glass/3D design language
 Desktop main window uses canonical 1120 x 820 default with 860 x 720 minimum
-Desktop main window uses deterministic Electron-controlled UI zoom with default 0.7 and persisted user preference
+Desktop main window applies deterministic APP_UI_ZOOM_FACTOR = 0.7 in Electron main process
 UI scale is not allowed to depend on Chromium persisted per-host zoom state
 Voice page uses Session and Activity as primary user-facing status indicators
-Settings page is organized as a modern control center with Connection, Appearance, Audio Output, Provider Configuration, Session Cost Guard, Support & Troubleshooting, Diagnostics, Auth, and Log cards
+Settings page is organized as a dark glass control center with Connection, Audio Output, Provider Configuration, Session Cost Guard, Support & Troubleshooting, Diagnostics, Auth, and Log cards
 Scenarios page is organized as Scenario & Instructions with Selected Scenario, Scenario Library, Scenario Preview, Current Instructions, and Scenario Default Instructions cards
 Scenario Preview displays human-readable metadata using displayDetails when available and never displays scenario.instruction
 Bottom app status bar no longer shows the redundant bottom volume mirror
-Header Backend/Provider cards removed and replaced with compact Zoom and Select Language controls
+Header Backend/Provider cards removed and replaced with compact Select Language control
 Settings Display Language and Header Select Language controls remain synchronized through shared display-language state
 Minimizing the main app opens a floating vertical Mini Control Window
 Mini Control Window is an Electron UI remote-control layer only
 Mini Control Window does not own or duplicate Direct Realtime audio, WebSocket, backend, provider, or scenario runtime
 Mini Control Window controls existing main renderer commands for Start, Stop, Refresh Instructions, Repeat Last Answer, and Reset Session
-Mini Control Window displays synchronized Session and Activity state from the main renderer and uses a narrowed centered layout
+Mini Control Window displays synchronized Session and Activity state from the main renderer
 Mini Control Window Open restores the main app and closes the mini control
 Desktop release 0.1.8 build and installer upgrade are validated
 
@@ -934,13 +930,12 @@ minimum height: 720
 Current deterministic UI zoom baseline:
 
 ```text
-Default main-window UI zoom factor = 0.7.
-Header provides visible Zoom - / + controls and a percent/reset button.
-Zoom is controlled explicitly through Electron main process webContents.setZoomFactor(...).
-Zoom preference is persisted under Electron userData and re-applied on startup/did-finish-load.
+APP_UI_ZOOM_FACTOR = 0.7
+Applied in Desktop/electron/main.cjs to mainWindow.webContents.
+Applied immediately after BrowserWindow creation.
+Re-applied on webContents did-finish-load.
 This app-level zoom is intentional and deterministic.
 It replaces accidental dependence on Chromium profile persisted zoom state.
-Touchpad/touchscreen pinch zoom and Chromium profile zoom are not the product zoom model.
 ```
 
 Root cause finding for desktop scale issue:
@@ -957,12 +952,11 @@ Current desktop scale implementation rules:
 
 ```text
 Do not use Chromium persisted profile zoom state as a product behavior.
-Do not rely on Ctrl-minus/manual zoom, touchpad pinch zoom, touchscreen pinch zoom, or Preferences per_host_zoom_levels.
-Use only the explicit Electron-controlled header Zoom controls for user-facing UI scale.
+Do not rely on Ctrl-minus/manual zoom or Preferences per_host_zoom_levels.
 Do not solve desktop scale by broad CSS rewrite unless explicitly approved.
 Keep BrowserWindow default at 1120 x 820 and minimum at 860 x 720.
-Keep default zoom behavior centralized in Desktop/electron/main.cjs and persisted via Electron userData.
-If visual scale needs future tuning, adjust the controlled zoom model first and validate before touching broad CSS.
+Keep APP_UI_ZOOM_FACTOR centralized in Desktop/electron/main.cjs.
+If visual scale needs future tuning, change only APP_UI_ZOOM_FACTOR first and validate before touching CSS.
 ```
 
 Current visual design direction:
@@ -1071,10 +1065,9 @@ Current mini control behavior:
 ```text
 When the main app is minimized, Electron opens a small floating Mini Control Window.
 The Mini Control Window is always-on-top, frameless, transparent/dark glass, not shown in the taskbar, and movable by dragging the header area.
-The Mini Control Window uses a narrowed vertical layout with centered title, status, and message text.
+The Mini Control Window uses a narrow vertical layout.
 The Mini Control Window shows Session and Activity status.
 The Mini Control Window provides Start, Stop, Refresh, Repeat, Reset, and Open controls.
-Mini Control does not include main-window Zoom controls.
 Open restores the main app and closes the Mini Control Window.
 Closing the Mini Control Window does not stop the main app or backend.
 ```
@@ -2952,164 +2945,291 @@ instruction refresh WebSocket message shape
 backend/app_realtime.py Realtime bridge behavior
 ```
 
-
 ---
 
-## 29. Desktop Appearance, Header Zoom, and Mini Control Refinement Baseline
+## 29. Gemini Live Runtime, Provider Auto-Save, and Language Capability Baseline
 
-This section captures the Desktop UI refinements completed after the troubleshooting export baseline.
+This section captures the provider/runtime work completed in the 2026-05-29 session.
 
 Completed commits:
 
 ```text
-2552622 Localize troubleshooting export UI
-4617607 Add light and dark appearance mode
-347f2bd Refine light theme contrast
-1db6b2f Add header UI zoom controls
-994428c Narrow mini control window
+5795c6d Add Gemini live runtime support
+e21a596 Improve Gemini voice pacing instructions
+73dce8d Auto-save provider config before start
+9293f71 Update provider language capability lists
 ```
 
-### Appearance mode
+### Current provider set
 
-Feature status:
+The Direct Realtime provider surface now includes:
 
 ```text
-Implemented.
-Runtime tested.
-Committed.
+azure-openai-realtime
+openai-realtime
+xai-grok-realtime
+google-gemini-live
 ```
+
+Current provider/runtime files include:
+
+```text
+backend/provider_capabilities.json
+backend/provider_config.py
+backend/provider_config.local.example.json
+backend/provider_config.local.json   # generated locally and ignored by Git
+backend/providers/base.py
+backend/providers/__init__.py
+backend/providers/azure_openai_realtime.py
+backend/providers/openai_realtime.py
+backend/providers/xai_grok_realtime.py
+backend/providers/google_gemini_live.py
+backend/gemini_audio.py
+backend/gemini_live_router.py
+```
+
+Runtime route rules:
+
+```text
+OpenAI-compatible providers use:
+ws://127.0.0.1:50505/voice/ws
+
+Gemini Live uses:
+ws://127.0.0.1:50505/gemini/voice/ws
+```
+
+Desktop route selection:
+
+```text
+Desktop/renderer/renderer.js builds the runtime WebSocket route from provider capabilities.
+If a provider defines runtimeRoute, that route is used.
+Gemini uses /gemini/voice/ws.
+OpenAI-compatible providers use /voice/ws.
+```
+
+### Gemini Live runtime support
+
+Gemini Live is implemented as a provider-specific runtime bridge.
+
+Current Gemini runtime files:
+
+```text
+backend/gemini_live_router.py
+backend/gemini_audio.py
+backend/providers/google_gemini_live.py
+```
+
+Current Gemini integration behavior:
+
+```text
+backend/app_realtime.py includes the Gemini router.
+Gemini has a dedicated /gemini/voice/ws WebSocket route.
+The Desktop still owns loopback/system/browser audio capture.
+The Desktop sends audio to the route selected for the active provider.
+The Gemini router opens the upstream Gemini Live WebSocket.
+The Gemini adapter builds the Gemini setup payload.
+The Gemini router waits for setupComplete before sending audio upstream.
+Gemini server messages may arrive as text or bytes; the router decodes bytes as UTF-8 JSON before processing.
+Desktop PCM16 mono 24 kHz input is converted for Gemini upstream audio through backend/gemini_audio.py where required.
+Gemini audio output is forwarded back to Desktop through the existing playback pipeline.
+```
+
+Gemini setup shape:
+
+```text
+Root setup payload remains "setup".
+Gemini model names are normalized to models/<model> when needed.
+generationConfig.responseModalities includes AUDIO.
+speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName uses selected provider voice, defaulting to Kore when empty.
+systemInstruction uses Gemini Content parts.
+realtimeInputConfig configures Gemini-native activity detection and interruption behavior.
+```
+
+Current Gemini-native VAD and interruption configuration:
+
+```text
+realtimeInputConfig.automaticActivityDetection.disabled = false
+realtimeInputConfig.automaticActivityDetection.prefixPaddingMs = 500
+realtimeInputConfig.automaticActivityDetection.silenceDurationMs = 1500
+realtimeInputConfig.activityHandling = START_OF_ACTIVITY_INTERRUPTS
+```
+
+Gemini barge-in/interruption flow:
+
+```text
+1. User/system audio starts while Gemini is speaking.
+2. Gemini automaticActivityDetection detects start of activity.
+3. Gemini START_OF_ACTIVITY_INTERRUPTS interrupts the active response.
+4. Gemini returns serverContent.interrupted = true.
+5. backend/gemini_live_router.py sends Desktop event type=interrupted.
+6. Desktop/renderer/renderer.js handles type=interrupted by calling stopAudioNow() and clearing assistant speaking state.
+7. Existing Desktop playback buffer is cleared.
+8. Gemini continues processing the new input.
+```
+
+Important boundary:
+
+```text
+Gemini interruption must not use fake OpenAI input_audio_buffer.speech_started events.
+Gemini interruption must use Gemini-native serverContent.interrupted mapping.
+OpenAI/Azure/Grok barge-in behavior remains unchanged.
+```
+
+### Gemini voice pacing / rate behavior
+
+Gemini Live does not currently have a confirmed OpenAI-like numeric speech speed field in the project implementation.
+
+Current Gemini rate rule:
+
+```text
+rate 1 / 1.0:
+  no Gemini pacing override is added
+
+rate 0.9:
+  add runtime voice delivery override as systemInstruction.parts[1]
+
+rate 0.8:
+  add stronger runtime voice delivery override as systemInstruction.parts[1]
+```
+
+Gemini instruction composition rule:
+
+```text
+systemInstruction.parts[0] = scenario/runtime instructions
+systemInstruction.parts[1] = Gemini runtime voice delivery override, only for rate 0.9 or 0.8
+```
+
+Do not:
+
+```text
+Do not write Gemini pacing text into scenario_presets.json.
+Do not write Gemini pacing text into scenario_presets.local.json.
+Do not display Gemini pacing override as a scenario edit.
+Do not append Gemini pacing text into the same large scenario string.
+Do not apply this Gemini parts[] pattern to OpenAI/Azure unless separately designed.
+```
+
+### Provider auto-save before Start
+
+Desktop now protects against starting the wrong provider after a dropdown change.
 
 Current behavior:
 
 ```text
-Main Desktop app supports Dark and Light appearance modes.
-Dark mode remains the default and preserves the previous dark glass visual design.
-Light mode is implemented as a targeted CSS override layer, not a broad layout rewrite.
-Appearance is selected from Settings -> Connection -> Appearance.
-The renderer applies theme state through body[data-theme="dark"] or body[data-theme="light"].
-Light theme contrast was refined across Voice, License, Settings, and Scenarios pages.
+Desktop tracks providerConfigDirty.
+Changing Active Provider or any provider setting marks provider config dirty.
+Start Direct Realtime checks providerConfigDirty before opening the Realtime WebSocket.
+If dirty, Desktop automatically saves the currently selected provider UI config through POST /v1/provider/config.
+If auto-save succeeds, Start continues.
+If auto-save fails, Start is blocked and a clear error is logged.
+Manual Save Provider remains available for explicit provider setting changes.
 ```
 
-Current implementation files:
+Dirty triggers:
 
 ```text
-Desktop/renderer/index.html
-Desktop/renderer/renderer.js
-Desktop/renderer/styles.css
-Desktop/renderer/locales/ui.json
+Active Provider dropdown
+Region
+Endpoint
+API version
+Model
+Voice
+Incoming language
+Outgoing language
+API key
 ```
 
-Current appearance rules:
+### Provider-specific language capability lists
+
+Provider language dropdowns are now provider-specific and come from:
 
 ```text
-Do not change Direct Realtime audio behavior because of theme selection.
-Do not change provider/scenario/runtime state because of theme selection.
-Do not apply theme through Electron BrowserWindow zoom or Chromium profile settings.
-Do not treat Mini Control appearance as part of the main app theme until explicitly designed.
+backend/provider_capabilities.json
 ```
 
-### Header UI zoom controls
-
-Feature status:
+Canonical code standard:
 
 ```text
-Implemented.
-Runtime tested.
-Committed.
+Chinese = zh
+Portuguese = pt
+Arabic = ar
+Tagalog / Filipino = tl
+Persian / Farsi = fa
+Norwegian = no
+Serbian = sr
+Bosnian = bs
 ```
 
-Current behavior:
+Language list rules:
 
 ```text
-Main Desktop header contains visible Zoom controls:
-Zoom - <percent> +
+OpenAI / Azure OpenAI:
+  supportedIncomingLanguages = supportedOutgoingLanguages
+  list contains the full OpenAI/Azure language set defined in backend/provider_capabilities.json
 
-Minus decreases main-window UI scale.
-Plus increases main-window UI scale.
-Clicking the percent/value resets zoom to the default scale.
-Zoom changes apply immediately to the main BrowserWindow.
-Zoom preference persists across app restarts.
-Default zoom remains 0.7.
+Grok:
+  supportedIncomingLanguages = supportedOutgoingLanguages
+  list contains the Grok-specific language set defined in backend/provider_capabilities.json
+
+Gemini:
+  supportedIncomingLanguages = Gemini voice-output languages plus additional input-only understanding languages
+  supportedOutgoingLanguages = only languages offered for Gemini audio answer output
 ```
 
-Current implementation files:
+Gemini input-only languages must not appear in the Gemini outgoing dropdown unless separately validated for audio output.
+
+Examples of Gemini input-only additions:
 
 ```text
-Desktop/electron/main.cjs
-Desktop/electron/preload.cjs
-Desktop/renderer/index.html
-Desktop/renderer/renderer.js
-Desktop/renderer/styles.css
-Desktop/renderer/locales/ui.json
+Swahili
+Zulu
+Icelandic
+Basque
+Galician
+Georgian
+Armenian
+Khmer
+Lao
+Amharic
+Kazakh
+Azerbaijani
+Mongolian
+Nepali
+Sinhala
 ```
 
-Current zoom model:
+Validation performed:
 
 ```text
-Zoom is controlled explicitly by Electron main process through webContents.setZoomFactor(...).
-Zoom state is exposed through preload as window.electronAPI.uiZoom.
-Zoom preference is stored under Electron userData.
-The app does not rely on Chromium persisted profile zoom state.
-Touchpad/touchscreen pinch zoom is intentionally not the supported product zoom mechanism.
+cmd /c "python -m json.tool backend/provider_capabilities.json > NUL": OK
+Desktop UI provider language dropdown test: OK
+Azure/OpenAI list differs from Grok and Gemini lists: OK
+Grok list excludes languages not in the Grok list and includes Telugu: OK
+Gemini outgoing excludes input-only languages such as Swahili/Zulu/Icelandic: OK
+Gemini incoming includes input-only languages such as Swahili/Zulu/Icelandic: OK
 ```
 
-Current zoom boundary:
+### Session validation summary
+
+Validated during this session:
 
 ```text
-Do not re-enable uncontrolled Chromium/browser zoom behavior.
-Do not depend on Ctrl-plus/Ctrl-minus or per_host_zoom_levels.
-Do not add Zoom controls to Mini Control Window.
-Do not use broad CSS density rewrite to solve main-window UI scale unless explicitly approved.
+Gemini Live direct setup test returned setupComplete and audio.
+Gemini route connects and streams Desktop audio frames.
+Gemini setupComplete handling works after byte-frame JSON decoding support.
+Gemini Live route waits for setupComplete before sending audio.
+Gemini Live response audio works from the Desktop application.
+Gemini-native interruption/barge-in works as expected.
+Gemini rate 0.8 instruction parts formatting was verified from terminal and runtime tested.
+Provider auto-save before Start works.
+Provider-specific language dropdowns work.
+Working tree clean after commits and cleanup.
 ```
 
-### Mini Control narrowing
-
-Feature status:
+Boundary:
 
 ```text
-Implemented.
-Runtime tested.
-Committed.
-```
-
-Current behavior:
-
-```text
-Mini Control Window remains a remote UI layer only.
-Mini Control Window is narrower than the original 0.1.8 implementation.
-Mini Control text/status layout is centered.
-Mini Control does not include main-window Zoom controls.
-Mini Control command routing and runtime ownership remain unchanged.
-```
-
-Current implementation files:
-
-```text
-Desktop/electron/main.cjs
-Desktop/renderer/mini-control.css
-```
-
-Runtime boundaries:
-
-```text
-No Direct Realtime audio flow changed.
-No backend/app_realtime.py behavior changed.
-No provider adapter behavior changed.
-No scenario API behavior changed.
-No Mini Control ownership rule changed.
-No second WebSocket or AudioContext was introduced.
-```
-
-Validation:
-
-```text
-node --check Desktop/electron/main.cjs: OK
-node --check Desktop/electron/preload.cjs: OK
-node --check Desktop/renderer/renderer.js: OK
-node --check Desktop/renderer/mini-control.js: OK
-Desktop runtime visual test: OK
-Light/Dark mode runtime test: OK
-Header Zoom - / + runtime test: OK
-Mini Control narrowed layout runtime test: OK
-Git clean after commits.
+These changes do not reintroduce STT, Orchestrator, Agent1, Control WS, TTS, Manual backend, Vite frontend, or microphone input.
+Loopback/system/browser audio remains the only Direct Realtime input path.
+Existing OpenAI/Azure/Grok runtime behavior remains provider-adapter owned.
 ```
