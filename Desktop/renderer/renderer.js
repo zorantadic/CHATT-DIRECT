@@ -1309,6 +1309,7 @@ function loadInstructionsTargetIntoInputs() {
   }
   let providerCapabilitiesState = null;
   let providerConfigState = null;
+  let providerConfigDirty = false;
 
   loadEndpointSettingsIntoInputs();
   initAuthUi();
@@ -1351,6 +1352,11 @@ function loadInstructionsTargetIntoInputs() {
       setSettingsBadge(settingsProviderBadgeEl, "warn", t("common.notTested", "Not tested"));
       if (settingsDiagProviderTestEl) settingsDiagProviderTestEl.textContent = t("common.notTested", "Not tested");
     }
+  }
+
+  function markProviderConfigDirty(message) {
+    providerConfigDirty = true;
+    setProviderStatus(message || "Provider changed. It will be saved automatically before Start.");
   }
 
   function fillSelectOptions(selectEl, items, selectedValue) {
@@ -1463,6 +1469,26 @@ function loadInstructionsTargetIntoInputs() {
     };
   }
 
+  async function saveProviderConfigFromUi(statusMessage) {
+    const c = directRealtimeCfg();
+    const payload = buildProviderConfigFromUi();
+    const res = await fetch(`${c.REALTIME_HTTP}/v1/provider/config`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+    providerConfigState = data;
+    providerConfigDirty = false;
+    applyProviderUi(providerConfigState.activeProvider);
+    updateProviderSummaryUi();
+    setProviderStatus(statusMessage || "Provider config saved");
+    return data;
+  }
+
   async function loadProviderUi() {
     try {
       const c = directRealtimeCfg();
@@ -1479,6 +1505,7 @@ function loadInstructionsTargetIntoInputs() {
       populateProviderActiveOptions();
       if (providerActiveEl) providerActiveEl.value = active;
       applyProviderUi(active);
+      providerConfigDirty = false;
       setProviderStatus("Provider config loaded");
     } catch (e) {
       setProviderStatus(`Provider config load failed: ${e?.message || e}`);
@@ -3685,6 +3712,15 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
       const playbackReady = await ensurePlayback();
       if (!playbackReady) throw new Error("Headphones output is required for Direct Realtime.");
 
+      if (providerConfigDirty) {
+        push("Provider config changed; saving before Start...");
+        try {
+          await saveProviderConfigFromUi("Provider config auto-saved before Start");
+        } catch (e) {
+          throw new Error(`Provider config auto-save failed: ${e?.message || e}`);
+        }
+      }
+
       desiredConnected = true;
       clearReconnectTimers();
       if (!rtWs || (rtWs.readyState !== WebSocket.OPEN && rtWs.readyState !== WebSocket.CONNECTING)) {
@@ -3986,14 +4022,27 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
 
       applyProviderUi(getSelectedProviderId());
       updateProviderSummaryUi();
-      setProviderStatus("Provider changed. Save provider to persist.");
+      markProviderConfigDirty("Provider changed. It will be saved automatically before Start.");
     });
   }
 
-  for (const el of [providerModelEl, providerVoiceEl, providerOutgoingLanguageEl]) {
+  for (const el of [
+    providerRegionEl,
+    providerEndpointEl,
+    providerApiVersionEl,
+    providerModelEl,
+    providerVoiceEl,
+    providerIncomingLanguageEl,
+    providerOutgoingLanguageEl,
+    providerApiKeyEl,
+  ]) {
     if (!el) continue;
-    el.addEventListener("change", updateProviderSummaryUi);
-    el.addEventListener("input", updateProviderSummaryUi);
+    const markChanged = () => {
+      updateProviderSummaryUi();
+      markProviderConfigDirty("Provider settings changed. They will be saved automatically before Start.");
+    };
+    el.addEventListener("change", markChanged);
+    el.addEventListener("input", markChanged);
   }
 
   if (btnProviderSave) {
@@ -4004,18 +4053,7 @@ loadLocaleCatalogs().then(() => applyLocale()).catch(() => {});
       }
 
       try {
-        const c = directRealtimeCfg();
-        const payload = buildProviderConfigFromUi();
-        const res = await fetch(`${c.REALTIME_HTTP}/v1/provider/config`, {
-          method: "POST",
-          headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        providerConfigState = await res.json();
-        applyProviderUi(providerConfigState.activeProvider);
-        setProviderStatus("Provider config saved");
+        await saveProviderConfigFromUi("Provider config saved");
       } catch (e) {
         setProviderStatus(`Provider save failed: ${e?.message || e}`);
       }
